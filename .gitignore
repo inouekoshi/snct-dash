@@ -1,18 +1,17 @@
 # Dependencies
-kosendash/node_modules/
+node_modules/
 
 # Next.js build output
-kosendash/.next/
-kosendash/out/
+.next/
+out/
 
 # Environment variables (never commit real secrets)
-kosendash/.env
-kosendash/.env.local
-kosendash/.env.production
+.env
+.env.local
+.env.production
 
 # Vercel
-kosendash/.vercel/
-kosendash/.env.local
+.vercel/
 
 # OS
 .DS_Store
