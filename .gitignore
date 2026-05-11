@@ -1,0 +1,22 @@
+# Dependencies
+kosendash/node_modules/
+
+# Next.js build output
+kosendash/.next/
+kosendash/out/
+
+# Environment variables (never commit real secrets)
+kosendash/.env
+kosendash/.env.local
+kosendash/.env.production
+
+# Vercel
+kosendash/.vercel/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
