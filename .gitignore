@@ -12,6 +12,7 @@ kosendash/.env.production
 
 # Vercel
 kosendash/.vercel/
+kosendash/.env.local
 
 # OS
 .DS_Store
