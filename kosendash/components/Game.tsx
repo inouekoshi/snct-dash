@@ -79,6 +79,11 @@ export default function Game({ nickname, onGameOver }: GameProps) {
           <p>⌨ ↓ ：スライディング</p>
           <p>📱 タップ：ジャンプ　スワイプ下：スライディング</p>
         </div>
+        <div className="bg-gray-800 rounded-xl px-4 py-3 text-sm space-y-1 w-full max-w-xs border border-gray-700">
+          <p className="text-cyan-400 font-bold">🛡 シールドシステム</p>
+          <p className="text-gray-300">1回まで障害物に当たっても大丈夫！</p>
+          <p className="text-gray-400">💎 シールドアイテムで回復できます</p>
+        </div>
         <button
           onClick={() => setStarted(true)}
           className="px-10 py-5 bg-yellow-400 hover:bg-yellow-300 text-gray-950 font-black text-2xl rounded-2xl transition-colors active:scale-95"

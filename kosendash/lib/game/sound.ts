@@ -44,3 +44,14 @@ export function playAreaChange() {
   setTimeout(() => playTone(550, 0.05, 'sine', 0.1), 80)
   setTimeout(() => playTone(660, 0.1, 'sine', 0.1), 160)
 }
+
+export function playHurt() {
+  playTone(200, 0.08, 'square', 0.25)
+  setTimeout(() => playTone(150, 0.12, 'square', 0.2), 80)
+}
+
+export function playShieldGet() {
+  playTone(550, 0.06, 'sine', 0.12)
+  setTimeout(() => playTone(700, 0.06, 'sine', 0.12), 70)
+  setTimeout(() => playTone(880, 0.1, 'sine', 0.12), 140)
+}
