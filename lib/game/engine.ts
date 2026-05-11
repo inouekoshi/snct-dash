@@ -1,37 +1,8 @@
 import { AREAS, type AreaId } from './areas'
 import { playJump, playCoin, playGameOver, playAreaChange, playHurt, playShieldGet } from './sound'
 import type { GameResult } from '@/lib/types'
-
-// ── Constants ─────────────────────────────────────────────────────────────────
-const GROUND_Y = 220
-const CANVAS_W = 800
-const CANVAS_H = 280
-const PLAYER_X = 110
-const GRAVITY = 0.65
-const JUMP_VY = -13.5
-const AREA_DURATION = 40 * 60 // 40 seconds × 60 fps
-
-// Speed per area (increases significantly each stage)
-const AREA_SPEEDS: Record<number, number> = { 1: 5, 2: 7.5, 3: 10.5, 4: 13.5, 5: 17 }
-
-// [minFrames, randFrames] between obstacle spawns
-const SPAWN_GAPS: [number, number][] = [
-  [0, 0], [110, 60], [85, 50], [65, 40], [50, 32], [36, 26],
-]
-
-// ── Types ─────────────────────────────────────────────────────────────────────
-type PlayerState = 'running' | 'jumping' | 'sliding' | 'dead'
-
-interface Obstacle {
-  x: number; y: number; w: number; h: number
-  type: 'low' | 'high'
-  shape: 'gear' | 'beam' | 'circuit' | 'bug' | 'server' | 'bacteria' | 'tube' | 'crystal'
-  moving: boolean; phase: number; baseY: number; amplitude: number
-}
-
-interface Coin   { x: number; y: number; collected: boolean; wobble: number }
-interface ShieldDrop { x: number; y: number; wobble: number }
-interface Particle { x: number; y: number; vx: number; vy: number; life: number; maxLife: number; color: string; size: number }
+import { GROUND_Y, CANVAS_W, CANVAS_H, PLAYER_X, GRAVITY, JUMP_VY, AREA_DURATION, AREA_SPEEDS, SPAWN_GAPS } from './constants'
+import type { PlayerState, Obstacle, Coin, ShieldDrop, Particle } from './engine-types'
 
 // ── Engine ────────────────────────────────────────────────────────────────────
 export class GameEngine {

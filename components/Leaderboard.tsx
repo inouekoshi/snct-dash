@@ -18,12 +18,22 @@ export default function Leaderboard() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    setLoading(true)
+    let ignore = false
     fetchScores(filter).then((data) => {
-      setScores(data)
-      setLoading(false)
+      if (!ignore) {
+        setScores(data)
+        setLoading(false)
+      }
     })
+    return () => { ignore = true }
   }, [filter])
+
+  const handleFilterChange = (f: LeaderboardFilter) => {
+    if (f !== filter) {
+      setLoading(true)
+      setFilter(f)
+    }
+  }
 
   return (
     <div className="w-full max-w-md space-y-4 pb-24">
@@ -31,7 +41,7 @@ export default function Leaderboard() {
         {(['all', 'today'] as const).map((f) => (
           <button
             key={f}
-            onClick={() => setFilter(f)}
+            onClick={() => handleFilterChange(f)}
             className={`flex-1 py-2 rounded-xl font-bold text-sm transition-colors ${
               filter === f
                 ? 'bg-yellow-400 text-gray-950'
