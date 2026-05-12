@@ -2,7 +2,7 @@ export type PlayerState = 'running' | 'jumping' | 'dead'
 
 export interface Obstacle {
   x: number; y: number; w: number; h: number
-  shape: 'gear' | 'circuit' | 'bug' | 'bacteria' | 'crystal'
+  shape: 'gear' | 'bolt' | 'piston' | 'circuit' | 'coil' | 'capacitor' | 'bug' | 'monitor' | 'chip' | 'bacteria' | 'flask' | 'mushroom' | 'crystal' | 'ingot' | 'lattice'
   moving: boolean; phase: number; baseY: number; amplitude: number
 }
 
