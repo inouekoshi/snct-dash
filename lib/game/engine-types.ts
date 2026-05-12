@@ -1,9 +1,8 @@
-export type PlayerState = 'running' | 'jumping' | 'sliding' | 'dead'
+export type PlayerState = 'running' | 'jumping' | 'dead'
 
 export interface Obstacle {
   x: number; y: number; w: number; h: number
-  type: 'low' | 'high'
-  shape: 'gear' | 'beam' | 'circuit' | 'bug' | 'server' | 'bacteria' | 'tube' | 'crystal'
+  shape: 'gear' | 'circuit' | 'bug' | 'bacteria' | 'crystal'
   moving: boolean; phase: number; baseY: number; amplitude: number
 }
 

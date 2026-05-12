@@ -16,7 +16,6 @@ export class GameEngine {
   private pvy = 0             // vertical velocity
   private pState: PlayerState = 'running'
   private jumpCount = 0
-  private slideTimer = 0
   private legPhase = 0
   private shield = true       // 2-hit protection
   private invincible = 0      // frames of invincibility after hit
@@ -57,7 +56,6 @@ export class GameEngine {
 
   jump() {
     if (this.isOver) return
-    if (this.pState === 'sliding') { this.pState = 'running'; this.slideTimer = 0; return }
     if (this.jumpCount < 2) {
       this.pvy = this.jumpCount === 1 ? JUMP_VY * 0.82 : JUMP_VY
       this.pState = 'jumping'
@@ -65,11 +63,6 @@ export class GameEngine {
       playJump()
       this.burst(PLAYER_X, this.py, '#ffffff', 4)
     }
-  }
-
-  slide() {
-    if (this.isOver || this.pState === 'jumping') return
-    this.pState = 'sliding'; this.slideTimer = 55
   }
 
   start() { this.raf = requestAnimationFrame(() => this.loop()) }
@@ -94,12 +87,11 @@ export class GameEngine {
     this.speed = AREA_SPEEDS[this.area]
 
     // Player physics
-    if (this.pState !== 'sliding') { this.pvy += GRAVITY; this.py += this.pvy }
+    this.pvy += GRAVITY; this.py += this.pvy
     if (this.py >= GROUND_Y) {
       this.py = GROUND_Y; this.pvy = 0; this.jumpCount = 0
       if (this.pState === 'jumping') this.pState = 'running'
     }
-    if (this.pState === 'sliding' && --this.slideTimer <= 0) this.pState = 'running'
     if (this.pState === 'running') this.legPhase += 0.25
     if (this.invincible > 0) this.invincible--
 
@@ -167,7 +159,7 @@ export class GameEngine {
   }
 
   // ── Spawn helpers ─────────────────────────────────────────────────────────────
-  private mk(o: Pick<Obstacle,'x'|'y'|'w'|'h'|'type'|'shape'> & Partial<Pick<Obstacle,'moving'|'phase'|'baseY'|'amplitude'>>) {
+  private mk(o: Pick<Obstacle,'x'|'y'|'w'|'h'|'shape'> & Partial<Pick<Obstacle,'moving'|'phase'|'baseY'|'amplitude'>>) {
     this.obstacles.push({ moving: false, phase: 0, baseY: o.y, amplitude: 0, ...o })
   }
 
@@ -180,88 +172,73 @@ export class GameEngine {
     else this.spawnA5()
   }
 
-  // Area 1 機械工学科: simple gears, 80% low / 20% high beam
+  // Area 1 機械工学科: gears — height / width variation
   private spawnA1() {
-    if (Math.random() < 0.2) {
-      this.mk({ x: CANVAS_W+10, y: GROUND_Y-90, w: 32, h: 75, type: 'high', shape: 'beam' })
-    } else {
-      const h = 34 + Math.random() * 22
-      this.mk({ x: CANVAS_W+10, y: GROUND_Y-h, w: 28+Math.random()*14, h, type: 'low', shape: 'gear' })
-    }
+    const h = 30 + Math.random() * 32
+    this.mk({ x: CANVAS_W+10, y: GROUND_Y-h, w: 28+Math.random()*18, h, shape: 'gear' })
   }
 
-  // Area 2 電気電子工学科: more highs, low+high combos
+  // Area 2 電気電子工学科: circuits — singles and close pairs
   private spawnA2() {
-    const r = Math.random()
-    if (r < 0.38) {
-      this.mk({ x: CANVAS_W+10, y: GROUND_Y-118, w: 26, h: 88, type: 'high', shape: 'beam' })
-    } else if (r < 0.60) {
-      // low then high combo (jump then immediately slide)
-      this.mk({ x: CANVAS_W+10, y: GROUND_Y-44, w: 28, h: 44, type: 'low', shape: 'circuit' })
-      this.mk({ x: CANVAS_W+90, y: GROUND_Y-112, w: 26, h: 80, type: 'high', shape: 'beam' })
+    if (Math.random() < 0.38) {
+      const h1 = 35 + Math.random() * 22, h2 = 30 + Math.random() * 22
+      this.mk({ x: CANVAS_W+10, y: GROUND_Y-h1, w: 28, h: h1, shape: 'circuit' })
+      this.mk({ x: CANVAS_W+72, y: GROUND_Y-h2, w: 26, h: h2, shape: 'circuit' })
     } else {
-      const h = 38 + Math.random() * 22
-      this.mk({ x: CANVAS_W+10, y: GROUND_Y-h, w: 30+Math.random()*12, h, type: 'low', shape: 'circuit' })
+      const h = 36 + Math.random() * 28
+      this.mk({ x: CANVAS_W+10, y: GROUND_Y-h, w: 30+Math.random()*14, h, shape: 'circuit' })
     }
   }
 
-  // Area 3 電子情報工学科: hopping bug enemies, server racks
+  // Area 3 電子情報工学科: bugs — hopping ones mixed with static
   private spawnA3() {
     const r = Math.random()
-    if (r < 0.42) {
-      // Bug that hops up and down (player must jump when low, slide when high)
+    if (r < 0.55) {
       const baseY = GROUND_Y - 32
-      this.mk({ x: CANVAS_W+10, y: baseY, w: 30, h: 30, type: 'low', shape: 'bug', moving: true, phase: Math.random()*Math.PI*2, baseY, amplitude: 52 })
-    } else if (r < 0.68) {
-      this.mk({ x: CANVAS_W+10, y: GROUND_Y-120, w: 28, h: 88, type: 'high', shape: 'server' })
+      this.mk({ x: CANVAS_W+10, y: baseY, w: 30, h: 30, shape: 'bug', moving: true, phase: Math.random()*Math.PI*2, baseY, amplitude: 52 })
     } else {
-      const h = 38 + Math.random() * 22
-      this.mk({ x: CANVAS_W+10, y: GROUND_Y-h, w: 32, h, type: 'low', shape: 'bug' })
+      const h = 36 + Math.random() * 26
+      this.mk({ x: CANVAS_W+10, y: GROUND_Y-h, w: 32, h, shape: 'bug' })
     }
   }
 
-  // Area 4 生物応用化学科: wide bacteria blobs, clusters, test tubes
+  // Area 4 生物応用化学科: bacteria blobs and clusters
   private spawnA4() {
     const r = Math.random()
-    if (r < 0.25) {
-      this.mk({ x: CANVAS_W+10, y: GROUND_Y-120, w: 26, h: 90, type: 'high', shape: 'tube' })
-    } else if (r < 0.48) {
-      // Bacteria cluster 2-3
+    if (r < 0.38) {
       const n = Math.random() < 0.5 ? 2 : 3
       for (let i = 0; i < n; i++) {
-        const h = 35 + Math.random() * 18
-        this.mk({ x: CANVAS_W+10+i*42, y: GROUND_Y-h, w: 24+Math.random()*10, h, type: 'low', shape: 'bacteria' })
+        const h = 35 + Math.random() * 20
+        this.mk({ x: CANVAS_W+10+i*44, y: GROUND_Y-h, w: 24+Math.random()*12, h, shape: 'bacteria' })
       }
-    } else if (r < 0.72) {
-      // Wide blob
-      const h = 48 + Math.random() * 24
-      this.mk({ x: CANVAS_W+10, y: GROUND_Y-h, w: 50+Math.random()*16, h, type: 'low', shape: 'bacteria' })
+    } else if (r < 0.68) {
+      const h = 45 + Math.random() * 30
+      this.mk({ x: CANVAS_W+10, y: GROUND_Y-h, w: 52+Math.random()*20, h, shape: 'bacteria' })
     } else {
-      // Combo blob + tube
-      this.mk({ x: CANVAS_W+10, y: GROUND_Y-46, w: 32, h: 46, type: 'low', shape: 'bacteria' })
-      this.mk({ x: CANVAS_W+92, y: GROUND_Y-115, w: 25, h: 85, type: 'high', shape: 'tube' })
+      const h1 = 40+Math.random()*22, h2 = 32+Math.random()*22
+      this.mk({ x: CANVAS_W+10, y: GROUND_Y-h1, w: 28, h: h1, shape: 'bacteria' })
+      this.mk({ x: CANVAS_W+76, y: GROUND_Y-h2, w: 26, h: h2, shape: 'bacteria' })
     }
   }
 
-  // Area 5 材料工学科: crystal spikes, stalactites, dense combos
+  // Area 5 材料工学科: crystal spikes — tall singles and dense multi-clusters
   private spawnA5() {
     const r = Math.random()
-    if (r < 0.22) {
-      const h = 55 + Math.random() * 32
-      this.mk({ x: CANVAS_W+10, y: GROUND_Y-h, w: 26+Math.random()*10, h, type: 'low', shape: 'crystal' })
-    } else if (r < 0.42) {
-      this.mk({ x: CANVAS_W+10, y: GROUND_Y-130, w: 24, h: 100, type: 'high', shape: 'crystal' })
-    } else if (r < 0.60) {
-      const h1 = 50+Math.random()*22, h2 = 42+Math.random()*22
-      this.mk({ x: CANVAS_W+10, y: GROUND_Y-h1, w: 24, h: h1, type: 'low', shape: 'crystal' })
-      this.mk({ x: CANVAS_W+58, y: GROUND_Y-h2, w: 22, h: h2, type: 'low', shape: 'crystal' })
+    if (r < 0.28) {
+      const h = 52 + Math.random() * 38
+      this.mk({ x: CANVAS_W+10, y: GROUND_Y-h, w: 26+Math.random()*12, h, shape: 'crystal' })
+    } else if (r < 0.55) {
+      const h1 = 48+Math.random()*28, h2 = 42+Math.random()*28
+      this.mk({ x: CANVAS_W+10, y: GROUND_Y-h1, w: 24, h: h1, shape: 'crystal' })
+      this.mk({ x: CANVAS_W+58, y: GROUND_Y-h2, w: 22, h: h2, shape: 'crystal' })
     } else if (r < 0.78) {
-      this.mk({ x: CANVAS_W+10, y: GROUND_Y-52, w: 26, h: 52, type: 'low', shape: 'crystal' })
-      this.mk({ x: CANVAS_W+82, y: GROUND_Y-125, w: 24, h: 95, type: 'high', shape: 'crystal' })
+      const h1 = 44+Math.random()*28, h2 = 56+Math.random()*28
+      this.mk({ x: CANVAS_W+10, y: GROUND_Y-h1, w: 24, h: h1, shape: 'crystal' })
+      this.mk({ x: CANVAS_W+70, y: GROUND_Y-h2, w: 24, h: h2, shape: 'crystal' })
     } else {
       for (let i = 0; i < 3; i++) {
-        const h = 40 + Math.random() * 28 * (i+1)/3
-        this.mk({ x: CANVAS_W+10+i*36, y: GROUND_Y-h, w: 20, h, type: 'low', shape: 'crystal' })
+        const h = 38 + Math.random() * 32 * (i+1)/3
+        this.mk({ x: CANVAS_W+10+i*36, y: GROUND_Y-h, w: 20, h, shape: 'crystal' })
       }
     }
   }
@@ -279,9 +256,7 @@ export class GameEngine {
 
   // ── Collision ─────────────────────────────────────────────────────────────────
   private hitbox() {
-    return this.pState === 'sliding'
-      ? { x: PLAYER_X-14, y: GROUND_Y-22, w: 28, h: 22 }
-      : { x: PLAYER_X-12, y: this.py-46,  w: 24, h: 46 }
+    return { x: PLAYER_X-12, y: this.py-46, w: 24, h: 46 }
   }
 
   private overlaps(a: {x:number;y:number;w:number;h:number}, b: {x:number;y:number;w:number;h:number}) {
@@ -476,7 +451,6 @@ export class GameEngine {
   // ── Player ────────────────────────────────────────────────────────────────────
   private drawPlayer(ctx: CanvasRenderingContext2D, accent: string) {
     const x = PLAYER_X, y = this.py
-    const sliding = this.pState === 'sliding'
     const blink = this.invincible > 0 && Math.floor(this.invincible/4) % 2 === 1
 
     if (blink) ctx.globalAlpha = 0.35
@@ -486,56 +460,48 @@ export class GameEngine {
       ctx.translate(x, y-23); ctx.rotate(Math.min(this.deathTimer*0.08, Math.PI*0.55)); ctx.translate(-x, -(y-23))
     }
 
-    if (sliding) {
-      ctx.fillStyle = '#3366dd'
-      this.rrect(ctx, x-20, GROUND_Y-22, 40, 22, 5); ctx.fill()
-      ctx.strokeStyle = '#6699ff'; ctx.lineWidth = 2
-      this.rrect(ctx, x-20, GROUND_Y-22, 40, 22, 5); ctx.stroke()
-      ctx.fillStyle = '#88aaff33'; this.rrect(ctx, x+2, GROUND_Y-19, 14, 10, 3); ctx.fill()
-    } else {
-      // Shadow
-      ctx.fillStyle = 'rgba(0,0,0,0.22)'
-      ctx.beginPath(); ctx.ellipse(x, GROUND_Y+3, 13, 4, 0, 0, Math.PI*2); ctx.fill()
+    // Shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.22)'
+    ctx.beginPath(); ctx.ellipse(x, GROUND_Y+3, 13, 4, 0, 0, Math.PI*2); ctx.fill()
 
-      // Legs
-      const lp = this.pState === 'jumping' ? 0 : this.legPhase
-      ctx.strokeStyle = '#2255bb'; ctx.lineWidth = 5; ctx.lineCap = 'round'
-      ctx.beginPath(); ctx.moveTo(x-5,y-12); ctx.lineTo(x-7+Math.sin(lp)*10, y+2); ctx.stroke()
-      ctx.beginPath(); ctx.moveTo(x+5,y-12); ctx.lineTo(x+7-Math.sin(lp)*10, y+2); ctx.stroke()
+    // Legs
+    const lp = this.pState === 'jumping' ? 0 : this.legPhase
+    ctx.strokeStyle = '#2255bb'; ctx.lineWidth = 5; ctx.lineCap = 'round'
+    ctx.beginPath(); ctx.moveTo(x-5,y-12); ctx.lineTo(x-7+Math.sin(lp)*10, y+2); ctx.stroke()
+    ctx.beginPath(); ctx.moveTo(x+5,y-12); ctx.lineTo(x+7-Math.sin(lp)*10, y+2); ctx.stroke()
 
-      // Body
-      ctx.fillStyle = '#3366dd'
-      this.rrect(ctx, x-13, y-40, 26, 28, 5); ctx.fill()
-      ctx.strokeStyle = '#6699ff'; ctx.lineWidth = 2
-      this.rrect(ctx, x-13, y-40, 26, 28, 5); ctx.stroke()
+    // Body
+    ctx.fillStyle = '#3366dd'
+    this.rrect(ctx, x-13, y-40, 26, 28, 5); ctx.fill()
+    ctx.strokeStyle = '#6699ff'; ctx.lineWidth = 2
+    this.rrect(ctx, x-13, y-40, 26, 28, 5); ctx.stroke()
 
-      // Chest patch
-      ctx.fillStyle = accent; ctx.globalAlpha = blink ? 0.25 : 0.65
-      this.rrect(ctx, x-6, y-36, 12, 8, 3); ctx.fill()
+    // Chest patch
+    ctx.fillStyle = accent; ctx.globalAlpha = blink ? 0.25 : 0.65
+    this.rrect(ctx, x-6, y-36, 12, 8, 3); ctx.fill()
+    ctx.globalAlpha = blink ? 0.35 : 1
+
+    // Arms
+    ctx.strokeStyle = '#3366dd'; ctx.lineWidth = 4; ctx.lineCap = 'round'
+    const ap = this.legPhase
+    ctx.beginPath(); ctx.moveTo(x-13,y-33); ctx.lineTo(x-21, y-33+Math.sin(ap)*7); ctx.stroke()
+    ctx.beginPath(); ctx.moveTo(x+13,y-33); ctx.lineTo(x+21, y-33-Math.sin(ap)*7); ctx.stroke()
+
+    // Head
+    ctx.fillStyle = '#4488ff'
+    ctx.beginPath(); ctx.arc(x, y-50, 12, 0, Math.PI*2); ctx.fill()
+    ctx.strokeStyle = '#88bbff'; ctx.lineWidth = 2; ctx.stroke()
+
+    // Eyes
+    ctx.fillStyle = '#fff'; ctx.fillRect(x-9, y-57, 6, 8); ctx.fillRect(x+3, y-57, 6, 8)
+    ctx.fillStyle = '#001133'; ctx.fillRect(x-7, y-55, 3, 5); ctx.fillRect(x+5, y-55, 3, 5)
+
+    // Shield aura
+    if (this.shield) {
+      ctx.strokeStyle = '#00ffff'; ctx.lineWidth = 1.5
+      ctx.globalAlpha = 0.35 + Math.sin(this.frame*0.1)*0.1
+      ctx.beginPath(); ctx.ellipse(x, y-25, 20, 33, 0, 0, Math.PI*2); ctx.stroke()
       ctx.globalAlpha = blink ? 0.35 : 1
-
-      // Arms
-      ctx.strokeStyle = '#3366dd'; ctx.lineWidth = 4; ctx.lineCap = 'round'
-      const ap = this.legPhase
-      ctx.beginPath(); ctx.moveTo(x-13,y-33); ctx.lineTo(x-21, y-33+Math.sin(ap)*7); ctx.stroke()
-      ctx.beginPath(); ctx.moveTo(x+13,y-33); ctx.lineTo(x+21, y-33-Math.sin(ap)*7); ctx.stroke()
-
-      // Head
-      ctx.fillStyle = '#4488ff'
-      ctx.beginPath(); ctx.arc(x, y-50, 12, 0, Math.PI*2); ctx.fill()
-      ctx.strokeStyle = '#88bbff'; ctx.lineWidth = 2; ctx.stroke()
-
-      // Eyes
-      ctx.fillStyle = '#fff'; ctx.fillRect(x-9, y-57, 6, 8); ctx.fillRect(x+3, y-57, 6, 8)
-      ctx.fillStyle = '#001133'; ctx.fillRect(x-7, y-55, 3, 5); ctx.fillRect(x+5, y-55, 3, 5)
-
-      // Shield aura
-      if (this.shield) {
-        ctx.strokeStyle = '#00ffff'; ctx.lineWidth = 1.5
-        ctx.globalAlpha = 0.35 + Math.sin(this.frame*0.1)*0.1
-        ctx.beginPath(); ctx.ellipse(x, y-25, 20, 33, 0, 0, Math.PI*2); ctx.stroke()
-        ctx.globalAlpha = blink ? 0.35 : 1
-      }
     }
 
     ctx.restore()
@@ -549,12 +515,9 @@ export class GameEngine {
     ctx.shadowColor = theme.obstacleStroke; ctx.shadowBlur = 6
 
     if      (o.shape === 'gear')     this.dGear(ctx, o, theme)
-    else if (o.shape === 'beam')     this.dBeam(ctx, o, theme)
     else if (o.shape === 'circuit')  this.dCircuit(ctx, o, theme)
     else if (o.shape === 'bug')      this.dBug(ctx, o)
-    else if (o.shape === 'server')   this.dServer(ctx, o, theme)
     else if (o.shape === 'bacteria') this.dBacteria(ctx, o, theme)
-    else if (o.shape === 'tube')     this.dTube(ctx, o, theme)
     else if (o.shape === 'crystal')  this.dCrystal(ctx, o)
 
     ctx.restore()
@@ -565,15 +528,6 @@ export class GameEngine {
     this.rrect(ctx, o.x, o.y, o.w, o.h, 3); ctx.stroke()
     for (let tx = o.x+3; tx < o.x+o.w-3; tx += 10) { ctx.fillRect(tx, o.y-6, 5, 6) }
     ctx.beginPath(); ctx.arc(o.x+o.w/2, o.y+o.h/2, o.w/4, 0, Math.PI*2); ctx.strokeStyle = theme.obstacleStroke; ctx.stroke()
-  }
-
-  private dBeam(ctx: CanvasRenderingContext2D, o: Obstacle, theme: typeof AREAS[AreaId]) {
-    ctx.fillRect(o.x, 0, o.w, o.y+o.h); ctx.strokeRect(o.x, 0, o.w, o.y+o.h)
-    ctx.strokeStyle = theme.obstacleStroke+'55'; ctx.lineWidth = 1.5
-    for (let sy = 5; sy < o.y+o.h; sy += 12) { ctx.beginPath(); ctx.moveTo(o.x,sy); ctx.lineTo(o.x+o.w,sy); ctx.stroke() }
-    const bx = o.x+o.w/2, by = o.y+o.h+4
-    ctx.strokeStyle = theme.obstacleStroke; ctx.lineWidth = 2
-    ctx.beginPath(); ctx.moveTo(bx+4,by); ctx.lineTo(bx-2,by+7); ctx.lineTo(bx+3,by+7); ctx.lineTo(bx-4,by+14); ctx.stroke()
   }
 
   private dCircuit(ctx: CanvasRenderingContext2D, o: Obstacle, theme: typeof AREAS[AreaId]) {
@@ -602,18 +556,6 @@ export class GameEngine {
     ctx.beginPath(); ctx.moveTo(ex2-es,ey-es); ctx.lineTo(ex2+es,ey+es); ctx.moveTo(ex2+es,ey-es); ctx.lineTo(ex2-es,ey+es); ctx.stroke()
   }
 
-  private dServer(ctx: CanvasRenderingContext2D, o: Obstacle, theme: typeof AREAS[AreaId]) {
-    ctx.fillRect(o.x, 0, o.w, o.y+o.h); ctx.strokeRect(o.x, 0, o.w, o.y+o.h)
-    ctx.strokeStyle = theme.obstacleStroke+'44'; ctx.lineWidth = 1
-    for (let sy = 8; sy < o.y+o.h; sy += 16) {
-      ctx.strokeRect(o.x+2, sy, o.w-4, 12)
-      ctx.fillStyle = Math.floor(this.frame/15)%2 ? '#00ff00' : '#005500'
-      ctx.beginPath(); ctx.arc(o.x+6, sy+6, 2, 0, Math.PI*2); ctx.fill()
-      ctx.fillStyle = theme.obstacleColor
-    }
-    ctx.strokeStyle = theme.obstacleStroke; ctx.lineWidth = 2; ctx.strokeRect(o.x, 0, o.w, o.y+o.h)
-  }
-
   private dBacteria(ctx: CanvasRenderingContext2D, o: Obstacle, theme: typeof AREAS[AreaId]) {
     const cx = o.x+o.w/2, cy = o.y+o.h/2, rx = o.w/2, ry = o.h/2
     const wb = Math.sin(this.frame*0.08)*2.5
@@ -625,26 +567,10 @@ export class GameEngine {
     }
   }
 
-  private dTube(ctx: CanvasRenderingContext2D, o: Obstacle, theme: typeof AREAS[AreaId]) {
-    ctx.fillRect(o.x, 0, o.w, o.y+o.h*0.7)
-    ctx.beginPath(); ctx.rect(o.x, o.y+o.h*0.5, o.w, o.h*0.4); ctx.arc(o.x+o.w/2, o.y+o.h, o.w/2, 0, Math.PI); ctx.fill()
-    ctx.strokeStyle = theme.obstacleStroke; ctx.lineWidth = 2
-    ctx.beginPath(); ctx.moveTo(o.x,0); ctx.lineTo(o.x,o.y+o.h); ctx.arc(o.x+o.w/2,o.y+o.h,o.w/2,Math.PI,0); ctx.lineTo(o.x+o.w,0); ctx.stroke()
-    ctx.fillStyle = theme.groundLineColor+'55'
-    ctx.fillRect(o.x+3, o.y+o.h*0.28, o.w-6, o.h*0.55)
-    ctx.fillStyle = theme.groundLineColor+'33'
-    for (let i=0;i<3;i++) { const by=o.y+o.h*0.5+Math.sin(this.frame*0.08+i)*9; ctx.beginPath(); ctx.arc(o.x+5+i*(o.w-10)/3, by, 3, 0, Math.PI*2); ctx.fill() }
-  }
-
   private dCrystal(ctx: CanvasRenderingContext2D, o: Obstacle) {
     const cx = o.x+o.w/2
     ctx.beginPath()
-    if (o.type === 'high') {
-      ctx.fillRect(o.x, 0, o.w, o.y+8)
-      ctx.moveTo(o.x, o.y); ctx.lineTo(o.x+o.w, o.y); ctx.lineTo(cx+o.w*0.14, o.y+o.h); ctx.lineTo(cx, o.y+o.h+10); ctx.lineTo(cx-o.w*0.14, o.y+o.h); ctx.closePath()
-    } else {
-      ctx.moveTo(cx, o.y); ctx.lineTo(cx+o.w*0.18, o.y+o.h*0.38); ctx.lineTo(o.x+o.w, o.y+o.h); ctx.lineTo(o.x, o.y+o.h); ctx.lineTo(cx-o.w*0.18, o.y+o.h*0.38); ctx.closePath()
-    }
+    ctx.moveTo(cx, o.y); ctx.lineTo(cx+o.w*0.18, o.y+o.h*0.38); ctx.lineTo(o.x+o.w, o.y+o.h); ctx.lineTo(o.x, o.y+o.h); ctx.lineTo(cx-o.w*0.18, o.y+o.h*0.38); ctx.closePath()
     ctx.fill(); ctx.stroke()
     ctx.lineWidth = 1; ctx.globalAlpha = 0.5
     ctx.beginPath(); ctx.moveTo(cx, o.y); ctx.lineTo(cx+o.w*0.08, o.y+o.h*0.55); ctx.stroke()

@@ -13,14 +13,9 @@ export default function Game({ nickname, onGameOver }: GameProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const engineRef = useRef<GameEngine | null>(null)
   const [started, setStarted] = useState(false)
-  const touchStartY = useRef(0)
 
   const handleJump = useCallback(() => {
     engineRef.current?.jump()
-  }, [])
-
-  const handleSlide = useCallback(() => {
-    engineRef.current?.slide()
   }, [])
 
   useEffect(() => {
@@ -36,36 +31,19 @@ export default function Game({ nickname, onGameOver }: GameProps) {
         e.preventDefault()
         handleJump()
       }
-      if (e.code === 'ArrowDown') {
-        e.preventDefault()
-        handleSlide()
-      }
     }
 
-    const onTouchStart = (e: TouchEvent) => {
-      touchStartY.current = e.touches[0].clientY
-    }
-
-    const onTouchEnd = (e: TouchEvent) => {
-      const dy = e.changedTouches[0].clientY - touchStartY.current
-      if (dy > 40) {
-        handleSlide()
-      } else {
-        handleJump()
-      }
-    }
+    const onTouchEnd = () => handleJump()
 
     window.addEventListener('keydown', onKeyDown)
-    canvas.addEventListener('touchstart', onTouchStart, { passive: true })
     canvas.addEventListener('touchend', onTouchEnd)
 
     return () => {
       engine.destroy()
       window.removeEventListener('keydown', onKeyDown)
-      canvas.removeEventListener('touchstart', onTouchStart)
       canvas.removeEventListener('touchend', onTouchEnd)
     }
-  }, [started, onGameOver, handleJump, handleSlide])
+  }, [started, onGameOver, handleJump])
 
   if (!started) {
     return (
@@ -76,8 +54,7 @@ export default function Game({ nickname, onGameOver }: GameProps) {
         </div>
         <div className="text-gray-400 text-sm space-y-1">
           <p>⌨ スペース / ↑ ：ジャンプ（二段ジャンプあり）</p>
-          <p>⌨ ↓ ：スライディング</p>
-          <p>📱 タップ：ジャンプ　スワイプ下：スライディング</p>
+          <p>📱 タップ：ジャンプ</p>
         </div>
         <div className="bg-gray-800 rounded-xl px-4 py-3 text-sm space-y-1 w-full max-w-xs border border-gray-700">
           <p className="text-cyan-400 font-bold">🛡 シールドシステム</p>
@@ -102,23 +79,8 @@ export default function Game({ nickname, onGameOver }: GameProps) {
         style={{ imageRendering: 'pixelated' }}
         onClick={handleJump}
       />
-      <div className="flex gap-6 sm:hidden">
-        <button
-          onPointerDown={handleJump}
-          className="flex-1 py-5 bg-blue-600 active:bg-blue-500 text-white font-black text-xl rounded-2xl"
-        >
-          ジャンプ
-        </button>
-        <button
-          onPointerDown={handleSlide}
-          className="flex-1 py-5 bg-gray-700 active:bg-gray-600 text-white font-black text-xl rounded-2xl"
-        >
-          スライド
-        </button>
-      </div>
-      <p className="text-gray-600 text-xs hidden sm:block">
-        スペース / クリック: ジャンプ　↓: スライド
-      </p>
+      <p className="text-gray-600 text-xs sm:hidden">タップでジャンプ（二段ジャンプあり）</p>
+      <p className="text-gray-600 text-xs hidden sm:block">スペース / クリック: ジャンプ（二段ジャンプあり）</p>
     </main>
   )
 }
