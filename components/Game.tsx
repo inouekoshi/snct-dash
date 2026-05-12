@@ -13,11 +13,32 @@ export default function Game({ nickname, onGameOver }: GameProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const engineRef = useRef<GameEngine | null>(null)
   const [started, setStarted] = useState(false)
+  const [isPortrait, setIsPortrait] = useState(false)
 
   const handleJump = useCallback(() => {
     engineRef.current?.jump()
   }, [])
 
+  // 縦向き検出（ゲーム開始後のみ表示）
+  useEffect(() => {
+    if (!started) return
+    const mql = window.matchMedia('(orientation: portrait)')
+    const update = () => setIsPortrait(mql.matches)
+    update()
+    mql.addEventListener('change', update)
+    return () => mql.removeEventListener('change', update)
+  }, [started])
+
+  // 横向き固定（Android Chrome 対応、iOS は警告オーバーレイで対応）
+  useEffect(() => {
+    if (!started) return
+    type ExtOrientation = ScreenOrientation & { lock?: (o: string) => Promise<void> }
+    const ori = screen.orientation as ExtOrientation
+    if (ori?.lock) ori.lock('landscape').catch(() => {})
+    return () => { if (ori?.unlock) ori.unlock() }
+  }, [started])
+
+  // ゲームループ・入力
   useEffect(() => {
     if (!started || !canvasRef.current) return
 
@@ -33,15 +54,19 @@ export default function Game({ nickname, onGameOver }: GameProps) {
       }
     }
 
-    const onTouchEnd = () => handleJump()
+    // touchstart で発火（touchend より ~100ms 早く、二段ジャンプの反応性が向上する）
+    const onTouchStart = (e: TouchEvent) => {
+      e.preventDefault()
+      handleJump()
+    }
 
     window.addEventListener('keydown', onKeyDown)
-    canvas.addEventListener('touchend', onTouchEnd)
+    canvas.addEventListener('touchstart', onTouchStart, { passive: false })
 
     return () => {
       engine.destroy()
       window.removeEventListener('keydown', onKeyDown)
-      canvas.removeEventListener('touchend', onTouchEnd)
+      canvas.removeEventListener('touchstart', onTouchStart)
     }
   }, [started, onGameOver, handleJump])
 
@@ -72,15 +97,28 @@ export default function Game({ nickname, onGameOver }: GameProps) {
   }
 
   return (
-    <main className="flex flex-col items-center justify-center min-h-screen bg-gray-950 gap-4 select-none">
+    <main className="flex flex-col items-center justify-center min-h-screen bg-gray-950 select-none overflow-hidden">
+      {/* 縦向き警告オーバーレイ（iOS など orientation.lock 非対応デバイス向け） */}
+      {isPortrait && (
+        <div className="fixed inset-0 z-50 bg-gray-950 flex flex-col items-center justify-center gap-6">
+          <div
+            className="text-6xl"
+            style={{ display: 'inline-block', transform: 'rotate(90deg)' }}
+          >
+            📱
+          </div>
+          <p className="text-white text-2xl font-black">横向きにしてください</p>
+          <p className="text-gray-400 text-sm">ゲームは横向きでプレイできます</p>
+        </div>
+      )}
       <canvas
         ref={canvasRef}
         className="w-full max-w-3xl rounded-xl border border-gray-800 touch-none"
         style={{ imageRendering: 'pixelated' }}
         onClick={handleJump}
       />
-      <p className="text-gray-600 text-xs sm:hidden">タップでジャンプ（二段ジャンプあり）</p>
-      <p className="text-gray-600 text-xs hidden sm:block">スペース / クリック: ジャンプ（二段ジャンプあり）</p>
+      <p className="text-gray-600 text-xs mt-4 sm:hidden">タップでジャンプ（二段ジャンプあり）</p>
+      <p className="text-gray-600 text-xs mt-4 hidden sm:block">スペース / クリック: ジャンプ（二段ジャンプあり）</p>
     </main>
   )
 }
