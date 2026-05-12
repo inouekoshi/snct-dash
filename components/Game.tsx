@@ -14,9 +14,17 @@ export default function Game({ nickname, onGameOver }: GameProps) {
   const engineRef = useRef<GameEngine | null>(null)
   const [started, setStarted] = useState(false)
   const [isPortrait, setIsPortrait] = useState(false)
+  const [paused, setPaused] = useState(false)
 
   const handleJump = useCallback(() => {
     engineRef.current?.jump()
+  }, [])
+
+  const handlePause = useCallback(() => {
+    const engine = engineRef.current
+    if (!engine) return
+    engine.togglePause()
+    setPaused(p => !p)
   }, [])
 
   // 縦向き検出（ゲーム開始後のみ表示）
@@ -52,6 +60,10 @@ export default function Game({ nickname, onGameOver }: GameProps) {
         e.preventDefault()
         handleJump()
       }
+      if (e.code === 'Escape' || e.code === 'KeyP') {
+        e.preventDefault()
+        handlePause()
+      }
     }
 
     // touchstart で発火（touchend より ~100ms 早く、二段ジャンプの反応性が向上する）
@@ -68,7 +80,7 @@ export default function Game({ nickname, onGameOver }: GameProps) {
       window.removeEventListener('keydown', onKeyDown)
       canvas.removeEventListener('touchstart', onTouchStart)
     }
-  }, [started, onGameOver, handleJump])
+  }, [started, onGameOver, handleJump, handlePause])
 
   if (!started) {
     return (
@@ -111,14 +123,22 @@ export default function Game({ nickname, onGameOver }: GameProps) {
           <p className="text-gray-400 text-sm">ゲームは横向きでプレイできます</p>
         </div>
       )}
-      <canvas
-        ref={canvasRef}
-        className="w-full max-w-3xl rounded-xl border border-gray-800 touch-none"
-        style={{ imageRendering: 'pixelated' }}
-        onClick={handleJump}
-      />
-      <p className="text-gray-600 text-xs mt-4 sm:hidden">タップでジャンプ（二段ジャンプあり）</p>
-      <p className="text-gray-600 text-xs mt-4 hidden sm:block">スペース / クリック: ジャンプ（二段ジャンプあり）</p>
+      <div className="relative w-full max-w-3xl">
+        <canvas
+          ref={canvasRef}
+          className="w-full rounded-xl border border-gray-800 touch-none"
+          style={{ imageRendering: 'pixelated' }}
+          onClick={handleJump}
+        />
+        <button
+          onClick={handlePause}
+          className="absolute top-2 right-2 px-3 py-1.5 bg-black/60 hover:bg-black/80 text-white text-sm font-bold rounded-lg border border-gray-600 transition-colors"
+        >
+          {paused ? '▶ 再開' : '⏸ 一時停止'}
+        </button>
+      </div>
+      <p className="text-gray-600 text-xs mt-4 sm:hidden">タップでジャンプ（二段ジャンプあり）｜⏸ボタンで一時停止</p>
+      <p className="text-gray-600 text-xs mt-4 hidden sm:block">スペース / クリック: ジャンプ（二段ジャンプあり）｜P / Esc: 一時停止</p>
     </main>
   )
 }

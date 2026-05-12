@@ -32,6 +32,7 @@ export class GameEngine {
   private noMiss = true
   private frame = 0
   private isOver = false
+  private isPaused = false
   private deathTimer = 0
   private bgX = 0             // parallax scroll offset
 
@@ -55,7 +56,7 @@ export class GameEngine {
   }
 
   jump() {
-    if (this.isOver) return
+    if (this.isOver || this.isPaused) return
     if (this.jumpCount < 2) {
       this.pvy = this.jumpCount === 1 ? JUMP_VY * 0.82 : JUMP_VY
       this.pState = 'jumping'
@@ -63,6 +64,24 @@ export class GameEngine {
       playJump()
       this.burst(PLAYER_X, this.py, '#ffffff', 4)
     }
+  }
+
+  pause() {
+    if (this.isOver || this.isPaused) return
+    this.isPaused = true
+    cancelAnimationFrame(this.raf)
+    this.renderPauseOverlay()
+  }
+
+  resume() {
+    if (!this.isPaused) return
+    this.isPaused = false
+    this.raf = requestAnimationFrame(() => this.loop())
+  }
+
+  togglePause() {
+    if (this.isPaused) this.resume()
+    else this.pause()
   }
 
   start() { this.raf = requestAnimationFrame(() => this.loop()) }
@@ -359,6 +378,19 @@ export class GameEngine {
       this.drawTransition(ctx, theme)
       this.transAlpha -= 0.02
     }
+  }
+
+  private renderPauseOverlay() {
+    const ctx = this.ctx
+    ctx.fillStyle = 'rgba(0,0,0,0.55)'
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H)
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+    ctx.fillStyle = '#ffffff'
+    ctx.font = 'bold 38px monospace'
+    ctx.fillText('⏸  PAUSE', CANVAS_W / 2, CANVAS_H / 2 - 18)
+    ctx.font = '16px sans-serif'
+    ctx.fillStyle = '#aaaaaa'
+    ctx.fillText('P キー / ポーズボタンで再開', CANVAS_W / 2, CANVAS_H / 2 + 24)
   }
 
   // ── Background per area ────────────────────────────────────────────────────────
