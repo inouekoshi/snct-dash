@@ -132,8 +132,8 @@ this.area = ((this.area % 6) + 1) as AreaId
 ```typescript
 interface Obstacle {
   // ...
-  shape: 'gear' | 'beam' | 'circuit' | 'bug' | 'server' | 'bacteria' | 'tube' | 'crystal' | 'robot'
-  //                                                                                           ↑ 追加
+  shape: 'gear' | 'bolt' | 'piston' | 'circuit' | 'coil' | 'capacitor' | 'bug' | 'monitor' | 'chip' | 'bacteria' | 'flask' | 'mushroom' | 'crystal' | 'ingot' | 'lattice' | 'robot'
+  //                                                                                                                                                                 ↑ 追加
 }
 ```
 
