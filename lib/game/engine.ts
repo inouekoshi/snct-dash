@@ -3,6 +3,12 @@ import { playJump, playCoin, playGameOver, playAreaChange, playHurt, playShieldG
 import type { GameResult } from '@/lib/types'
 import { GROUND_Y, CANVAS_W, CANVAS_H, PLAYER_X, GRAVITY, JUMP_VY, AREA_DURATION, AREA_SPEEDS, SPAWN_GAPS, LAP_SPEED_SCALE, LAP_SPAWN_SCALE, MIN_SPAWN_SCALE, MAX_SPEED_SCALE } from './constants'
 import type { PlayerState, Obstacle, Coin, ShieldDrop, Particle } from './engine-types'
+import { overlaps, hitCircle, playerHitbox } from './helpers'
+import { drawObstacle } from './obstacle-drawers'
+import { drawBg, drawGround, type BgContext } from './background-renderers'
+import { drawPlayer } from './player-renderer'
+import { drawHUD, drawTransition, renderPauseOverlay, drawCoin, drawShieldDrop } from './hud-renderer'
+import { spawnObstacle, spawnCeilingObstacle, spawnCoin } from './spawner'
 
 // ── Engine ────────────────────────────────────────────────────────────────────
 export class GameEngine {
@@ -12,13 +18,13 @@ export class GameEngine {
   private onGameOver: (r: GameResult) => void
 
   // Player
-  private py = GROUND_Y       // y position (bottom of player)
-  private pvy = 0             // vertical velocity
+  private py = GROUND_Y
+  private pvy = 0
   private pState: PlayerState = 'running'
   private jumpCount = 0
   private legPhase = 0
-  private shield = true       // 2-hit protection
-  private invincible = 0      // frames of invincibility after hit
+  private shield = true
+  private invincible = 0
 
   // Game
   private score = 0
@@ -35,7 +41,7 @@ export class GameEngine {
   private lap = 0
   private isPaused = false
   private deathTimer = 0
-  private bgX = 0             // parallax scroll offset
+  private bgX = 0
 
   // Objects
   private obstacles: Obstacle[] = []
@@ -76,7 +82,7 @@ export class GameEngine {
     if (this.isOver || this.isPaused) return
     this.isPaused = true
     cancelAnimationFrame(this.raf)
-    this.renderPauseOverlay()
+    renderPauseOverlay(this.ctx)
   }
 
   resume() {
@@ -139,11 +145,16 @@ export class GameEngine {
     if (++this.areaTimer >= AREA_DURATION) this.nextArea()
 
     // Spawn
-    if (--this.nextObs <= 0)  { this.spawnObstacle(); const [mn, r] = SPAWN_GAPS[this.area]; const spawnScale = Math.max(MIN_SPAWN_SCALE, 1 - this.lap * LAP_SPAWN_SCALE); this.nextObs = (mn + Math.random() * r) * spawnScale }
-    if (--this.nextCoin <= 0) { this.spawnCoin(); this.nextCoin = 30 + Math.random() * 35 }
+    if (--this.nextObs <= 0) {
+      spawnObstacle(this.area, this.obstacles)
+      const [mn, r] = SPAWN_GAPS[this.area]
+      const spawnScale = Math.max(MIN_SPAWN_SCALE, 1 - this.lap * LAP_SPAWN_SCALE)
+      this.nextObs = (mn + Math.random() * r) * spawnScale
+    }
+    if (--this.nextCoin <= 0) { spawnCoin(this.coins); this.nextCoin = 30 + Math.random() * 35 }
     if (--this.nextShield <= 0) { this.shieldDrops.push({ x: CANVAS_W + 20, y: GROUND_Y - 75, wobble: 0 }); this.nextShield = 1100 + Math.random() * 700 }
     if (this.area >= 2 && --this.nextCeilingObs <= 0) {
-      this.spawnCeilingObstacle()
+      spawnCeilingObstacle(this.obstacles)
       const spawnScale = Math.max(MIN_SPAWN_SCALE, 1 - this.lap * LAP_SPAWN_SCALE)
       const base = Math.max(100, 260 - this.area * 25)
       this.nextCeilingObs = (base + Math.random() * 100) * spawnScale
@@ -157,18 +168,18 @@ export class GameEngine {
     this.particles  = this.particles.filter(p  => { p.x += p.vx; p.y += p.vy; p.vy += 0.15; return --p.life > 0 })
 
     // Collisions
-    const ph = this.hitbox()
+    const ph = playerHitbox(this.py)
     if (this.invincible === 0) {
       for (const o of this.obstacles) {
-        if (this.overlaps(ph, { x: o.x + 4, y: o.y + 4, w: o.w - 8, h: o.h - 8 })) { this.hit(); return }
+        if (overlaps(ph, { x: o.x + 4, y: o.y + 4, w: o.w - 8, h: o.h - 8 })) { this.hit(); return }
       }
     }
     for (const c of this.coins) {
-      if (!c.collected && this.hitCircle(ph, c.x, c.y, 10)) { c.collected = true; this.score += 10; playCoin(); this.burst(c.x, c.y, AREAS[this.area].coinColor, 4) }
+      if (!c.collected && hitCircle(ph, c.x, c.y, 10)) { c.collected = true; this.score += 10; playCoin(); this.burst(c.x, c.y, AREAS[this.area].coinColor, 4) }
     }
     for (let i = this.shieldDrops.length - 1; i >= 0; i--) {
       const s = this.shieldDrops[i]
-      if (this.hitCircle(ph, s.x, s.y, 14)) {
+      if (hitCircle(ph, s.x, s.y, 14)) {
         this.shieldDrops.splice(i, 1)
         if (!this.shield) { this.shield = true; this.burst(s.x, s.y, '#00ffff', 10); playShieldGet() }
         else { this.score += 50; this.burst(s.x, s.y, '#ffff00', 6) }
@@ -201,207 +212,30 @@ export class GameEngine {
     }
   }
 
-  // ── Spawn helpers ─────────────────────────────────────────────────────────────
-  private mk(o: Pick<Obstacle,'x'|'y'|'w'|'h'|'shape'> & Partial<Pick<Obstacle,'moving'|'phase'|'baseY'|'amplitude'>>) {
-    this.obstacles.push({ moving: false, phase: 0, baseY: o.y, amplitude: 0, ...o })
-  }
-
-  private spawnObstacle() {
-    const a = this.area
-    if (a === 1) this.spawnA1()
-    else if (a === 2) this.spawnA2()
-    else if (a === 3) this.spawnA3()
-    else if (a === 4) this.spawnA4()
-    else this.spawnA5()
-  }
-
-  private spawnCeilingObstacle() {
-    const count = Math.random() < 0.3 ? 2 : 1
-    for (let i = 0; i < count; i++) {
-      const w = 32 + Math.random() * 28
-      const h = 100 + Math.random() * 50
-      const xOffset = i * (w + 20 + Math.random() * 30)
-      this.obstacles.push({ x: CANVAS_W + 10 + xOffset, y: 0, w, h, shape: 'stalactite', moving: false, phase: 0, baseY: 0, amplitude: 0 })
-    }
-  }
-
-  // Area 1 機械工学科: gear / bolt / piston
-  private spawnA1() {
-    const r = Math.random()
-    if (r < 0.32) {
-      const h = 30 + Math.random() * 28
-      this.mk({ x: CANVAS_W+10, y: GROUND_Y-h, w: 28+Math.random()*16, h, shape: 'gear' })
-    } else if (r < 0.62) {
-      // ボルト — 縦長でネジ軸が細い
-      const h = 44 + Math.random() * 24
-      this.mk({ x: CANVAS_W+10, y: GROUND_Y-h, w: 20+Math.random()*8, h, shape: 'bolt' })
-    } else if (r < 0.84) {
-      // ピストン — ヘッドが広く目立つ
-      const h = 38 + Math.random() * 22
-      this.mk({ x: CANVAS_W+10, y: GROUND_Y-h, w: 26+Math.random()*10, h, shape: 'piston' })
-    } else {
-      // 歯車＋ボルトのコンボ
-      const h1 = 30+Math.random()*20, h2 = 44+Math.random()*18
-      this.mk({ x: CANVAS_W+10, y: GROUND_Y-h1, w: 28, h: h1, shape: 'gear' })
-      this.mk({ x: CANVAS_W+66, y: GROUND_Y-h2, w: 20, h: h2, shape: 'bolt' })
-    }
-  }
-
-  // Area 2 電気電子工学科: circuit / coil / capacitor
-  private spawnA2() {
-    const r = Math.random()
-    if (r < 0.28) {
-      const h = 36 + Math.random() * 26
-      this.mk({ x: CANVAS_W+10, y: GROUND_Y-h, w: 30+Math.random()*14, h, shape: 'circuit' })
-    } else if (r < 0.52) {
-      // コイル — 細いが縦に長い
-      const h = 44 + Math.random() * 24
-      this.mk({ x: CANVAS_W+10, y: GROUND_Y-h, w: 18+Math.random()*6, h, shape: 'coil' })
-    } else if (r < 0.74) {
-      // コンデンサ — 太めの円筒
-      const h = 44 + Math.random() * 26
-      this.mk({ x: CANVAS_W+10, y: GROUND_Y-h, w: 22+Math.random()*8, h, shape: 'capacitor' })
-    } else {
-      // 回路2個並び
-      const h1 = 36+Math.random()*22, h2 = 32+Math.random()*20
-      this.mk({ x: CANVAS_W+10, y: GROUND_Y-h1, w: 28, h: h1, shape: 'circuit' })
-      this.mk({ x: CANVAS_W+74, y: GROUND_Y-h2, w: 26, h: h2, shape: 'circuit' })
-    }
-  }
-
-  // Area 3 電子情報工学科: bug / monitor / chip
-  private spawnA3() {
-    const r = Math.random()
-    if (r < 0.35) {
-      // 動くバグ
-      const baseY = GROUND_Y - 32
-      this.mk({ x: CANVAS_W+10, y: baseY, w: 30, h: 30, shape: 'bug', moving: true, phase: Math.random()*Math.PI*2, baseY, amplitude: 52 })
-    } else if (r < 0.55) {
-      // モニター — 正方形っぽくて大きい
-      const h = 44 + Math.random() * 20
-      this.mk({ x: CANVAS_W+10, y: GROUND_Y-h, w: 44+Math.random()*16, h, shape: 'monitor' })
-    } else if (r < 0.74) {
-      // ICチップ — 低くて横に広い
-      const h = 26 + Math.random() * 16
-      this.mk({ x: CANVAS_W+10, y: GROUND_Y-h, w: 46+Math.random()*18, h, shape: 'chip' })
-    } else if (r < 0.88) {
-      // 静止バグ
-      const h = 34 + Math.random() * 22
-      this.mk({ x: CANVAS_W+10, y: GROUND_Y-h, w: 32, h, shape: 'bug' })
-    } else {
-      // バグ＋チップのコンボ
-      const h1 = 34+Math.random()*14, h2 = 26+Math.random()*14
-      this.mk({ x: CANVAS_W+10, y: GROUND_Y-h1, w: 30, h: h1, shape: 'bug' })
-      this.mk({ x: CANVAS_W+72, y: GROUND_Y-h2, w: 44, h: h2, shape: 'chip' })
-    }
-  }
-
-  // Area 4 生物応用化学科: bacteria / flask / mushroom
-  private spawnA4() {
-    const r = Math.random()
-    if (r < 0.26) {
-      // 細菌クラスター
-      const n = Math.random() < 0.5 ? 2 : 3
-      for (let i = 0; i < n; i++) {
-        const h = 35 + Math.random() * 20
-        this.mk({ x: CANVAS_W+10+i*44, y: GROUND_Y-h, w: 24+Math.random()*12, h, shape: 'bacteria' })
-      }
-    } else if (r < 0.48) {
-      // 幅広バクテリア
-      const h = 46 + Math.random() * 26
-      this.mk({ x: CANVAS_W+10, y: GROUND_Y-h, w: 52+Math.random()*18, h, shape: 'bacteria' })
-    } else if (r < 0.66) {
-      // 三角フラスコ — 細くて高い、形が特徴的
-      const h = 58 + Math.random() * 22
-      this.mk({ x: CANVAS_W+10, y: GROUND_Y-h, w: 30+Math.random()*10, h, shape: 'flask' })
-    } else if (r < 0.84) {
-      // キノコ — 傘が広い
-      const h = 44 + Math.random() * 20
-      this.mk({ x: CANVAS_W+10, y: GROUND_Y-h, w: 44+Math.random()*16, h, shape: 'mushroom' })
-    } else {
-      // フラスコ＋細菌のコンボ
-      const h1 = 55+Math.random()*18, h2 = 38+Math.random()*16
-      this.mk({ x: CANVAS_W+10, y: GROUND_Y-h1, w: 28, h: h1, shape: 'flask' })
-      this.mk({ x: CANVAS_W+74, y: GROUND_Y-h2, w: 38, h: h2, shape: 'bacteria' })
-    }
-  }
-
-  // Area 5 材料工学科: crystal / ingot / lattice
-  private spawnA5() {
-    const r = Math.random()
-    if (r < 0.22) {
-      // クリスタルスパイク単体
-      const h = 52 + Math.random() * 36
-      this.mk({ x: CANVAS_W+10, y: GROUND_Y-h, w: 26+Math.random()*12, h, shape: 'crystal' })
-    } else if (r < 0.38) {
-      // クリスタル2本
-      const h1 = 48+Math.random()*26, h2 = 42+Math.random()*26
-      this.mk({ x: CANVAS_W+10, y: GROUND_Y-h1, w: 24, h: h1, shape: 'crystal' })
-      this.mk({ x: CANVAS_W+58, y: GROUND_Y-h2, w: 22, h: h2, shape: 'crystal' })
-    } else if (r < 0.54) {
-      // インゴット — 低くて広い台形
-      const h = 22 + Math.random() * 14
-      this.mk({ x: CANVAS_W+10, y: GROUND_Y-h, w: 46+Math.random()*24, h, shape: 'ingot' })
-    } else if (r < 0.70) {
-      // 格子構造 — 正方形っぽい
-      const h = 40 + Math.random() * 24
-      this.mk({ x: CANVAS_W+10, y: GROUND_Y-h, w: 40+Math.random()*18, h, shape: 'lattice' })
-    } else if (r < 0.84) {
-      // クリスタル3本密集
-      for (let i = 0; i < 3; i++) {
-        const h = 38 + Math.random() * 34 * (i+1)/3
-        this.mk({ x: CANVAS_W+10+i*36, y: GROUND_Y-h, w: 20, h, shape: 'crystal' })
-      }
-    } else {
-      // インゴット＋クリスタルのコンボ
-      const h1 = 22+Math.random()*12, h2 = 52+Math.random()*24
-      this.mk({ x: CANVAS_W+10, y: GROUND_Y-h1, w: 46, h: h1, shape: 'ingot' })
-      this.mk({ x: CANVAS_W+88, y: GROUND_Y-h2, w: 22, h: h2, shape: 'crystal' })
-    }
-  }
-
-  private spawnCoin() {
-    this.coins.push({ x: CANVAS_W+20, y: GROUND_Y-55-Math.random()*50, collected: false, wobble: Math.random()*Math.PI*2 })
-  }
-
   private burst(x: number, y: number, color: string, n: number) {
     for (let i = 0; i < n; i++) {
-      const a = Math.random()*Math.PI*2, s = 1.5+Math.random()*3.5
-      this.particles.push({ x, y, vx: Math.cos(a)*s, vy: Math.sin(a)*s-2, life: 20+Math.random()*20, maxLife: 40, color, size: 2+Math.random()*3 })
+      const a = Math.random() * Math.PI * 2, s = 1.5 + Math.random() * 3.5
+      this.particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 2, life: 20 + Math.random() * 20, maxLife: 40, color, size: 2 + Math.random() * 3 })
     }
-  }
-
-  // ── Collision ─────────────────────────────────────────────────────────────────
-  private hitbox() {
-    return { x: PLAYER_X-12, y: this.py-46, w: 24, h: 46 }
-  }
-
-  private overlaps(a: {x:number;y:number;w:number;h:number}, b: {x:number;y:number;w:number;h:number}) {
-    return a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y
-  }
-
-  private hitCircle(box: {x:number;y:number;w:number;h:number}, cx: number, cy: number, r: number) {
-    const nx = Math.max(box.x, Math.min(cx, box.x+box.w))
-    const ny = Math.max(box.y, Math.min(cy, box.y+box.h))
-    return (nx-cx)**2 + (ny-cy)**2 < r*r
   }
 
   // ── Render ────────────────────────────────────────────────────────────────────
   private render() {
     const ctx = this.ctx
     const theme = AREAS[this.area]
+    const bg: BgContext = { frame: this.frame, bgX: this.bgX, speed: this.speed }
 
-    this.drawBg(ctx, theme)
-    this.drawGround(ctx, theme)
+    drawBg(ctx, this.area, theme, bg)
+    drawGround(ctx, theme, bg)
 
-    for (const s of this.shieldDrops) this.drawShieldDrop(ctx, s)
-    for (const c of this.coins) if (!c.collected) this.drawCoin(ctx, c, theme.coinColor)
-    for (const o of this.obstacles) this.drawObstacle(ctx, o, theme)
+    for (const s of this.shieldDrops) drawShieldDrop(ctx, s, this.frame)
+    for (const c of this.coins) if (!c.collected) drawCoin(ctx, c, theme.coinColor)
+    for (const o of this.obstacles) drawObstacle(ctx, o, theme, this.frame)
 
     for (const p of this.particles) {
       ctx.globalAlpha = p.life / p.maxLife
       ctx.fillStyle = p.color
-      ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2); ctx.fill()
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill()
     }
     ctx.globalAlpha = 1
 
@@ -420,611 +254,21 @@ export class GameEngine {
       ctx.restore()
     }
 
-    this.drawPlayer(ctx, theme.coinColor)
-    this.drawHUD(ctx, theme)
+    drawPlayer(ctx, theme.coinColor, {
+      py: this.py, pState: this.pState, pvy: this.pvy,
+      invincible: this.invincible, legPhase: this.legPhase,
+      shield: this.shield, deathTimer: this.deathTimer, frame: this.frame
+    })
+
+    drawHUD(ctx, theme, {
+      score: this.score, distance: this.distance, shield: this.shield,
+      lap: this.lap, burstTimer: this.burstTimer,
+      areaTimer: this.areaTimer, invincible: this.invincible
+    })
 
     if (this.transAlpha > 0) {
-      this.drawTransition(ctx, theme)
+      drawTransition(ctx, theme, this.transAlpha, this.lap)
       this.transAlpha -= 0.02
     }
-  }
-
-  private renderPauseOverlay() {
-    const ctx = this.ctx
-    ctx.fillStyle = 'rgba(0,0,0,0.55)'
-    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H)
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-    ctx.fillStyle = '#ffffff'
-    ctx.font = 'bold 38px monospace'
-    ctx.fillText('⏸  PAUSE', CANVAS_W / 2, CANVAS_H / 2 - 18)
-    ctx.font = '16px sans-serif'
-    ctx.fillStyle = '#aaaaaa'
-    ctx.fillText('P キー / ポーズボタンで再開', CANVAS_W / 2, CANVAS_H / 2 + 24)
-  }
-
-  // ── Background per area ────────────────────────────────────────────────────────
-  private drawBg(ctx: CanvasRenderingContext2D, theme: typeof AREAS[AreaId]) {
-    const g = ctx.createLinearGradient(0, 0, 0, CANVAS_H)
-    g.addColorStop(0, theme.bgTop); g.addColorStop(1, theme.bgBottom)
-    ctx.fillStyle = g; ctx.fillRect(0, 0, CANVAS_W, CANVAS_H)
-
-    ctx.save()
-    switch (this.area) {
-      case 1: this.bgMech(ctx, theme); break
-      case 2: this.bgElec(ctx, theme); break
-      case 3: this.bgCode(ctx, theme); break
-      case 4: this.bgBio(ctx, theme);  break
-      case 5: this.bgMat(ctx, theme);  break
-    }
-    ctx.restore()
-  }
-
-  private bgMech(ctx: CanvasRenderingContext2D, theme: typeof AREAS[AreaId]) {
-    ctx.strokeStyle = theme.groundLineColor; ctx.lineWidth = 2
-    for (let gx = (this.bgX * 0.15 % 220) - 220; gx < CANVAS_W + 220; gx += 220) {
-      for (let i = 0; i < 2; i++) {
-        const gy = 70 + i * 115, r = 40 + i * 15
-        const rot = this.frame * 0.004 * (i % 2 ? -1 : 1)
-        ctx.globalAlpha = 0.07
-        ctx.beginPath(); ctx.arc(gx + i*100, gy, r, 0, Math.PI*2); ctx.stroke()
-        for (let t = 0; t < 12; t++) {
-          const a = rot + t/12*Math.PI*2
-          ctx.beginPath()
-          ctx.moveTo(gx+i*100+Math.cos(a)*r, gy+Math.sin(a)*r)
-          ctx.lineTo(gx+i*100+Math.cos(a)*(r+9), gy+Math.sin(a)*(r+9))
-          ctx.stroke()
-        }
-      }
-    }
-    ctx.globalAlpha = 1
-  }
-
-  private bgElec(ctx: CanvasRenderingContext2D, theme: typeof AREAS[AreaId]) {
-    ctx.strokeStyle = theme.groundLineColor; ctx.lineWidth = 1
-    const gs = 32, ox = this.bgX % gs
-    ctx.globalAlpha = 0.08
-    for (let x = ox; x < CANVAS_W; x += gs) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,GROUND_Y); ctx.stroke() }
-    for (let y = 30; y < GROUND_Y; y += gs) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(CANVAS_W,y); ctx.stroke() }
-    ctx.fillStyle = theme.groundLineColor
-    ctx.globalAlpha = 0.18
-    for (let x = ox; x < CANVAS_W; x += gs) {
-      for (let y = 30; y < GROUND_Y; y += gs) {
-        if (Math.abs(Math.sin(x*0.31 + y*0.67)) > 0.84) { ctx.beginPath(); ctx.arc(x, y, 2.5, 0, Math.PI*2); ctx.fill() }
-      }
-    }
-    ctx.globalAlpha = 1
-  }
-
-  private bgCode(ctx: CanvasRenderingContext2D, theme: typeof AREAS[AreaId]) {
-    ctx.fillStyle = theme.groundLineColor
-    ctx.font = '10px monospace'; ctx.textAlign = 'center'
-    for (let col = 0; col < CANVAS_W; col += 22) {
-      const drop = ((this.frame * 0.5 + col * 3.7) % 80)
-      ctx.globalAlpha = Math.max(0, 0.18 - drop * 0.003)
-      const bit = Math.floor(Math.sin(col * 13.7 + drop) * 100) % 2 === 0 ? '1' : '0'
-      ctx.fillText(bit, col, drop + 10)
-      ctx.globalAlpha = Math.max(0, 0.10 - drop * 0.002)
-      ctx.fillText(bit === '1' ? '0' : '1', col, drop + 24)
-    }
-    ctx.globalAlpha = 1
-  }
-
-  private bgBio(ctx: CanvasRenderingContext2D, theme: typeof AREAS[AreaId]) {
-    ctx.strokeStyle = theme.groundLineColor; ctx.lineWidth = 1.5
-    for (let i = 0; i < 8; i++) {
-      const bx = ((this.frame * 0.4 + i*137) % (CANVAS_W+60)) - 30
-      const by = GROUND_Y - 25 - ((this.frame * 0.8 + i*47) % (GROUND_Y - 60))
-      const br = 8 + (i % 3) * 7
-      ctx.globalAlpha = 0.09
-      ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI*2); ctx.stroke()
-      ctx.fillStyle = theme.groundLineColor; ctx.globalAlpha = 0.04
-      ctx.beginPath(); ctx.arc(bx - br*0.3, by - br*0.3, br*0.25, 0, Math.PI*2); ctx.fill()
-    }
-    ctx.globalAlpha = 1
-  }
-
-  private bgMat(ctx: CanvasRenderingContext2D, theme: typeof AREAS[AreaId]) {
-    ctx.strokeStyle = theme.groundLineColor; ctx.lineWidth = 1
-    const s = 40, ox = this.bgX % (s*2)
-    ctx.globalAlpha = 0.07
-    for (let x = ox; x < CANVAS_W+s; x += s) {
-      for (let y = 20; y < GROUND_Y; y += s) {
-        ctx.beginPath()
-        ctx.moveTo(x, y)
-        ctx.lineTo(x+s, y+s*0.5)
-        ctx.lineTo(x, y+s)
-        ctx.lineTo(x-s, y+s*0.5)
-        ctx.closePath(); ctx.stroke()
-      }
-    }
-    const lv = ctx.createLinearGradient(0, GROUND_Y-20, 0, GROUND_Y)
-    lv.addColorStop(0, 'transparent'); lv.addColorStop(1, theme.groundLineColor+'44')
-    ctx.globalAlpha = 0.6; ctx.fillStyle = lv; ctx.fillRect(0, GROUND_Y-20, CANVAS_W, 20)
-    ctx.globalAlpha = 1
-  }
-
-  private drawGround(ctx: CanvasRenderingContext2D, theme: typeof AREAS[AreaId]) {
-    ctx.fillStyle = theme.groundColor
-    ctx.fillRect(0, GROUND_Y+3, CANVAS_W, CANVAS_H-GROUND_Y-3)
-    ctx.strokeStyle = theme.groundLineColor; ctx.lineWidth = 2
-    ctx.shadowColor = theme.groundLineColor; ctx.shadowBlur = 5
-    ctx.setLineDash([28, 14])
-    ctx.lineDashOffset = -(this.frame * this.speed * 0.4) % 42
-    ctx.beginPath(); ctx.moveTo(0, GROUND_Y+3); ctx.lineTo(CANVAS_W, GROUND_Y+3); ctx.stroke()
-    ctx.setLineDash([]); ctx.shadowBlur = 0
-  }
-
-  private drawHUD(ctx: CanvasRenderingContext2D, theme: typeof AREAS[AreaId]) {
-    ctx.fillStyle = 'rgba(0,0,0,0.62)'; ctx.fillRect(0, 0, CANVAS_W, 42)
-
-    ctx.font = 'bold 16px monospace'; ctx.textBaseline = 'middle'
-    ctx.fillStyle = '#FFD700'; ctx.textAlign = 'left'
-    ctx.fillText(`SCORE  ${this.score.toLocaleString()}`, 10, 18)
-
-    ctx.fillStyle = theme.groundLineColor; ctx.textAlign = 'center'
-    ctx.fillText(`${theme.emoji} ${theme.name}`, CANVAS_W/2, 14)
-
-    ctx.fillStyle = '#aaaaaa'; ctx.textAlign = 'right'
-    ctx.fillText(`${Math.floor(this.distance)} m`, CANVAS_W-10, 18)
-
-    // Shield icon
-    ctx.textAlign = 'left'; ctx.font = '14px sans-serif'
-    ctx.fillText(this.shield ? '🛡' : '💔', CANVAS_W-42, 33)
-
-    // Lap badge
-    if (this.lap >= 1) {
-      ctx.font = 'bold 13px monospace'; ctx.textAlign = 'left'
-      ctx.fillStyle = '#ff6644'
-      ctx.fillText(`LAP ${this.lap + 1}`, 10, 36)
-    }
-
-    // Burst RUSH indicator
-    if (this.burstTimer > 0) {
-      ctx.font = 'bold 17px monospace'; ctx.textAlign = 'center'
-      ctx.fillStyle = '#ffee00'
-      ctx.shadowColor = '#ffaa00'; ctx.shadowBlur = 8
-      ctx.fillText(`⚡ RUSH! ⚡`, CANVAS_W / 2, 36)
-      ctx.shadowBlur = 0
-    }
-
-    // Area progress bar
-    const bw = 140, bx = (CANVAS_W-bw)/2, by = 30
-    ctx.fillStyle = 'rgba(255,255,255,0.1)'; ctx.fillRect(bx, by, bw, 5)
-    ctx.fillStyle = theme.groundLineColor
-    ctx.shadowColor = theme.groundLineColor; ctx.shadowBlur = 4
-    ctx.fillRect(bx, by, bw * (this.areaTimer / AREA_DURATION), 5)
-    ctx.shadowBlur = 0
-
-    // Invincibility flash overlay
-    if (this.invincible > 0 && Math.floor(this.invincible/6) % 2 === 0) {
-      ctx.globalAlpha = 0.22; ctx.fillStyle = '#ff8800'; ctx.fillRect(0, 0, CANVAS_W, CANVAS_H); ctx.globalAlpha = 1
-    }
-  }
-
-  private drawTransition(ctx: CanvasRenderingContext2D, theme: typeof AREAS[AreaId]) {
-    ctx.globalAlpha = this.transAlpha * 0.28; ctx.fillStyle = theme.groundLineColor; ctx.fillRect(0, 0, CANVAS_W, CANVAS_H)
-    ctx.globalAlpha = Math.min(this.transAlpha * 2, 1)
-    ctx.fillStyle = '#fff'; ctx.font = 'bold 26px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-    const yOffset = this.lap >= 1 ? -12 : 0
-    ctx.fillText(`${theme.emoji}  ${theme.name}`, CANVAS_W/2, CANVAS_H/2 + yOffset)
-    if (this.lap >= 1) {
-      ctx.font = 'bold 16px monospace'; ctx.fillStyle = '#ff6644'
-      ctx.fillText(`LAP ${this.lap + 1}`, CANVAS_W/2, CANVAS_H/2 + 16)
-    }
-    ctx.globalAlpha = 1
-  }
-
-  // ── Player ────────────────────────────────────────────────────────────────────
-  private drawPlayer(ctx: CanvasRenderingContext2D, accent: string) {
-    const x = PLAYER_X, y = this.py
-    const blink = this.invincible > 0 && Math.floor(this.invincible/4) % 2 === 1
-
-    if (blink) ctx.globalAlpha = 0.35
-
-    ctx.save()
-    if (this.pState === 'dead' && this.deathTimer > 0) {
-      ctx.translate(x, y-23); ctx.rotate(Math.min(this.deathTimer*0.08, Math.PI*0.55)); ctx.translate(-x, -(y-23))
-    }
-
-    // Shadow
-    ctx.fillStyle = 'rgba(0,0,0,0.22)'
-    ctx.beginPath(); ctx.ellipse(x, GROUND_Y+3, 13, 4, 0, 0, Math.PI*2); ctx.fill()
-
-    // Legs
-    const lp = this.pState === 'jumping' ? 0 : this.legPhase
-    ctx.strokeStyle = '#2255bb'; ctx.lineWidth = 5; ctx.lineCap = 'round'
-    ctx.beginPath(); ctx.moveTo(x-5,y-12); ctx.lineTo(x-7+Math.sin(lp)*10, y+2); ctx.stroke()
-    ctx.beginPath(); ctx.moveTo(x+5,y-12); ctx.lineTo(x+7-Math.sin(lp)*10, y+2); ctx.stroke()
-
-    // Body
-    ctx.fillStyle = '#3366dd'
-    this.rrect(ctx, x-13, y-40, 26, 28, 5); ctx.fill()
-    ctx.strokeStyle = '#6699ff'; ctx.lineWidth = 2
-    this.rrect(ctx, x-13, y-40, 26, 28, 5); ctx.stroke()
-
-    // Chest patch
-    ctx.fillStyle = accent; ctx.globalAlpha = blink ? 0.25 : 0.65
-    this.rrect(ctx, x-6, y-36, 12, 8, 3); ctx.fill()
-    ctx.globalAlpha = blink ? 0.35 : 1
-
-    // Arms
-    ctx.strokeStyle = '#3366dd'; ctx.lineWidth = 4; ctx.lineCap = 'round'
-    const ap = this.legPhase
-    ctx.beginPath(); ctx.moveTo(x-13,y-33); ctx.lineTo(x-21, y-33+Math.sin(ap)*7); ctx.stroke()
-    ctx.beginPath(); ctx.moveTo(x+13,y-33); ctx.lineTo(x+21, y-33-Math.sin(ap)*7); ctx.stroke()
-
-    // Head
-    ctx.fillStyle = '#4488ff'
-    ctx.beginPath(); ctx.arc(x, y-50, 12, 0, Math.PI*2); ctx.fill()
-    ctx.strokeStyle = '#88bbff'; ctx.lineWidth = 2; ctx.stroke()
-
-    // Eyes
-    ctx.fillStyle = '#fff'; ctx.fillRect(x-9, y-57, 6, 8); ctx.fillRect(x+3, y-57, 6, 8)
-    ctx.fillStyle = '#001133'; ctx.fillRect(x-7, y-55, 3, 5); ctx.fillRect(x+5, y-55, 3, 5)
-
-    // Shield aura
-    if (this.shield) {
-      ctx.strokeStyle = '#00ffff'; ctx.lineWidth = 1.5
-      ctx.globalAlpha = 0.35 + Math.sin(this.frame*0.1)*0.1
-      ctx.beginPath(); ctx.ellipse(x, y-25, 20, 33, 0, 0, Math.PI*2); ctx.stroke()
-      ctx.globalAlpha = blink ? 0.35 : 1
-    }
-
-    ctx.restore()
-    ctx.globalAlpha = 1
-  }
-
-  // ── Obstacle drawers ──────────────────────────────────────────────────────────
-  private drawObstacle(ctx: CanvasRenderingContext2D, o: Obstacle, theme: typeof AREAS[AreaId]) {
-    ctx.save()
-    ctx.fillStyle = theme.obstacleColor; ctx.strokeStyle = theme.obstacleStroke; ctx.lineWidth = 2
-    ctx.shadowColor = theme.obstacleStroke; ctx.shadowBlur = 6
-
-    if      (o.shape === 'gear')       this.dGear(ctx, o, theme)
-    else if (o.shape === 'bolt')       this.dBolt(ctx, o, theme)
-    else if (o.shape === 'piston')     this.dPiston(ctx, o, theme)
-    else if (o.shape === 'circuit')    this.dCircuit(ctx, o, theme)
-    else if (o.shape === 'coil')       this.dCoil(ctx, o, theme)
-    else if (o.shape === 'capacitor')  this.dCapacitor(ctx, o, theme)
-    else if (o.shape === 'bug')        this.dBug(ctx, o)
-    else if (o.shape === 'monitor')    this.dMonitor(ctx, o, theme)
-    else if (o.shape === 'chip')       this.dChip(ctx, o, theme)
-    else if (o.shape === 'bacteria')   this.dBacteria(ctx, o, theme)
-    else if (o.shape === 'flask')      this.dFlask(ctx, o, theme)
-    else if (o.shape === 'mushroom')   this.dMushroom(ctx, o, theme)
-    else if (o.shape === 'crystal')    this.dCrystal(ctx, o)
-    else if (o.shape === 'ingot')      this.dIngot(ctx, o, theme)
-    else if (o.shape === 'lattice')    this.dLattice(ctx, o, theme)
-    else if (o.shape === 'stalactite') this.dStalactite(ctx, o, theme)
-
-    ctx.restore()
-  }
-
-  private dGear(ctx: CanvasRenderingContext2D, o: Obstacle, theme: typeof AREAS[AreaId]) {
-    this.rrect(ctx, o.x, o.y, o.w, o.h, 3); ctx.fill()
-    this.rrect(ctx, o.x, o.y, o.w, o.h, 3); ctx.stroke()
-    for (let tx = o.x+3; tx < o.x+o.w-3; tx += 10) { ctx.fillRect(tx, o.y-6, 5, 6) }
-    ctx.beginPath(); ctx.arc(o.x+o.w/2, o.y+o.h/2, o.w/4, 0, Math.PI*2); ctx.strokeStyle = theme.obstacleStroke; ctx.stroke()
-  }
-
-  private dBolt(ctx: CanvasRenderingContext2D, o: Obstacle, theme: typeof AREAS[AreaId]) {
-    const cx = o.x + o.w / 2
-    const hh = Math.min(o.h * 0.3, 14)
-    // 六角ヘッド
-    ctx.beginPath()
-    ctx.moveTo(o.x + 3, o.y); ctx.lineTo(o.x + o.w - 3, o.y)
-    ctx.lineTo(o.x + o.w, o.y + hh * 0.5); ctx.lineTo(o.x + o.w - 3, o.y + hh)
-    ctx.lineTo(o.x + 3, o.y + hh); ctx.lineTo(o.x, o.y + hh * 0.5)
-    ctx.closePath(); ctx.fill(); ctx.stroke()
-    // ネジ軸
-    const sw = o.w * 0.42
-    ctx.fillRect(cx - sw / 2, o.y + hh, sw, o.h - hh)
-    ctx.strokeRect(cx - sw / 2, o.y + hh, sw, o.h - hh)
-    // ネジ山
-    ctx.strokeStyle = theme.obstacleStroke + '66'; ctx.lineWidth = 1
-    for (let sy = o.y + hh + 4; sy < o.y + o.h - 3; sy += 5) {
-      ctx.beginPath(); ctx.moveTo(cx - sw / 2, sy); ctx.lineTo(cx + sw / 2, sy); ctx.stroke()
-    }
-  }
-
-  private dPiston(ctx: CanvasRenderingContext2D, o: Obstacle, theme: typeof AREAS[AreaId]) {
-    const cx = o.x + o.w / 2
-    const headH = o.h * 0.28, rodH = o.h * 0.22
-    const cylY = o.y + headH + rodH
-    // ヘッド（幅広）
-    ctx.fillRect(o.x - 3, o.y, o.w + 6, headH); ctx.strokeRect(o.x - 3, o.y, o.w + 6, headH)
-    // ロッド（細い）
-    ctx.fillRect(cx - 4, o.y + headH, 8, rodH); ctx.strokeRect(cx - 4, o.y + headH, 8, rodH)
-    // シリンダー
-    ctx.fillRect(o.x + 2, cylY, o.w - 4, o.y + o.h - cylY)
-    ctx.strokeRect(o.x + 2, cylY, o.w - 4, o.y + o.h - cylY)
-    // ハイライト
-    ctx.fillStyle = theme.obstacleStroke + '33'
-    ctx.fillRect(o.x + 5, cylY + 3, 4, o.y + o.h - cylY - 6)
-  }
-
-  private dCircuit(ctx: CanvasRenderingContext2D, o: Obstacle, theme: typeof AREAS[AreaId]) {
-    this.rrect(ctx, o.x, o.y, o.w, o.h, 3); ctx.fill()
-    this.rrect(ctx, o.x, o.y, o.w, o.h, 3); ctx.stroke()
-    ctx.strokeStyle = theme.obstacleStroke+'66'; ctx.lineWidth = 1.5
-    ctx.beginPath()
-    ctx.moveTo(o.x+4, o.y+o.h*0.3); ctx.lineTo(o.x+o.w*0.5, o.y+o.h*0.3)
-    ctx.lineTo(o.x+o.w*0.5, o.y+o.h*0.7); ctx.lineTo(o.x+o.w-4, o.y+o.h*0.7)
-    ctx.stroke()
-    ctx.fillStyle = theme.obstacleStroke; ctx.globalAlpha = 0.8
-    ;[[o.x+4, o.y+o.h*0.3],[o.x+o.w-4, o.y+o.h*0.7]].forEach(([nx,ny]) => { ctx.beginPath(); ctx.arc(nx,ny,3,0,Math.PI*2); ctx.fill() })
-    ctx.globalAlpha = 1
-  }
-
-  private dCoil(ctx: CanvasRenderingContext2D, o: Obstacle, theme: typeof AREAS[AreaId]) {
-    const cx = o.x + o.w / 2
-    const segments = 5, segH = o.h / (segments + 1)
-    ctx.lineWidth = 3; ctx.lineCap = 'round'
-    // 上端
-    ctx.beginPath(); ctx.moveTo(cx, o.y); ctx.lineTo(cx, o.y + segH * 0.3); ctx.stroke()
-    // ジグザグ
-    for (let i = 0; i < segments; i++) {
-      const y1 = o.y + segH * (i + 0.3), y2 = o.y + segH * (i + 1.3)
-      ctx.beginPath()
-      if (i % 2 === 0) { ctx.moveTo(cx, y1); ctx.lineTo(o.x + o.w - 2, y1 + segH * 0.5); ctx.lineTo(cx, y2) }
-      else              { ctx.moveTo(cx, y1); ctx.lineTo(o.x + 2, y1 + segH * 0.5); ctx.lineTo(cx, y2) }
-      ctx.stroke()
-    }
-    // 下端
-    ctx.beginPath(); ctx.moveTo(cx, o.y + segH * (segments + 0.3)); ctx.lineTo(cx, o.y + o.h); ctx.stroke()
-    // 上下固定板
-    ctx.lineWidth = 4
-    ctx.beginPath(); ctx.moveTo(o.x + 2, o.y); ctx.lineTo(o.x + o.w - 2, o.y); ctx.stroke()
-    ctx.beginPath(); ctx.moveTo(o.x + 2, o.y + o.h); ctx.lineTo(o.x + o.w - 2, o.y + o.h); ctx.stroke()
-    void theme
-  }
-
-  private dCapacitor(ctx: CanvasRenderingContext2D, o: Obstacle, theme: typeof AREAS[AreaId]) {
-    const cx = o.x + o.w / 2, er = 6
-    // 上面楕円
-    ctx.beginPath(); ctx.ellipse(cx, o.y + er, o.w / 2, er, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke()
-    // 側面
-    ctx.fillRect(o.x, o.y + er, o.w, o.h - er * 2)
-    ctx.beginPath(); ctx.moveTo(o.x, o.y + er); ctx.lineTo(o.x, o.y + o.h - er); ctx.stroke()
-    ctx.beginPath(); ctx.moveTo(o.x + o.w, o.y + er); ctx.lineTo(o.x + o.w, o.y + o.h - er); ctx.stroke()
-    // 下面楕円
-    ctx.beginPath(); ctx.ellipse(cx, o.y + o.h - er, o.w / 2, er, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke()
-    // ハイライト
-    ctx.fillStyle = theme.obstacleStroke + '33'
-    ctx.fillRect(o.x + 3, o.y + er + 2, o.w * 0.22, o.h - er * 2 - 4)
-    // ＋マーク
-    ctx.strokeStyle = theme.obstacleStroke; ctx.lineWidth = 2
-    ctx.beginPath()
-    ctx.moveTo(cx, o.y + 2); ctx.lineTo(cx, o.y + er - 1)
-    ctx.moveTo(cx - 4, o.y + er * 0.5); ctx.lineTo(cx + 4, o.y + er * 0.5)
-    ctx.stroke()
-  }
-
-  private dBug(ctx: CanvasRenderingContext2D, o: Obstacle) {
-    ctx.beginPath(); ctx.ellipse(o.x+o.w/2, o.y+o.h/2, o.w/2, o.h/2, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke()
-    ctx.lineWidth = 1.5
-    ctx.beginPath()
-    ctx.moveTo(o.x+o.w*0.35, o.y); ctx.lineTo(o.x+o.w*0.25, o.y-10)
-    ctx.moveTo(o.x+o.w*0.65, o.y); ctx.lineTo(o.x+o.w*0.75, o.y-10); ctx.stroke()
-    ctx.strokeStyle = '#ff4444'; ctx.lineWidth = 2
-    const ex = o.x+o.w*0.35, ey = o.y+o.h*0.38, es = 5
-    ctx.beginPath(); ctx.moveTo(ex-es,ey-es); ctx.lineTo(ex+es,ey+es); ctx.moveTo(ex+es,ey-es); ctx.lineTo(ex-es,ey+es); ctx.stroke()
-    const ex2 = o.x+o.w*0.65
-    ctx.beginPath(); ctx.moveTo(ex2-es,ey-es); ctx.lineTo(ex2+es,ey+es); ctx.moveTo(ex2+es,ey-es); ctx.lineTo(ex2-es,ey+es); ctx.stroke()
-  }
-
-  private dMonitor(ctx: CanvasRenderingContext2D, o: Obstacle, theme: typeof AREAS[AreaId]) {
-    const cx = o.x + o.w / 2
-    const screenH = o.h * 0.72
-    // フレーム
-    this.rrect(ctx, o.x, o.y, o.w, screenH, 3); ctx.fill(); ctx.stroke()
-    // 画面
-    ctx.fillStyle = '#001122'
-    this.rrect(ctx, o.x + 3, o.y + 3, o.w - 6, screenH - 6, 2); ctx.fill()
-    // ERRORテキスト（点滅）
-    ctx.fillStyle = '#00ff44'
-    ctx.font = `bold ${Math.max(8, Math.floor(o.w * 0.18))}px monospace`
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-    ctx.globalAlpha = 0.6 + Math.sin(this.frame * 0.14) * 0.4
-    ctx.fillText('ERROR', cx, o.y + screenH * 0.5)
-    ctx.globalAlpha = 1
-    // スタンド
-    ctx.fillStyle = theme.obstacleColor
-    ctx.fillRect(cx - o.w * 0.12, o.y + screenH, o.w * 0.24, o.h - screenH)
-    ctx.strokeRect(cx - o.w * 0.12, o.y + screenH, o.w * 0.24, o.h - screenH)
-  }
-
-  private dChip(ctx: CanvasRenderingContext2D, o: Obstacle, theme: typeof AREAS[AreaId]) {
-    const pw = 5, pinH = 6, pinGap = 10
-    const pins = Math.max(2, Math.floor((o.h - 10) / pinGap))
-    const bodyX = o.x + pw + 3, bodyW = o.w - (pw + 3) * 2
-    // ピン（左右）
-    for (let i = 0; i < pins; i++) {
-      const py = o.y + 5 + i * pinGap
-      ctx.fillRect(o.x, py, pw, pinH); ctx.strokeRect(o.x, py, pw, pinH)
-      ctx.fillRect(o.x + o.w - pw, py, pw, pinH); ctx.strokeRect(o.x + o.w - pw, py, pw, pinH)
-    }
-    // 本体
-    this.rrect(ctx, bodyX, o.y, bodyW, o.h, 2); ctx.fill(); ctx.stroke()
-    // ノッチマーク
-    ctx.fillStyle = '#001133'
-    ctx.beginPath(); ctx.arc(bodyX + 8, o.y + 8, 4, 0, Math.PI * 2); ctx.fill()
-    // 内部ライン
-    ctx.strokeStyle = theme.obstacleStroke + '44'; ctx.lineWidth = 1
-    ctx.beginPath(); ctx.moveTo(bodyX + 4, o.y + o.h * 0.44); ctx.lineTo(bodyX + bodyW - 4, o.y + o.h * 0.44); ctx.stroke()
-    ctx.beginPath(); ctx.moveTo(bodyX + 4, o.y + o.h * 0.66); ctx.lineTo(bodyX + bodyW - 4, o.y + o.h * 0.66); ctx.stroke()
-  }
-
-  private dBacteria(ctx: CanvasRenderingContext2D, o: Obstacle, theme: typeof AREAS[AreaId]) {
-    const cx = o.x+o.w/2, cy = o.y+o.h/2, rx = o.w/2, ry = o.h/2
-    const wb = Math.sin(this.frame*0.08)*2.5
-    ctx.beginPath(); ctx.ellipse(cx, cy, rx+wb*0.5, ry-wb*0.5, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke()
-    ctx.strokeStyle = theme.obstacleStroke+'88'; ctx.lineWidth = 1.5
-    for (let i = 0; i < 4; i++) {
-      const a = i/4*Math.PI*2 + this.frame*0.03
-      ctx.beginPath(); ctx.moveTo(cx+Math.cos(a)*rx, cy+Math.sin(a)*ry); ctx.lineTo(cx+Math.cos(a)*(rx+10), cy+Math.sin(a)*(ry+10)); ctx.stroke()
-    }
-  }
-
-  private dFlask(ctx: CanvasRenderingContext2D, o: Obstacle, theme: typeof AREAS[AreaId]) {
-    const cx = o.x + o.w / 2
-    const neckH = o.h * 0.32, nw = o.w * 0.32
-    // フラスコ形
-    ctx.beginPath()
-    ctx.moveTo(cx - nw / 2, o.y); ctx.lineTo(cx + nw / 2, o.y)
-    ctx.lineTo(cx + nw / 2, o.y + neckH); ctx.lineTo(o.x + o.w, o.y + o.h)
-    ctx.lineTo(o.x, o.y + o.h); ctx.lineTo(cx - nw / 2, o.y + neckH)
-    ctx.closePath(); ctx.fill(); ctx.stroke()
-    // 液体
-    const liqRatio = 0.42
-    const liqTop = o.y + neckH + (o.h - neckH) * liqRatio
-    const liqW = liqRatio * o.w
-    ctx.fillStyle = theme.groundLineColor + '50'
-    ctx.beginPath()
-    ctx.moveTo(cx - liqW / 2, liqTop); ctx.lineTo(cx + liqW / 2, liqTop)
-    ctx.lineTo(o.x + o.w, o.y + o.h); ctx.lineTo(o.x, o.y + o.h)
-    ctx.closePath(); ctx.fill()
-    // キャップ
-    ctx.fillStyle = theme.obstacleStroke
-    ctx.fillRect(cx - nw / 2 - 2, o.y - 5, nw + 4, 6); ctx.strokeRect(cx - nw / 2 - 2, o.y - 5, nw + 4, 6)
-  }
-
-  private dMushroom(ctx: CanvasRenderingContext2D, o: Obstacle, theme: typeof AREAS[AreaId]) {
-    const cx = o.x + o.w / 2
-    const stemH = o.h * 0.4, stemW = o.w * 0.36
-    const capY = o.y + o.h - stemH - 6
-    // 茎
-    ctx.fillRect(cx - stemW / 2, o.y + o.h - stemH, stemW, stemH)
-    ctx.strokeRect(cx - stemW / 2, o.y + o.h - stemH, stemW, stemH)
-    // 傘
-    ctx.beginPath()
-    ctx.arc(cx, capY, o.w / 2, Math.PI, 0)
-    ctx.lineTo(o.x + o.w, capY + 10)
-    ctx.quadraticCurveTo(cx + o.w * 0.14, capY + 18, cx, capY + 13)
-    ctx.quadraticCurveTo(cx - o.w * 0.14, capY + 18, o.x, capY + 10)
-    ctx.closePath(); ctx.fill(); ctx.stroke()
-    // 水玉スポット
-    ctx.fillStyle = theme.obstacleStroke + '55'
-    ctx.beginPath(); ctx.arc(cx - o.w * 0.2, capY - o.h * 0.1, o.w * 0.1, 0, Math.PI * 2); ctx.fill()
-    ctx.beginPath(); ctx.arc(cx + o.w * 0.2, capY - o.h * 0.08, o.w * 0.08, 0, Math.PI * 2); ctx.fill()
-    ctx.beginPath(); ctx.arc(cx, capY - o.h * 0.22, o.w * 0.09, 0, Math.PI * 2); ctx.fill()
-  }
-
-  private dCrystal(ctx: CanvasRenderingContext2D, o: Obstacle) {
-    const cx = o.x+o.w/2
-    ctx.beginPath()
-    ctx.moveTo(cx, o.y); ctx.lineTo(cx+o.w*0.18, o.y+o.h*0.38); ctx.lineTo(o.x+o.w, o.y+o.h); ctx.lineTo(o.x, o.y+o.h); ctx.lineTo(cx-o.w*0.18, o.y+o.h*0.38); ctx.closePath()
-    ctx.fill(); ctx.stroke()
-    ctx.lineWidth = 1; ctx.globalAlpha = 0.5
-    ctx.beginPath(); ctx.moveTo(cx, o.y); ctx.lineTo(cx+o.w*0.08, o.y+o.h*0.55); ctx.stroke()
-    ctx.globalAlpha = 1
-  }
-
-  private dIngot(ctx: CanvasRenderingContext2D, o: Obstacle, theme: typeof AREAS[AreaId]) {
-    const bv = Math.min(o.h * 0.38, 9)
-    // 台形ブロック
-    ctx.beginPath()
-    ctx.moveTo(o.x + bv, o.y); ctx.lineTo(o.x + o.w - bv, o.y)
-    ctx.lineTo(o.x + o.w, o.y + o.h); ctx.lineTo(o.x, o.y + o.h)
-    ctx.closePath(); ctx.fill(); ctx.stroke()
-    // 金属光沢（斜めハイライト）
-    ctx.fillStyle = theme.obstacleStroke + '44'
-    ctx.beginPath()
-    ctx.moveTo(o.x + bv + 3, o.y + 3); ctx.lineTo(o.x + o.w * 0.52, o.y + 3)
-    ctx.lineTo(o.x + o.w * 0.52 + 2, o.y + o.h - 3); ctx.lineTo(o.x + bv + 1, o.y + o.h - 3)
-    ctx.closePath(); ctx.fill()
-    // 刻印ライン
-    ctx.strokeStyle = theme.obstacleStroke + '44'; ctx.lineWidth = 1
-    const midY = o.y + o.h * 0.5
-    ctx.beginPath(); ctx.moveTo(o.x + bv * 0.5, midY); ctx.lineTo(o.x + o.w - bv * 0.5, midY); ctx.stroke()
-  }
-
-  private dLattice(ctx: CanvasRenderingContext2D, o: Obstacle, theme: typeof AREAS[AreaId]) {
-    // 背景
-    ctx.fillStyle = theme.obstacleColor + '55'
-    ctx.fillRect(o.x, o.y, o.w, o.h)
-    // 格子
-    const cols = Math.max(2, Math.round(o.w / 15))
-    const rows = Math.max(2, Math.round(o.h / 15))
-    ctx.strokeStyle = theme.obstacleStroke; ctx.lineWidth = 2.5
-    for (let c = 0; c <= cols; c++) {
-      const x = o.x + (o.w / cols) * c
-      ctx.beginPath(); ctx.moveTo(x, o.y); ctx.lineTo(x, o.y + o.h); ctx.stroke()
-    }
-    for (let r = 0; r <= rows; r++) {
-      const y = o.y + (o.h / rows) * r
-      ctx.beginPath(); ctx.moveTo(o.x, y); ctx.lineTo(o.x + o.w, y); ctx.stroke()
-    }
-    // 交点の丸
-    ctx.fillStyle = theme.obstacleStroke
-    for (let c = 0; c <= cols; c++) {
-      for (let r = 0; r <= rows; r++) {
-        ctx.beginPath()
-        ctx.arc(o.x + (o.w / cols) * c, o.y + (o.h / rows) * r, 3, 0, Math.PI * 2)
-        ctx.fill()
-      }
-    }
-  }
-
-  private dStalactite(ctx: CanvasRenderingContext2D, o: Obstacle, theme: typeof AREAS[AreaId]) {
-    const { x, y, w, h } = o
-    const tipCount = Math.max(2, Math.round(w / 16))
-    const tipW = w / tipCount
-
-    ctx.fillStyle = theme.obstacleColor
-    ctx.strokeStyle = theme.obstacleStroke
-    ctx.lineWidth = 2
-
-    // 天井に接する上部の矩形
-    ctx.fillRect(x, y, w, h * 0.55)
-    ctx.strokeRect(x, y, w, h * 0.55)
-
-    // 下端にトゲを並べる
-    for (let i = 0; i < tipCount; i++) {
-      const tx = x + i * tipW
-      const ty = y + h * 0.55
-      ctx.beginPath()
-      ctx.moveTo(tx, ty)
-      ctx.lineTo(tx + tipW, ty)
-      ctx.lineTo(tx + tipW / 2, y + h)
-      ctx.closePath()
-      ctx.fill()
-      ctx.stroke()
-    }
-
-    // 警告ライン（天井から光るライン）
-    ctx.strokeStyle = theme.obstacleStroke + 'aa'
-    ctx.lineWidth = 1
-    ctx.setLineDash([4, 4])
-    ctx.beginPath(); ctx.moveTo(x + w/2, y + h); ctx.lineTo(x + w/2, GROUND_Y); ctx.stroke()
-    ctx.setLineDash([])
-  }
-
-  private drawCoin(ctx: CanvasRenderingContext2D, c: Coin, color: string) {
-    const cy = c.y + Math.sin(c.wobble)*4
-    ctx.fillStyle = color; ctx.shadowColor = color; ctx.shadowBlur = 10
-    ctx.beginPath(); ctx.arc(c.x, cy, 9, 0, Math.PI*2); ctx.fill()
-    ctx.shadowBlur = 0; ctx.strokeStyle = '#ffffff66'; ctx.lineWidth = 1.5; ctx.stroke()
-    ctx.fillStyle = '#ffffff33'; ctx.beginPath(); ctx.arc(c.x-3, cy-3, 3.5, 0, Math.PI*2); ctx.fill()
-  }
-
-  private drawShieldDrop(ctx: CanvasRenderingContext2D, s: ShieldDrop) {
-    const x = s.x, y = s.y + Math.sin(s.wobble)*5
-    ctx.shadowColor = '#00ffff'; ctx.shadowBlur = 12 + Math.sin(this.frame*0.1)*4
-    ctx.strokeStyle = '#00ffff'; ctx.fillStyle = '#00ffff22'; ctx.lineWidth = 2
-    ctx.beginPath()
-    ctx.moveTo(x, y-13); ctx.lineTo(x+11, y-6); ctx.lineTo(x+11, y+4); ctx.lineTo(x, y+13); ctx.lineTo(x-11, y+4); ctx.lineTo(x-11, y-6); ctx.closePath()
-    ctx.fill(); ctx.stroke()
-    ctx.strokeStyle = '#00ffff'; ctx.lineWidth = 1.5
-    ctx.beginPath(); ctx.moveTo(x,y-7); ctx.lineTo(x,y+7); ctx.moveTo(x-5,y); ctx.lineTo(x+5,y); ctx.stroke()
-    ctx.shadowBlur = 0
-  }
-
-  private rrect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
-    ctx.beginPath()
-    ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r)
-    ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h)
-    ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r)
-    ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y); ctx.closePath()
   }
 }
