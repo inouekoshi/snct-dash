@@ -130,12 +130,16 @@ this.area = ((this.area % 6) + 1) as AreaId
 ### 1. `Obstacle` 型の `shape` に追加
 
 ```typescript
+// lib/game/engine-types.ts
 interface Obstacle {
   // ...
-  shape: 'gear' | 'bolt' | 'piston' | 'circuit' | 'coil' | 'capacitor' | 'bug' | 'monitor' | 'chip' | 'bacteria' | 'flask' | 'mushroom' | 'crystal' | 'ingot' | 'lattice' | 'robot'
-  //                                                                                                                                                                 ↑ 追加
+  shape: 'gear' | 'bolt' | 'piston' | 'circuit' | 'coil' | 'capacitor' | 'bug' | 'monitor' | 'chip' | 'bacteria' | 'flask' | 'mushroom' | 'crystal' | 'ingot' | 'lattice' | 'stalactite' | 'robot'
+  //                                                                                                                                                                  ↑ 天井障害物  ↑ 追加例
 }
 ```
+
+> **天井障害物 `stalactite` について**
+> `stalactite` は `y = 0`（天井）を起点に垂れ下がる特殊な障害物で、`spawnCeilingObstacle()` によって管理されます。地面障害物のスポーンタイマー（`nextObs`）とは独立した別タイマー（`nextCeilingObs`）で制御されます。地面側の障害物を追加する場合は通常の手順で問題ありません。
 
 ### 2. `drawObstacle()` に描画処理を追加
 
@@ -169,12 +173,14 @@ private spawnA1() {
 
 **速度を遅くする:**
 ```typescript
+// lib/game/constants.ts
 const AREA_SPEEDS = { 1: 4, 2: 6, 3: 8.5, 4: 11, 5: 14 }
 //                      ↑ 各エリアを少し遅く
 ```
 
 **障害物の間隔を広げる:**
 ```typescript
+// lib/game/constants.ts
 const SPAWN_GAPS: [number, number][] = [
   [0, 0],
   [130, 80],   // エリア 1: 2.2〜3.5秒ごと（より余裕）
@@ -184,21 +190,42 @@ const SPAWN_GAPS: [number, number][] = [
 
 **シールドの無敵時間を延ばす:**
 ```typescript
-// hit() メソッド内
+// engine.ts の hit() メソッド内
 this.invincible = 180  // 2秒 → 3秒（60fps × 3）
 ```
 
 ### ステージ時間を変えたい
 
 ```typescript
+// lib/game/constants.ts
 const AREA_DURATION = 30 * 60  // 30秒に変更
 ```
 
 ### ノーミスボーナスを調整したい
 
 ```typescript
-// nextArea() メソッド内
+// engine.ts の nextArea() メソッド内
 if (this.noMiss) { this.score += 200 }  // 100点 → 200点
+```
+
+### 周回スケーリングを調整したい
+
+```typescript
+// lib/game/constants.ts
+export const LAP_SPEED_SCALE = 0.10   // 1周ごとの速度増加率（デフォルト0.15）
+export const LAP_SPAWN_SCALE = 0.05   // 1周ごとのスポーン短縮率（デフォルト0.07）
+export const MAX_SPEED_SCALE = 2.0    // 速度の最大倍率上限（デフォルト3.0）
+```
+
+### 速度バーストを調整したい
+
+```typescript
+// engine.ts の update() 内
+this.burstTimer = 120           // バースト持続フレーム（デフォルト150 = 2.5秒）
+this.burstCooldown = 900 + ...  // 次バーストまでのフレーム（デフォルト600〜900）
+
+// 速度倍率
+const burstScale = this.burstTimer > 0 ? 1.8 : 1.0  // 1.8倍 → 任意の値に変更
 ```
 
 ---

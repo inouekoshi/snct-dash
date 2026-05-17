@@ -50,9 +50,9 @@ SNCT-Casual-games/
 [ユーザー操作]
     ↓ キーボード/タッチイベント
 [Game.tsx]
-    ↓ jump() / slide() 呼び出し
+    ↓ jump() / togglePause() 呼び出し
 [GameEngine (engine.ts)]
-    ↓ onGameOver コールバック
+    ↓ onGameOver コールバック（GameResult: score, distance, maxArea, lap）
 [ResultModal.tsx]
     ↓ POST /api/scores
 [scores/route.ts]
