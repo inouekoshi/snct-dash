@@ -47,6 +47,11 @@ export class GameEngine {
   private nextObs = 120
   private nextCoin = 60
   private nextShield = 1000 + Math.random() * 600
+  private nextCeilingObs = 300
+
+  // Speed burst
+  private burstTimer = 0
+  private burstCooldown = 900
 
   constructor(canvas: HTMLCanvasElement, onGameOver: (r: GameResult) => void) {
     this.canvas = canvas
@@ -104,8 +109,18 @@ export class GameEngine {
       return
     }
 
+    // Burst phase
+    if (this.burstTimer > 0) {
+      this.burstTimer--
+    } else if (--this.burstCooldown <= 0) {
+      this.burstTimer = 150
+      this.burstCooldown = 600 + Math.random() * 300
+      this.burst(PLAYER_X + 60, GROUND_Y - 60, '#ffee00', 10)
+    }
+
     const lapScale = Math.min(1 + this.lap * LAP_SPEED_SCALE, MAX_SPEED_SCALE)
-    this.speed = AREA_SPEEDS[this.area] * lapScale
+    const burstScale = this.burstTimer > 0 ? 1.8 : 1.0
+    this.speed = AREA_SPEEDS[this.area] * lapScale * burstScale
 
     // Player physics
     this.pvy += GRAVITY; this.py += this.pvy
@@ -127,6 +142,12 @@ export class GameEngine {
     if (--this.nextObs <= 0)  { this.spawnObstacle(); const [mn, r] = SPAWN_GAPS[this.area]; const spawnScale = Math.max(MIN_SPAWN_SCALE, 1 - this.lap * LAP_SPAWN_SCALE); this.nextObs = (mn + Math.random() * r) * spawnScale }
     if (--this.nextCoin <= 0) { this.spawnCoin(); this.nextCoin = 30 + Math.random() * 35 }
     if (--this.nextShield <= 0) { this.shieldDrops.push({ x: CANVAS_W + 20, y: GROUND_Y - 75, wobble: 0 }); this.nextShield = 1100 + Math.random() * 700 }
+    if (this.area >= 2 && --this.nextCeilingObs <= 0) {
+      this.spawnCeilingObstacle()
+      const spawnScale = Math.max(MIN_SPAWN_SCALE, 1 - this.lap * LAP_SPAWN_SCALE)
+      const base = Math.max(100, 260 - this.area * 25)
+      this.nextCeilingObs = (base + Math.random() * 100) * spawnScale
+    }
 
     // Move
     const spd = this.speed
@@ -192,6 +213,16 @@ export class GameEngine {
     else if (a === 3) this.spawnA3()
     else if (a === 4) this.spawnA4()
     else this.spawnA5()
+  }
+
+  private spawnCeilingObstacle() {
+    const count = Math.random() < 0.3 ? 2 : 1
+    for (let i = 0; i < count; i++) {
+      const w = 32 + Math.random() * 28
+      const h = 100 + Math.random() * 50
+      const xOffset = i * (w + 20 + Math.random() * 30)
+      this.obstacles.push({ x: CANVAS_W + 10 + xOffset, y: 0, w, h, shape: 'stalactite', moving: false, phase: 0, baseY: 0, amplitude: 0 })
+    }
   }
 
   // Area 1 機械工学科: gear / bolt / piston
@@ -374,6 +405,21 @@ export class GameEngine {
     }
     ctx.globalAlpha = 1
 
+    // Burst speed lines
+    if (this.burstTimer > 0) {
+      ctx.save()
+      for (let i = 0; i < 10; i++) {
+        const ly = 50 + Math.random() * (GROUND_Y - 60)
+        const lx = Math.random() * CANVAS_W
+        const lw = 30 + Math.random() * 90
+        ctx.globalAlpha = 0.08 + Math.random() * 0.1
+        ctx.strokeStyle = '#ffee44'; ctx.lineWidth = 1.5
+        ctx.beginPath(); ctx.moveTo(lx, ly); ctx.lineTo(lx - lw, ly); ctx.stroke()
+      }
+      ctx.globalAlpha = 1
+      ctx.restore()
+    }
+
     this.drawPlayer(ctx, theme.coinColor)
     this.drawHUD(ctx, theme)
 
@@ -532,6 +578,15 @@ export class GameEngine {
       ctx.fillText(`LAP ${this.lap + 1}`, 10, 36)
     }
 
+    // Burst RUSH indicator
+    if (this.burstTimer > 0) {
+      ctx.font = 'bold 17px monospace'; ctx.textAlign = 'center'
+      ctx.fillStyle = '#ffee00'
+      ctx.shadowColor = '#ffaa00'; ctx.shadowBlur = 8
+      ctx.fillText(`⚡ RUSH! ⚡`, CANVAS_W / 2, 36)
+      ctx.shadowBlur = 0
+    }
+
     // Area progress bar
     const bw = 140, bx = (CANVAS_W-bw)/2, by = 30
     ctx.fillStyle = 'rgba(255,255,255,0.1)'; ctx.fillRect(bx, by, bw, 5)
@@ -640,6 +695,7 @@ export class GameEngine {
     else if (o.shape === 'crystal')    this.dCrystal(ctx, o)
     else if (o.shape === 'ingot')      this.dIngot(ctx, o, theme)
     else if (o.shape === 'lattice')    this.dLattice(ctx, o, theme)
+    else if (o.shape === 'stalactite') this.dStalactite(ctx, o, theme)
 
     ctx.restore()
   }
@@ -908,6 +964,40 @@ export class GameEngine {
         ctx.fill()
       }
     }
+  }
+
+  private dStalactite(ctx: CanvasRenderingContext2D, o: Obstacle, theme: typeof AREAS[AreaId]) {
+    const { x, y, w, h } = o
+    const tipCount = Math.max(2, Math.round(w / 16))
+    const tipW = w / tipCount
+
+    ctx.fillStyle = theme.obstacleColor
+    ctx.strokeStyle = theme.obstacleStroke
+    ctx.lineWidth = 2
+
+    // 天井に接する上部の矩形
+    ctx.fillRect(x, y, w, h * 0.55)
+    ctx.strokeRect(x, y, w, h * 0.55)
+
+    // 下端にトゲを並べる
+    for (let i = 0; i < tipCount; i++) {
+      const tx = x + i * tipW
+      const ty = y + h * 0.55
+      ctx.beginPath()
+      ctx.moveTo(tx, ty)
+      ctx.lineTo(tx + tipW, ty)
+      ctx.lineTo(tx + tipW / 2, y + h)
+      ctx.closePath()
+      ctx.fill()
+      ctx.stroke()
+    }
+
+    // 警告ライン（天井から光るライン）
+    ctx.strokeStyle = theme.obstacleStroke + 'aa'
+    ctx.lineWidth = 1
+    ctx.setLineDash([4, 4])
+    ctx.beginPath(); ctx.moveTo(x + w/2, y + h); ctx.lineTo(x + w/2, GROUND_Y); ctx.stroke()
+    ctx.setLineDash([])
   }
 
   private drawCoin(ctx: CanvasRenderingContext2D, c: Coin, color: string) {
