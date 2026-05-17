@@ -73,6 +73,12 @@ export default function ResultModal({ nickname, result, onRetry, onHome, onLeade
             <p className="font-bold">{AREA_NAMES[result.maxArea]}</p>
           </div>
         </div>
+        {result.lap >= 1 && (
+          <div className="border-t border-gray-700 pt-3 text-sm">
+            <p className="text-gray-400">最高周回</p>
+            <p className="font-black text-orange-400 text-lg">LAP {result.lap + 1}</p>
+          </div>
+        )}
         {submitted && rank !== null && (
           <div className="border-t border-gray-700 pt-4">
             <p className="text-gray-400 text-sm">現在のランキング</p>

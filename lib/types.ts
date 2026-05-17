@@ -2,6 +2,7 @@ export interface GameResult {
   score: number
   distance: number
   maxArea: number
+  lap: number
 }
 
 export interface ScoreEntry {

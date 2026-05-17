@@ -1,7 +1,7 @@
 import { AREAS, type AreaId } from './areas'
 import { playJump, playCoin, playGameOver, playAreaChange, playHurt, playShieldGet } from './sound'
 import type { GameResult } from '@/lib/types'
-import { GROUND_Y, CANVAS_W, CANVAS_H, PLAYER_X, GRAVITY, JUMP_VY, AREA_DURATION, AREA_SPEEDS, SPAWN_GAPS } from './constants'
+import { GROUND_Y, CANVAS_W, CANVAS_H, PLAYER_X, GRAVITY, JUMP_VY, AREA_DURATION, AREA_SPEEDS, SPAWN_GAPS, LAP_SPEED_SCALE, LAP_SPAWN_SCALE, MIN_SPAWN_SCALE, MAX_SPEED_SCALE } from './constants'
 import type { PlayerState, Obstacle, Coin, ShieldDrop, Particle } from './engine-types'
 
 // ── Engine ────────────────────────────────────────────────────────────────────
@@ -32,6 +32,7 @@ export class GameEngine {
   private noMiss = true
   private frame = 0
   private isOver = false
+  private lap = 0
   private isPaused = false
   private deathTimer = 0
   private bgX = 0             // parallax scroll offset
@@ -103,7 +104,8 @@ export class GameEngine {
       return
     }
 
-    this.speed = AREA_SPEEDS[this.area]
+    const lapScale = Math.min(1 + this.lap * LAP_SPEED_SCALE, MAX_SPEED_SCALE)
+    this.speed = AREA_SPEEDS[this.area] * lapScale
 
     // Player physics
     this.pvy += GRAVITY; this.py += this.pvy
@@ -122,7 +124,7 @@ export class GameEngine {
     if (++this.areaTimer >= AREA_DURATION) this.nextArea()
 
     // Spawn
-    if (--this.nextObs <= 0)  { this.spawnObstacle(); const [mn, r] = SPAWN_GAPS[this.area]; this.nextObs = mn + Math.random() * r }
+    if (--this.nextObs <= 0)  { this.spawnObstacle(); const [mn, r] = SPAWN_GAPS[this.area]; const spawnScale = Math.max(MIN_SPAWN_SCALE, 1 - this.lap * LAP_SPAWN_SCALE); this.nextObs = (mn + Math.random() * r) * spawnScale }
     if (--this.nextCoin <= 0) { this.spawnCoin(); this.nextCoin = 30 + Math.random() * 35 }
     if (--this.nextShield <= 0) { this.shieldDrops.push({ x: CANVAS_W + 20, y: GROUND_Y - 75, wobble: 0 }); this.nextShield = 1100 + Math.random() * 700 }
 
@@ -157,6 +159,7 @@ export class GameEngine {
   private nextArea() {
     this.areaTimer = 0
     this.prevArea = this.area
+    if (this.area === 5) this.lap++
     this.area = ((this.area % 5) + 1) as AreaId
     if (this.area > this.maxArea) this.maxArea = this.area
     this.transAlpha = 1
@@ -173,7 +176,7 @@ export class GameEngine {
     } else {
       this.isOver = true; this.pState = 'dead'; this.pvy = -8
       playGameOver(); this.burst(PLAYER_X, this.py - 20, '#ff3333', 14)
-      setTimeout(() => this.onGameOver({ score: this.score, distance: Math.floor(this.distance), maxArea: this.maxArea }), 1000)
+      setTimeout(() => this.onGameOver({ score: this.score, distance: Math.floor(this.distance), maxArea: this.maxArea, lap: this.lap }), 1000)
     }
   }
 
@@ -522,6 +525,13 @@ export class GameEngine {
     ctx.textAlign = 'left'; ctx.font = '14px sans-serif'
     ctx.fillText(this.shield ? '🛡' : '💔', CANVAS_W-42, 33)
 
+    // Lap badge
+    if (this.lap >= 1) {
+      ctx.font = 'bold 13px monospace'; ctx.textAlign = 'left'
+      ctx.fillStyle = '#ff6644'
+      ctx.fillText(`LAP ${this.lap + 1}`, 10, 36)
+    }
+
     // Area progress bar
     const bw = 140, bx = (CANVAS_W-bw)/2, by = 30
     ctx.fillStyle = 'rgba(255,255,255,0.1)'; ctx.fillRect(bx, by, bw, 5)
@@ -540,7 +550,12 @@ export class GameEngine {
     ctx.globalAlpha = this.transAlpha * 0.28; ctx.fillStyle = theme.groundLineColor; ctx.fillRect(0, 0, CANVAS_W, CANVAS_H)
     ctx.globalAlpha = Math.min(this.transAlpha * 2, 1)
     ctx.fillStyle = '#fff'; ctx.font = 'bold 26px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-    ctx.fillText(`${theme.emoji}  ${theme.name}`, CANVAS_W/2, CANVAS_H/2)
+    const yOffset = this.lap >= 1 ? -12 : 0
+    ctx.fillText(`${theme.emoji}  ${theme.name}`, CANVAS_W/2, CANVAS_H/2 + yOffset)
+    if (this.lap >= 1) {
+      ctx.font = 'bold 16px monospace'; ctx.fillStyle = '#ff6644'
+      ctx.fillText(`LAP ${this.lap + 1}`, CANVAS_W/2, CANVAS_H/2 + 16)
+    }
     ctx.globalAlpha = 1
   }
 
