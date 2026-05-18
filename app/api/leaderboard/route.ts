@@ -14,13 +14,13 @@ export async function GET(request: NextRequest) {
 
   if (filter === 'today') {
     const festivalDate = process.env.FESTIVAL_DATE
-    if (festivalDate) {
-      const start = `${festivalDate}T00:00:00.000Z`
-      const end = `${festivalDate}T23:59:59.999Z`
-      query = query.gte('created_at', start).lte('created_at', end).limit(10)
-    } else {
-      query = query.limit(10)
-    }
+    // FESTIVAL_DATE未設定時はJST(UTC+9)の本日を使用
+    const now = new Date()
+    const jstDate = new Date(now.getTime() + 9 * 60 * 60 * 1000)
+    const dateStr = festivalDate ?? jstDate.toISOString().slice(0, 10)
+    const start = `${dateStr}T00:00:00+09:00`
+    const end = `${dateStr}T23:59:59.999+09:00`
+    query = query.gte('created_at', start).lte('created_at', end).limit(10)
   } else {
     query = query.limit(20)
   }
