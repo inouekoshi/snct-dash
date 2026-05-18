@@ -191,12 +191,16 @@ export class GameEngine {
     // Area progression (time-based: 40 seconds per area)
     if (++this.areaTimer >= AREA_DURATION) this.nextArea()
 
-    // Spawn
+    // Spawn — ground and ceiling obstacles enforce a minimum separation to prevent
+    // unbeatable "jump into ceiling / run into wall" combinations.
+    const CEIL_GROUND_GAP = 90 // ~1.5s at 60fps; enough to clear one obstacle before the next
     if (--this.nextObs <= 0) {
       spawnObstacle(this.area, this.obstacles)
       const [mn, r] = SPAWN_GAPS[this.area]
       const spawnScale = Math.max(MIN_SPAWN_SCALE, 1 - this.lap * LAP_SPAWN_SCALE)
       this.nextObs = (mn + Math.random() * r) * spawnScale
+      // Keep ceiling obstacles away so the player can safely jump over ground ones
+      this.nextCeilingObs = Math.max(this.nextCeilingObs, CEIL_GROUND_GAP)
     }
     if (--this.nextCoin <= 0) { spawnCoin(this.coins); this.nextCoin = 30 + Math.random() * 35 }
     if (--this.nextShield <= 0) { this.shieldDrops.push({ x: CANVAS_W + 20, y: GROUND_Y - 75, wobble: 0 }); this.nextShield = 1100 + Math.random() * 700 }
@@ -205,6 +209,8 @@ export class GameEngine {
       const spawnScale = Math.max(MIN_SPAWN_SCALE, 1 - this.lap * LAP_SPAWN_SCALE)
       const base = Math.max(100, 260 - this.area * 25)
       this.nextCeilingObs = (base + Math.random() * 100) * spawnScale
+      // Keep ground obstacles away so the player can safely pass under ceiling ones
+      this.nextObs = Math.max(this.nextObs, CEIL_GROUND_GAP)
     }
 
     // Move
