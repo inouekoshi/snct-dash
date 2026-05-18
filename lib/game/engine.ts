@@ -1,7 +1,7 @@
 import { AREAS, type AreaId } from './areas'
 import { playJump, playCoin, playGameOver, playAreaChange, playHurt, playShieldGet } from './sound'
 import type { GameResult } from '@/lib/types'
-import { GROUND_Y, CANVAS_W, CANVAS_H, PLAYER_X, GRAVITY, JUMP_VY, AREA_DURATION, AREA_SPEEDS, SPAWN_GAPS, LAP_SPEED_SCALE, LAP_SPAWN_SCALE, MIN_SPAWN_SCALE, MAX_SPEED_SCALE } from './constants'
+import { GROUND_Y, CANVAS_W, CANVAS_H, PLAYER_X, GRAVITY, JUMP_VY, AREA_DURATION, AREA_SPEEDS, SPAWN_GAPS, LAP_SPEED_SCALE, LAP_SPAWN_SCALE, MIN_SPAWN_SCALE, MAX_SPEED_SCALE, COYOTE_FRAMES, JUMP_BUFFER_FRAMES, HIT_STOP_FRAMES } from './constants'
 import type { PlayerState, Obstacle, Coin, ShieldDrop, Particle } from './engine-types'
 import { overlaps, hitCircle, playerHitbox } from './helpers'
 import { drawObstacle } from './obstacle-drawers'
@@ -25,6 +25,23 @@ export class GameEngine {
   private legPhase = 0
   private shield = true
   private invincible = 0
+
+  // A2: Coyote time + jump buffer
+  private coyoteTime = 0
+  private jumpBuffer = 0
+
+  // A3: Hit stop + screen shake
+  private hitStopTimer = 0
+  private shakeTimer = 0
+  private shakeIntensity = 0
+
+  // A5: Score multiplier
+  private multiplier = 1
+  private multiplierJustUp = false
+
+  // A3: Coin combo pitch
+  private coinCombo = 0
+  private coinComboTimer = 0
 
   // Game
   private score = 0
@@ -69,13 +86,25 @@ export class GameEngine {
 
   jump() {
     if (this.isOver || this.isPaused) return
-    if (this.jumpCount < 2) {
-      this.pvy = this.jumpCount === 1 ? JUMP_VY * 0.82 : JUMP_VY
-      this.pState = 'jumping'
-      this.jumpCount++
-      playJump()
-      this.burst(PLAYER_X, this.py, '#ffffff', 4)
+    // Coyote time: treat as first jump if recently grounded
+    if (this.jumpCount === 0 || (this.coyoteTime > 0 && this.jumpCount === 1)) {
+      if (this.coyoteTime > 0 && this.jumpCount === 1) this.jumpCount = 0
+      this.performJump()
+    } else if (this.jumpCount === 1) {
+      this.performJump()
+    } else {
+      // Buffer the input for after landing
+      this.jumpBuffer = JUMP_BUFFER_FRAMES
     }
+  }
+
+  private performJump() {
+    this.pvy = this.jumpCount === 1 ? JUMP_VY * 0.82 : JUMP_VY
+    this.pState = 'jumping'
+    this.jumpCount++
+    this.coyoteTime = 0
+    playJump()
+    this.burst(PLAYER_X, this.py, '#ffffff', 4)
   }
 
   pause() {
@@ -115,14 +144,21 @@ export class GameEngine {
       return
     }
 
+    // A3: Hit stop — freeze physics briefly after shield hit
+    if (this.hitStopTimer > 0) { this.hitStopTimer--; return }
+
     // Burst phase
     if (this.burstTimer > 0) {
       this.burstTimer--
     } else if (--this.burstCooldown <= 0) {
       this.burstTimer = 150
       this.burstCooldown = 600 + Math.random() * 300
+      // A3: Screen shake on RUSH activation
+      this.shakeTimer = 20
+      this.shakeIntensity = 4
       this.burst(PLAYER_X + 60, GROUND_Y - 60, '#ffee00', 10)
     }
+    if (this.shakeTimer > 0) this.shakeTimer--
 
     const lapScale = Math.min(1 + this.lap * LAP_SPEED_SCALE, MAX_SPEED_SCALE)
     const burstScale = this.burstTimer > 0 ? 1.8 : 1.0
@@ -133,12 +169,23 @@ export class GameEngine {
     if (this.py >= GROUND_Y) {
       this.py = GROUND_Y; this.pvy = 0; this.jumpCount = 0
       if (this.pState === 'jumping') this.pState = 'running'
+      // A2: Coyote time reset on landing + consume buffered jump
+      this.coyoteTime = COYOTE_FRAMES
+      if (this.jumpBuffer > 0) { this.jumpBuffer = 0; this.performJump() }
+    } else {
+      // A2: Tick down coyote time and jump buffer while airborne
+      if (this.coyoteTime > 0) this.coyoteTime--
+      if (this.jumpBuffer > 0) this.jumpBuffer--
     }
     if (this.pState === 'running') this.legPhase += 0.25
     if (this.invincible > 0) this.invincible--
 
+    // A3: Coin combo decay
+    if (this.coinComboTimer > 0) { this.coinComboTimer-- } else { this.coinCombo = 0 }
+
     this.distance += this.speed
-    this.score += Math.ceil(this.speed / 8)
+    // A5: Apply score multiplier to distance score
+    this.score += Math.ceil(this.speed / 8) * this.multiplier
     this.bgX -= this.speed * 0.25
 
     // Area progression (time-based: 40 seconds per area)
@@ -175,7 +222,15 @@ export class GameEngine {
       }
     }
     for (const c of this.coins) {
-      if (!c.collected && hitCircle(ph, c.x, c.y, 10)) { c.collected = true; this.score += 10; playCoin(); this.burst(c.x, c.y, AREAS[this.area].coinColor, 4) }
+      if (!c.collected && hitCircle(ph, c.x, c.y, 10)) {
+        c.collected = true
+        // A5: coin score also scaled by multiplier; A3: rising pitch on combo
+        this.score += 10 * this.multiplier
+        playCoin(this.coinCombo)
+        this.coinCombo = Math.min(this.coinCombo + 1, 8)
+        this.coinComboTimer = 90
+        this.burst(c.x, c.y, AREAS[this.area].coinColor, 4)
+      }
     }
     for (let i = this.shieldDrops.length - 1; i >= 0; i--) {
       const s = this.shieldDrops[i]
@@ -195,7 +250,16 @@ export class GameEngine {
     this.area = ((this.area % 5) + 1) as AreaId
     if (this.area > this.maxArea) this.maxArea = this.area
     this.transAlpha = 1
-    if (this.noMiss) { this.score += 100; this.burst(PLAYER_X, this.py - 30, AREAS[this.prevArea].coinColor, 12) }
+    if (this.noMiss) {
+      // A5: multiplier up on no-miss clear
+      const prevMult = this.multiplier
+      this.multiplier = Math.min(this.multiplier + 1, 3)
+      this.multiplierJustUp = this.multiplier > prevMult
+      this.score += 100 * this.multiplier
+      this.burst(PLAYER_X, this.py - 30, AREAS[this.prevArea].coinColor, 12)
+    } else {
+      this.multiplierJustUp = false
+    }
     this.noMiss = true
     this.obstacles = this.obstacles.filter(o => o.x < PLAYER_X - 20)
     playAreaChange()
@@ -204,6 +268,9 @@ export class GameEngine {
   private hit() {
     if (this.shield) {
       this.shield = false; this.invincible = 120; this.noMiss = false
+      // A3: Hit stop + A5: multiplier reset on damage
+      this.hitStopTimer = HIT_STOP_FRAMES
+      this.multiplier = 1; this.multiplierJustUp = false
       playHurt(); this.burst(PLAYER_X, this.py - 20, '#ff8800', 10)
     } else {
       this.isOver = true; this.pState = 'dead'; this.pvy = -8
@@ -224,6 +291,13 @@ export class GameEngine {
     const ctx = this.ctx
     const theme = AREAS[this.area]
     const bg: BgContext = { frame: this.frame, bgX: this.bgX, speed: this.speed }
+
+    // A3: Screen shake
+    ctx.save()
+    if (this.shakeTimer > 0) {
+      const s = this.shakeIntensity * (this.shakeTimer / 20)
+      ctx.translate((Math.random() - 0.5) * s * 2, (Math.random() - 0.5) * s)
+    }
 
     drawBg(ctx, this.area, theme, bg)
     drawGround(ctx, theme, bg)
@@ -263,12 +337,17 @@ export class GameEngine {
     drawHUD(ctx, theme, {
       score: this.score, distance: this.distance, shield: this.shield,
       lap: this.lap, burstTimer: this.burstTimer,
-      areaTimer: this.areaTimer, invincible: this.invincible
+      areaTimer: this.areaTimer, invincible: this.invincible,
+      multiplier: this.multiplier,
     })
 
     if (this.transAlpha > 0) {
-      drawTransition(ctx, theme, this.transAlpha, this.lap)
-      this.transAlpha -= 0.02
+      drawTransition(ctx, theme, this.transAlpha, this.lap, this.multiplier, this.multiplierJustUp)
+      this.transAlpha -= 0.016
+    } else {
+      this.multiplierJustUp = false
     }
+
+    ctx.restore()
   }
 }

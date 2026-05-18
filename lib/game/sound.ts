@@ -28,9 +28,13 @@ export function playJump() {
   setTimeout(() => playTone(440, 0.08, 'sine'), 60)
 }
 
-export function playCoin() {
-  playTone(660, 0.06, 'sine', 0.1)
-  setTimeout(() => playTone(880, 0.08, 'sine', 0.1), 50)
+// combo: 0=normal, 1=slightly higher, 2+=max pitch
+export function playCoin(combo = 0) {
+  const scale = 1 + Math.min(combo, 4) * 0.12
+  const base = Math.round(660 * scale)
+  const high = Math.round(880 * scale)
+  playTone(base, 0.06, 'sine', 0.1)
+  setTimeout(() => playTone(high, 0.08, 'sine', 0.1), 50)
 }
 
 export function playGameOver() {

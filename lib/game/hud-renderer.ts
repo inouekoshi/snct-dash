@@ -13,6 +13,7 @@ export interface HudState {
   burstTimer: number
   areaTimer: number
   invincible: number
+  multiplier: number
 }
 
 export function drawHUD(ctx: CanvasRenderingContext2D, theme: Theme, s: HudState) {
@@ -20,7 +21,8 @@ export function drawHUD(ctx: CanvasRenderingContext2D, theme: Theme, s: HudState
 
   ctx.font = 'bold 16px monospace'; ctx.textBaseline = 'middle'
   ctx.fillStyle = '#FFD700'; ctx.textAlign = 'left'
-  ctx.fillText(`SCORE  ${s.score.toLocaleString()}`, 10, 18)
+  const multiplierTag = s.multiplier >= 2 ? ` ×${s.multiplier}` : ''
+  ctx.fillText(`SCORE  ${s.score.toLocaleString()}${multiplierTag}`, 10, 18)
 
   ctx.fillStyle = theme.groundLineColor; ctx.textAlign = 'center'
   ctx.fillText(`${theme.emoji} ${theme.name}`, CANVAS_W / 2, 14)
@@ -62,15 +64,25 @@ export function drawHUD(ctx: CanvasRenderingContext2D, theme: Theme, s: HudState
   }
 }
 
-export function drawTransition(ctx: CanvasRenderingContext2D, theme: Theme, transAlpha: number, lap: number) {
-  ctx.globalAlpha = transAlpha * 0.28; ctx.fillStyle = theme.groundLineColor; ctx.fillRect(0, 0, CANVAS_W, CANVAS_H)
-  ctx.globalAlpha = Math.min(transAlpha * 2, 1)
+export function drawTransition(ctx: CanvasRenderingContext2D, theme: Theme, transAlpha: number, lap: number, multiplier = 1, multiplierJustUp = false) {
+  ctx.globalAlpha = transAlpha * 0.35; ctx.fillStyle = theme.groundLineColor; ctx.fillRect(0, 0, CANVAS_W, CANVAS_H)
+  ctx.globalAlpha = Math.min(transAlpha * 2.2, 1)
+
   ctx.fillStyle = '#fff'; ctx.font = 'bold 26px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-  const yOffset = lap >= 1 ? -12 : 0
+  const hasExtra = lap >= 1 || multiplierJustUp
+  const yOffset = hasExtra ? -16 : 0
   ctx.fillText(`${theme.emoji}  ${theme.name}`, CANVAS_W / 2, CANVAS_H / 2 + yOffset)
+
   if (lap >= 1) {
     ctx.font = 'bold 16px monospace'; ctx.fillStyle = '#ff6644'
-    ctx.fillText(`LAP ${lap + 1}`, CANVAS_W / 2, CANVAS_H / 2 + 16)
+    ctx.fillText(`LAP ${lap + 1}`, CANVAS_W / 2, CANVAS_H / 2 + (multiplierJustUp ? 4 : 12))
+  }
+  if (multiplierJustUp) {
+    ctx.font = 'bold 18px monospace'
+    ctx.fillStyle = '#ffee00'
+    ctx.shadowColor = '#ffaa00'; ctx.shadowBlur = 10
+    ctx.fillText(`× ${multiplier}  BONUS!`, CANVAS_W / 2, CANVAS_H / 2 + (lap >= 1 ? 22 : 12))
+    ctx.shadowBlur = 0
   }
   ctx.globalAlpha = 1
 }
