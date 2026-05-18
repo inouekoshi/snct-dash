@@ -37,11 +37,17 @@ SNCT-Casual-games/
     ├── supabase.ts                # クライアントサイド用 Supabase クライアント
     ├── supabase-server.ts         # サーバーサイド用 Supabase クライアント（APIルート専用）
     └── game/
-        ├── engine.ts              # ゲームエンジン本体（GameEngine クラス）
-        ├── engine-types.ts        # ゲーム内型定義（refactoring済）
-        ├── constants.ts           # 定数定義（refactoring済）
+        ├── engine.ts              # GameEngine クラス（ループ・状態管理・衝突判定の統合）
+        ├── engine-types.ts        # Obstacle / Coin / ShieldDrop / Particle 型定義
+        ├── constants.ts           # 全定数（速度・スポーン間隔・スケーリング・コヨーテタイム等）
         ├── areas.ts               # 5学科エリアのテーマ定義（色・名前・絵文字）
-        └── sound.ts               # Web Audio API による効果音生成
+        ├── helpers.ts             # overlaps / hitCircle / playerHitbox / rrect
+        ├── spawner.ts             # spawnObstacle / spawnCeilingObstacle / spawnCoin
+        ├── obstacle-drawers.ts    # drawObstacle（Record<Shape, DrawFn> によるデータ駆動描画）
+        ├── background-renderers.ts# drawBg / drawGround
+        ├── player-renderer.ts     # drawPlayer
+        ├── hud-renderer.ts        # drawHUD / drawTransition / drawCoin / drawShieldDrop
+        └── sound.ts               # Web Audio API によるプロシージャル効果音
 ```
 
 ### データフロー

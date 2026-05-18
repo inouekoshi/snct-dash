@@ -256,20 +256,22 @@ const burstScale = this.burstTimer > 0 ? 1.8 : 1.0  // 1.8倍 → 任意の値�
 
 ### 当日ランキングが機能しない
 
-`FESTIVAL_DATE` 環境変数が `YYYY-MM-DD` 形式で正しく設定されているか確認してください。
+`app/api/leaderboard/route.ts` はJST（UTC+9）ベースでフィルタリングを行います。
+
+- `FESTIVAL_DATE` 環境変数（`YYYY-MM-DD` 形式）が設定されていればその日付を使用
+- 未設定の場合はサーバー上の現在時刻をJSTに変換して当日の範囲を自動計算
 
 ```bash
 vercel env ls  # 現在の環境変数を確認
 ```
 
-タイムゾーンに注意: Supabase のタイムスタンプは UTC で保存されます。
-`FESTIVAL_DATE=2026-11-03` を設定すると、UTC で 2026-11-03 00:00:00〜23:59:59 の範囲を当日とみなします。
-日本時間（JST = UTC+9）でのプレイは UTC 前日の 15:00 以降から翌日の 14:59 までが対象になるためズレが生じる場合があります。
-JST でフィルターしたい場合は `leaderboard/route.ts` のクエリを調整してください。
+フィルタリングの仕組み：
 
 ```typescript
-// JST 対応例
-const jstOffset = 9 * 60 * 60 * 1000  // 9時間をミリ秒で
-const start = new Date(`${festivalDate}T00:00:00+09:00`).toISOString()
-const end   = new Date(`${festivalDate}T23:59:59+09:00`).toISOString()
+// FESTIVAL_DATE未設定時はJST(UTC+9)の本日を自動計算
+const now = new Date()
+const jstDate = new Date(now.getTime() + 9 * 60 * 60 * 1000)
+const dateStr = festivalDate ?? jstDate.toISOString().slice(0, 10)
+const start = `${dateStr}T00:00:00+09:00`
+const end = `${dateStr}T23:59:59.999+09:00`
 ```
