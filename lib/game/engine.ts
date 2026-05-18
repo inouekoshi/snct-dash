@@ -30,10 +30,8 @@ export class GameEngine {
   private coyoteTime = 0
   private jumpBuffer = 0
 
-  // A3: Hit stop + screen shake
+  // A3: Hit stop
   private hitStopTimer = 0
-  private shakeTimer = 0
-  private shakeIntensity = 0
 
   // A5: Score multiplier
   private multiplier = 1
@@ -72,9 +70,6 @@ export class GameEngine {
   private nextShield = 1000 + Math.random() * 600
   private nextCeilingObs = 300
 
-  // Speed burst
-  private burstTimer = 0
-  private burstCooldown = 900
 
   constructor(canvas: HTMLCanvasElement, onGameOver: (r: GameResult) => void) {
     this.canvas = canvas
@@ -147,22 +142,8 @@ export class GameEngine {
     // A3: Hit stop — freeze physics briefly after shield hit
     if (this.hitStopTimer > 0) { this.hitStopTimer--; return }
 
-    // Burst phase
-    if (this.burstTimer > 0) {
-      this.burstTimer--
-    } else if (--this.burstCooldown <= 0) {
-      this.burstTimer = 150
-      this.burstCooldown = 600 + Math.random() * 300
-      // A3: Screen shake on RUSH activation
-      this.shakeTimer = 20
-      this.shakeIntensity = 4
-      this.burst(PLAYER_X + 60, GROUND_Y - 60, '#ffee00', 10)
-    }
-    if (this.shakeTimer > 0) this.shakeTimer--
-
     const lapScale = Math.min(1 + this.lap * LAP_SPEED_SCALE, MAX_SPEED_SCALE)
-    const burstScale = this.burstTimer > 0 ? 1.8 : 1.0
-    this.speed = AREA_SPEEDS[this.area] * lapScale * burstScale
+    this.speed = AREA_SPEEDS[this.area] * lapScale
 
     // Player physics
     this.pvy += GRAVITY; this.py += this.pvy
@@ -298,12 +279,7 @@ export class GameEngine {
     const theme = AREAS[this.area]
     const bg: BgContext = { frame: this.frame, bgX: this.bgX, speed: this.speed }
 
-    // A3: Screen shake
     ctx.save()
-    if (this.shakeTimer > 0) {
-      const s = this.shakeIntensity * (this.shakeTimer / 20)
-      ctx.translate((Math.random() - 0.5) * s * 2, (Math.random() - 0.5) * s)
-    }
 
     drawBg(ctx, this.area, theme, bg)
     drawGround(ctx, theme, bg)
@@ -319,21 +295,6 @@ export class GameEngine {
     }
     ctx.globalAlpha = 1
 
-    // Burst speed lines
-    if (this.burstTimer > 0) {
-      ctx.save()
-      for (let i = 0; i < 10; i++) {
-        const ly = 50 + Math.random() * (GROUND_Y - 60)
-        const lx = Math.random() * CANVAS_W
-        const lw = 30 + Math.random() * 90
-        ctx.globalAlpha = 0.08 + Math.random() * 0.1
-        ctx.strokeStyle = '#ffee44'; ctx.lineWidth = 1.5
-        ctx.beginPath(); ctx.moveTo(lx, ly); ctx.lineTo(lx - lw, ly); ctx.stroke()
-      }
-      ctx.globalAlpha = 1
-      ctx.restore()
-    }
-
     drawPlayer(ctx, theme.coinColor, {
       py: this.py, pState: this.pState, pvy: this.pvy,
       invincible: this.invincible, legPhase: this.legPhase,
@@ -342,8 +303,7 @@ export class GameEngine {
 
     drawHUD(ctx, theme, {
       score: this.score, distance: this.distance, shield: this.shield,
-      lap: this.lap, burstTimer: this.burstTimer,
-      areaTimer: this.areaTimer, invincible: this.invincible,
+      lap: this.lap, areaTimer: this.areaTimer, invincible: this.invincible,
       multiplier: this.multiplier,
     })
 

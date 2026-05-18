@@ -10,7 +10,6 @@ export interface HudState {
   distance: number
   shield: boolean
   lap: number
-  burstTimer: number
   areaTimer: number
   invincible: number
   multiplier: number
@@ -39,15 +38,6 @@ export function drawHUD(ctx: CanvasRenderingContext2D, theme: Theme, s: HudState
     ctx.font = 'bold 13px monospace'; ctx.textAlign = 'left'
     ctx.fillStyle = '#ff6644'
     ctx.fillText(`LAP ${s.lap + 1}`, 10, 36)
-  }
-
-  // Burst RUSH indicator
-  if (s.burstTimer > 0) {
-    ctx.font = 'bold 17px monospace'; ctx.textAlign = 'center'
-    ctx.fillStyle = '#ffee00'
-    ctx.shadowColor = '#ffaa00'; ctx.shadowBlur = 8
-    ctx.fillText(`⚡ RUSH! ⚡`, CANVAS_W / 2, 36)
-    ctx.shadowBlur = 0
   }
 
   // Area progress bar

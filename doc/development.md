@@ -217,17 +217,6 @@ export const LAP_SPAWN_SCALE = 0.05   // 1周ごとのスポーン短縮率（�
 export const MAX_SPEED_SCALE = 2.0    // 速度の最大倍率上限（デフォルト3.0）
 ```
 
-### 速度バーストを調整したい
-
-```typescript
-// engine.ts の update() 内
-this.burstTimer = 120           // バースト持続フレーム（デフォルト150 = 2.5秒）
-this.burstCooldown = 900 + ...  // 次バーストまでのフレーム（デフォルト600〜900）
-
-// 速度倍率
-const burstScale = this.burstTimer > 0 ? 1.8 : 1.0  // 1.8倍 → 任意の値に変更
-```
-
 ---
 
 ## よくあるトラブル
