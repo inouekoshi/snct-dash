@@ -132,7 +132,7 @@ export default function Game({ nickname, onGameOver }: GameProps) {
         />
         <button
           onClick={handlePause}
-          className="absolute top-2 right-2 px-3 py-1.5 bg-black/60 hover:bg-black/80 text-white text-sm font-bold rounded-lg border border-gray-600 transition-colors"
+          className="absolute bottom-2 right-2 px-3 py-1.5 bg-black/60 hover:bg-black/80 text-white text-sm font-bold rounded-lg border border-gray-600 transition-colors"
         >
           {paused ? '▶ 再開' : '⏸ 一時停止'}
         </button>
