@@ -208,10 +208,13 @@ function spawnDept1(stageX: number, obstacles: Obstacle[]) {
 ### ステージ長・速度
 
 ```typescript
-export const STAGE_LENGTH = 6000    // ゴールまでの距離（大きいほどステージが長い）
-export const SPEED_START   = 4      // 序盤の速度
-export const SPEED_END     = 15     // 終盤の速度
+export const STAGE_LENGTH = 70000   // ゴールまでの距離（約2分20秒でクリア）
+export const SPEED_START   = 4      // 序盤の速度（px/frame）
+export const SPEED_END     = 15     // 終盤の速度（px/frame）
 ```
+
+> **注意**: `STAGE_LENGTH = 6000` にすると約12秒でクリアになってしまう。
+> テスト時は `15000`（約30秒）、本番は `70000` を使うこと。
 
 ### ノックバック量
 
@@ -242,8 +245,17 @@ export const KNOCKBACK_INVINCIBLE = 90 // ノックバック後の無敵フレ�
 ### クリアタイムが登録されない
 
 1. ブラウザの DevTools → **Network タブ**で `POST /api/stage-clears` のレスポンスを確認
-2. エラーレスポンスに `error` フィールドがあれば原因がわかる
-3. Supabase ダッシュボードの **Logs** でエラーを確認
+2. **HTTP 500 "missing Supabase env vars"** の場合:
+   - Vercel ダッシュボード → Settings → Environment Variables を開く
+   - `NEXT_PUBLIC_SUPABASE_URL` と `NEXT_PUBLIC_SUPABASE_ANON_KEY` が **All Environments** になっているか確認
+   - Production のみだと Preview（dev ブランチ）では動かない
+   - 変更後は必ず**再デプロイ**が必要（`NEXT_PUBLIC_*` はビルド時に埋め込まれるため）
+3. **HTTP 500 その他** の場合: Supabase ダッシュボードの **Logs** でエラーを確認
+4. RLS ポリシーの確認:
+   ```sql
+   SELECT policyname, cmd FROM pg_policies WHERE tablename = 'stage_clears';
+   -- SELECT と INSERT の両方のポリシーが存在すること
+   ```
 
 ### ランキングが表示されない
 
@@ -253,3 +265,9 @@ export const KNOCKBACK_INVINCIBLE = 90 // ノックバック後の無敵フレ�
    SELECT * FROM pg_policies WHERE tablename = 'stage_clears';
    ```
 3. `NEXT_PUBLIC_SUPABASE_URL` と `NEXT_PUBLIC_SUPABASE_ANON_KEY` が正しいか確認
+
+### Vercel Preview デプロイの注意事項
+
+- `NEXT_PUBLIC_*` 環境変数はビルド時に埋め込まれる。**設定変更後は再デプロイが必要**。
+- 環境変数が Preview 環境に設定されていない場合、API ルートがサーバーサイドで env var を読めずに 500 エラーになる。
+- 空コミット `git commit --allow-empty -m "trigger redeploy" && git push origin dev` で再デプロイをトリガーできる。

@@ -81,8 +81,14 @@ snct-dash/
 
 ## 環境変数
 
-| 変数名 | 説明 |
-|--------|------|
-| NEXT_PUBLIC_SUPABASE_URL | Supabase API URL |
-| NEXT_PUBLIC_SUPABASE_ANON_KEY | 匿名キー（公開可） |
-| SUPABASE_SERVICE_ROLE_KEY | サービスロールキー（秘密・APIルート専用） |
+| 変数名 | 必須 | 説明 |
+|--------|------|------|
+| `NEXT_PUBLIC_SUPABASE_URL` | ✅ | Supabase API URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅ | 匿名キー（公開可・クライアント/サーバー両用） |
+| `SUPABASE_SERVICE_ROLE_KEY` | ❌ | 現在不使用（RLS ポリシーで anon キーからの INSERT を許可済み） |
+
+### Vercel 設定の注意点
+
+- すべての変数を **All Environments**（Production・Preview・Development）に設定すること
+- `NEXT_PUBLIC_*` はビルド時に埋め込まれるため、**設定変更後は再デプロイが必要**
+- Preview 環境に設定されていないと dev ブランチのAPIルートが 500 エラーになる
