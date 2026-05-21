@@ -37,8 +37,15 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: 'Invalid clear_time_ms' }, { status: 400 })
   }
 
-  const supabase = createServerClient()
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!supabaseUrl || !supabaseKey) {
+    console.error('Missing Supabase env vars')
+    return Response.json({ error: 'Server misconfiguration: missing Supabase env vars' }, { status: 500 })
+  }
+
   try {
+    const supabase = createServerClient()
     const { error } = await supabase
       .from('stage_clears')
       .insert({ nickname: nickname.trim(), department, clear_time_ms })
