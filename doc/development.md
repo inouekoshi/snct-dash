@@ -77,27 +77,40 @@ overlaps(ph, { x: o.x + 4, y: o.y + 4, w: o.w - 8, h: o.h - 8 })
 ### TerrainSegment 型
 
 ```typescript
-interface TerrainSegment {
-  type: 'ground' | 'hole'
-  x: number        // 画面上のX座標（スクロールで左に流れる）
-  width: number    // セグメントの横幅
-  groundY: number  // 地面のY座標（段差で変わる。穴では参照されない）
-}
+type TerrainSegment =
+  | { type: 'ground'; stageX: number; width: number; groundY: number }
+  | { type: 'hole';   stageX: number; width: number }
 ```
+
+- `stageX`：ステージ上の固定位置（生成時に決定し、以後変化しない）
+- `type === 'hole'` には `groundY` がない（discriminated union）
+
+### 座標管理の基本方針
+
+ゲーム内の全オブジェクトは **`stageX`（ステージ上の固定座標）** と **`stageProgress`（プレイヤーの進捗）** からCanvas座標を毎フレーム計算します。
+
+```
+Canvas上のX座標 = PLAYER_X + (stageX - stageProgress)
+```
+
+- オブジェクト自身の `x` は毎フレーム `toCanvasX(stageX)` で上書きされる
+- `terrain` は `stageX` で管理されるため、スクロールさせる必要がない
+- ノックバック時は `stageProgress` を減らすだけ → 全オブジェクトの位置が自動で正しくなる
 
 ### 仕組み
 
-- `terrain` 配列を右から左にスクロールさせる
-- プレイヤーX直下のセグメントを参照して着地Y座標を決定
+- プレイヤーは画面上 `PLAYER_X = 110` に固定（動かない）
+- 「世界がプレイヤーの方に流れてくる」表現
+- プレイヤー直下の `stageProgress` でどのセグメントにいるかを判定
 - `type === 'hole'` のセグメントでは着地判定なし → 落下 → ジュゲム処理
-- 段差（隣接セグメントの `groundY` が異なる）はプレイヤーの `py` をなめらかに追随させる
+- 段差（`groundY` が変わるセグメント）は `currentGroundY` を `STEP_FOLLOW_SPEED` ずつなめらかに追随
 
 ### 地形の追加（`lib/game/terrain.ts`）
 
 学科ごとの地形パターンはこのファイルで定義します。
 
 ```typescript
-export function generateTerrain(departmentId: number): TerrainSegment[] {
+export function buildStage(departmentId: number): TerrainSegment[] {
   // departmentId に応じて段差・穴の配置を返す
 }
 ```
@@ -111,11 +124,13 @@ export function generateTerrain(departmentId: number): TerrainSegment[] {
 ```typescript
 private knockback(amount: number) {
   this.stageProgress = Math.max(0, this.stageProgress - amount)
-  for (const o of this.obstacles) o.x += amount
-  for (const t of this.terrain)   t.x += amount
-  this.invincible = 90  // 無敵フレーム（約1.5秒）
+  this.invincible = KNOCKBACK_INVINCIBLE  // 無敵フレーム（約1.5秒）
+  this.hitStopTimer = HIT_STOP_FRAMES
+  playKnockback()
 }
 ```
+
+`stageProgress` を戻すだけで完結します。`stageX` ベースの座標管理のため、全オブジェクトのCanvas座標は次フレームの `toCanvasX()` 呼び出しで自動的に正しい値になります。
 
 **「世界が前に流れる = プレイヤーが後退した見た目」** になります。
 ノックバック量は `constants.ts` の `KNOCKBACK_AMOUNT` で調整できます。
@@ -178,8 +193,9 @@ const drawFns: Record<Shape, DrawFn> = {
 ### 3. スポーン関数で使用（`spawner.ts`）
 
 ```typescript
-function spawnDept1(obstacles: Obstacle[]) {
-  mk(obstacles, { x: CANVAS_W + 10, y: GROUND_Y - 50, w: 35, h: 50, shape: 'new_shape' })
+// stageX = スポーンのステージ座標（通常 stageProgress + CANVAS_W 付近）
+function spawnDept1(stageX: number, obstacles: Obstacle[]) {
+  mk(obstacles, { stageX, x: CANVAS_W + 10, y: DEFAULT_GROUND_Y - 50, w: 35, h: 50, shape: 'new_shape' })
 }
 ```
 

@@ -118,9 +118,9 @@
 ```typescript
 const engine = new GameEngine(
   canvasElement,
-  departmentId,           // 1〜5 の学科ID
-  (timeMs: number) => {   // クリア時コールバック
-    console.log(timeMs)
+  departmentId,                    // 1〜5 の学科ID
+  (result: GameClearResult) => {   // クリア時コールバック（GameClearResult型）
+    // result.timeMs, result.departmentId
   }
 )
 
