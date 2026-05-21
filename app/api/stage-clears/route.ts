@@ -38,16 +38,19 @@ export async function POST(request: NextRequest) {
   }
 
   const supabase = createServerClient()
-  const { data, error } = await supabase
-    .from('stage_clears')
-    .insert({ nickname: nickname.trim(), department, clear_time_ms })
-    .select('id')
-    .single()
+  try {
+    const { error } = await supabase
+      .from('stage_clears')
+      .insert({ nickname: nickname.trim(), department, clear_time_ms })
 
-  if (error) {
-    console.error('Supabase insert error:', error)
-    return Response.json({ error: 'Failed to save clear time' }, { status: 500 })
+    if (error) {
+      console.error('Supabase insert error:', error.message, error.code)
+      return Response.json({ error: error.message }, { status: 500 })
+    }
+  } catch (e) {
+    console.error('Unexpected error:', e)
+    return Response.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 })
   }
 
-  return Response.json({ id: data.id }, { status: 201 })
+  return Response.json({ ok: true }, { status: 201 })
 }
