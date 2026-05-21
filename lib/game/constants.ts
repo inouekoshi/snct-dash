@@ -6,7 +6,7 @@ export const JUMP_VY = -13.5
 
 export const DEFAULT_GROUND_Y = 220
 
-export const STAGE_LENGTH = 70000
+export const STAGE_LENGTH = 15000 // TODO: テスト用。本番は70000に戻す
 export const SPEED_START   = 4
 export const SPEED_END     = 15
 
