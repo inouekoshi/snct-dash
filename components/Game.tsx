@@ -2,14 +2,15 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { GameEngine } from '@/lib/game/engine'
-import type { GameResult } from '@/lib/types'
+import type { GameClearResult } from '@/lib/types'
 
 interface GameProps {
   nickname: string
-  onGameOver: (result: GameResult) => void
+  departmentId: number
+  onClear: (result: GameClearResult) => void
 }
 
-export default function Game({ nickname, onGameOver }: GameProps) {
+export default function Game({ nickname, departmentId, onClear }: GameProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const engineRef = useRef<GameEngine | null>(null)
   const [started, setStarted] = useState(false)
@@ -27,7 +28,6 @@ export default function Game({ nickname, onGameOver }: GameProps) {
     setPaused(p => !p)
   }, [])
 
-  // 縦向き検出（ゲーム開始後のみ表示）
   useEffect(() => {
     if (!started) return
     const mql = window.matchMedia('(orientation: portrait)')
@@ -37,7 +37,6 @@ export default function Game({ nickname, onGameOver }: GameProps) {
     return () => mql.removeEventListener('change', update)
   }, [started])
 
-  // 横向き固定（Android Chrome 対応、iOS は警告オーバーレイで対応）
   useEffect(() => {
     if (!started) return
     type ExtOrientation = ScreenOrientation & { lock?: (o: string) => Promise<void> }
@@ -46,30 +45,24 @@ export default function Game({ nickname, onGameOver }: GameProps) {
     return () => { if (ori?.unlock) ori.unlock() }
   }, [started])
 
-  // ゲームループ・入力
   useEffect(() => {
     if (!started || !canvasRef.current) return
 
     const canvas = canvasRef.current
-    const engine = new GameEngine(canvas, onGameOver)
+    const engine = new GameEngine(canvas, departmentId, onClear)
     engineRef.current = engine
     engine.start()
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'Space' || e.code === 'ArrowUp') {
-        e.preventDefault()
-        handleJump()
+        e.preventDefault(); handleJump()
       }
       if (e.code === 'Escape' || e.code === 'KeyP') {
-        e.preventDefault()
-        handlePause()
+        e.preventDefault(); handlePause()
       }
     }
-
-    // touchstart で発火（touchend より ~100ms 早く、二段ジャンプの反応性が向上する）
     const onTouchStart = (e: TouchEvent) => {
-      e.preventDefault()
-      handleJump()
+      e.preventDefault(); handleJump()
     }
 
     window.addEventListener('keydown', onKeyDown)
@@ -80,7 +73,7 @@ export default function Game({ nickname, onGameOver }: GameProps) {
       window.removeEventListener('keydown', onKeyDown)
       canvas.removeEventListener('touchstart', onTouchStart)
     }
-  }, [started, onGameOver, handleJump, handlePause])
+  }, [started, departmentId, onClear, handleJump, handlePause])
 
   if (!started) {
     return (
@@ -94,9 +87,9 @@ export default function Game({ nickname, onGameOver }: GameProps) {
           <p>📱 タップ：ジャンプ</p>
         </div>
         <div className="bg-gray-800 rounded-xl px-4 py-3 text-sm space-y-1 w-full max-w-xs border border-gray-700">
-          <p className="text-cyan-400 font-bold">🛡 シールドシステム</p>
-          <p className="text-gray-300">1回まで障害物に当たっても大丈夫！</p>
-          <p className="text-gray-400">💎 シールドアイテムで回復できます</p>
+          <p className="text-orange-400 font-bold">⚠ 障害物に当たるとノックバック！</p>
+          <p className="text-gray-300">後退するだけ。諦めずにゴールを目指せ！</p>
+          <p className="text-gray-400">穴に落ちても少し戻されるだけです</p>
         </div>
         <button
           onClick={() => setStarted(true)}
@@ -110,13 +103,9 @@ export default function Game({ nickname, onGameOver }: GameProps) {
 
   return (
     <main className="flex flex-col items-center justify-center min-h-screen bg-gray-950 select-none overflow-hidden">
-      {/* 縦向き警告オーバーレイ（iOS など orientation.lock 非対応デバイス向け） */}
       {isPortrait && (
         <div className="fixed inset-0 z-50 bg-gray-950 flex flex-col items-center justify-center gap-6">
-          <div
-            className="text-6xl"
-            style={{ display: 'inline-block', transform: 'rotate(90deg)' }}
-          >
+          <div className="text-6xl" style={{ display: 'inline-block', transform: 'rotate(90deg)' }}>
             📱
           </div>
           <p className="text-white text-2xl font-black">横向きにしてください</p>

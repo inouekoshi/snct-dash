@@ -3,25 +3,32 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Game from '@/components/Game'
+import DepartmentSelect from '@/components/DepartmentSelect'
 import ResultModal from '@/components/ResultModal'
-import type { GameResult } from '@/lib/types'
+import type { GameClearResult } from '@/lib/types'
 
-type Phase = 'nickname' | 'playing' | 'result'
+type Phase = 'nickname' | 'department' | 'playing' | 'result'
 
 export default function GamePage() {
   const router = useRouter()
   const [phase, setPhase] = useState<Phase>('nickname')
   const [nickname, setNickname] = useState('')
-  const [result, setResult] = useState<GameResult | null>(null)
+  const [departmentId, setDepartmentId] = useState<number>(1)
+  const [result, setResult] = useState<GameClearResult | null>(null)
 
-  function handleStart(e: React.FormEvent) {
+  function handleNicknameSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (nickname.trim().length === 0) return
+    setPhase('department')
+  }
+
+  function handleDepartmentSelect(id: number) {
+    setDepartmentId(id)
     setPhase('playing')
   }
 
-  function handleGameOver(gameResult: GameResult) {
-    setResult(gameResult)
+  function handleClear(clearResult: GameClearResult) {
+    setResult(clearResult)
     setPhase('result')
   }
 
@@ -30,7 +37,7 @@ export default function GamePage() {
       <main className="flex flex-col items-center justify-center min-h-screen gap-6 px-4">
         <h2 className="text-3xl font-black">ニックネームを入力</h2>
         <p className="text-gray-400 text-sm">ランキングに表示される名前（最大20文字）</p>
-        <form onSubmit={handleStart} className="flex flex-col gap-4 w-full max-w-xs">
+        <form onSubmit={handleNicknameSubmit} className="flex flex-col gap-4 w-full max-w-xs">
           <input
             type="text"
             value={nickname}
@@ -44,7 +51,7 @@ export default function GamePage() {
             disabled={nickname.trim().length === 0}
             className="w-full py-4 bg-yellow-400 hover:bg-yellow-300 disabled:bg-gray-600 disabled:cursor-not-allowed text-gray-950 font-black text-xl rounded-2xl transition-colors"
           >
-            スタート！
+            次へ →
           </button>
           <button
             type="button"
@@ -58,19 +65,32 @@ export default function GamePage() {
     )
   }
 
+  if (phase === 'department') {
+    return (
+      <DepartmentSelect
+        onSelect={handleDepartmentSelect}
+        onBack={() => setPhase('nickname')}
+      />
+    )
+  }
+
   if (phase === 'result' && result) {
     return (
       <ResultModal
         nickname={nickname}
         result={result}
-        onRetry={() => setPhase('playing')}
+        onRetry={() => setPhase('department')}
         onHome={() => router.push('/')}
-        onLeaderboard={() => router.push('/leaderboard')}
+        onLeaderboard={() => router.push(`/leaderboard?department=${result.departmentId}`)}
       />
     )
   }
 
   return (
-    <Game nickname={nickname} onGameOver={handleGameOver} />
+    <Game
+      nickname={nickname}
+      departmentId={departmentId}
+      onClear={handleClear}
+    />
   )
 }

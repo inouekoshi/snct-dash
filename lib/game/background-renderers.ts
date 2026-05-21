@@ -1,6 +1,7 @@
 import type { AreaId } from './areas'
 import { AREAS } from './areas'
-import { CANVAS_W, CANVAS_H, GROUND_Y } from './constants'
+import type { TerrainSegment } from './engine-types'
+import { CANVAS_W, CANVAS_H, DEFAULT_GROUND_Y, PLAYER_X } from './constants'
 
 type Theme = typeof AREAS[AreaId]
 
@@ -50,12 +51,12 @@ function bgElec(ctx: CanvasRenderingContext2D, theme: Theme, bg: BgContext) {
   ctx.strokeStyle = theme.groundLineColor; ctx.lineWidth = 1
   const gs = 32, ox = bg.bgX % gs
   ctx.globalAlpha = 0.08
-  for (let x = ox; x < CANVAS_W; x += gs) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, GROUND_Y); ctx.stroke() }
-  for (let y = 30; y < GROUND_Y; y += gs) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(CANVAS_W, y); ctx.stroke() }
+  for (let x = ox; x < CANVAS_W; x += gs) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, DEFAULT_GROUND_Y); ctx.stroke() }
+  for (let y = 30; y < DEFAULT_GROUND_Y; y += gs) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(CANVAS_W, y); ctx.stroke() }
   ctx.fillStyle = theme.groundLineColor
   ctx.globalAlpha = 0.18
   for (let x = ox; x < CANVAS_W; x += gs) {
-    for (let y = 30; y < GROUND_Y; y += gs) {
+    for (let y = 30; y < DEFAULT_GROUND_Y; y += gs) {
       if (Math.abs(Math.sin(x * 0.31 + y * 0.67)) > 0.84) { ctx.beginPath(); ctx.arc(x, y, 2.5, 0, Math.PI * 2); ctx.fill() }
     }
   }
@@ -80,7 +81,7 @@ function bgBio(ctx: CanvasRenderingContext2D, theme: Theme, bg: BgContext) {
   ctx.strokeStyle = theme.groundLineColor; ctx.lineWidth = 1.5
   for (let i = 0; i < 8; i++) {
     const bx = ((bg.frame * 0.4 + i * 137) % (CANVAS_W + 60)) - 30
-    const by = GROUND_Y - 25 - ((bg.frame * 0.8 + i * 47) % (GROUND_Y - 60))
+    const by = DEFAULT_GROUND_Y - 25 - ((bg.frame * 0.8 + i * 47) % (DEFAULT_GROUND_Y - 60))
     const br = 8 + (i % 3) * 7
     ctx.globalAlpha = 0.09
     ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI * 2); ctx.stroke()
@@ -95,7 +96,7 @@ function bgMat(ctx: CanvasRenderingContext2D, theme: Theme, bg: BgContext) {
   const s = 40, ox = bg.bgX % (s * 2)
   ctx.globalAlpha = 0.07
   for (let x = ox; x < CANVAS_W + s; x += s) {
-    for (let y = 20; y < GROUND_Y; y += s) {
+    for (let y = 20; y < DEFAULT_GROUND_Y; y += s) {
       ctx.beginPath()
       ctx.moveTo(x, y)
       ctx.lineTo(x + s, y + s * 0.5)
@@ -104,19 +105,38 @@ function bgMat(ctx: CanvasRenderingContext2D, theme: Theme, bg: BgContext) {
       ctx.closePath(); ctx.stroke()
     }
   }
-  const lv = ctx.createLinearGradient(0, GROUND_Y - 20, 0, GROUND_Y)
+  const lv = ctx.createLinearGradient(0, DEFAULT_GROUND_Y - 20, 0, DEFAULT_GROUND_Y)
   lv.addColorStop(0, 'transparent'); lv.addColorStop(1, theme.groundLineColor + '44')
-  ctx.globalAlpha = 0.6; ctx.fillStyle = lv; ctx.fillRect(0, GROUND_Y - 20, CANVAS_W, 20)
+  ctx.globalAlpha = 0.6; ctx.fillStyle = lv; ctx.fillRect(0, DEFAULT_GROUND_Y - 20, CANVAS_W, 20)
   ctx.globalAlpha = 1
 }
 
-export function drawGround(ctx: CanvasRenderingContext2D, theme: Theme, bg: BgContext) {
-  ctx.fillStyle = theme.groundColor
-  ctx.fillRect(0, GROUND_Y + 3, CANVAS_W, CANVAS_H - GROUND_Y - 3)
-  ctx.strokeStyle = theme.groundLineColor; ctx.lineWidth = 2
-  ctx.shadowColor = theme.groundLineColor; ctx.shadowBlur = 5
-  ctx.setLineDash([28, 14])
-  ctx.lineDashOffset = -(bg.frame * bg.speed * 0.4) % 42
-  ctx.beginPath(); ctx.moveTo(0, GROUND_Y + 3); ctx.lineTo(CANVAS_W, GROUND_Y + 3); ctx.stroke()
-  ctx.setLineDash([]); ctx.shadowBlur = 0
+// 地形セグメントに基づいて地面を描画する（穴の部分は描画しない）
+export function drawGround(
+  ctx: CanvasRenderingContext2D,
+  theme: Theme,
+  bg: BgContext,
+  terrain: TerrainSegment[],
+  stageProgress: number,
+) {
+  for (const seg of terrain) {
+    if (seg.type === 'hole') continue
+    const canvasX = PLAYER_X + (seg.stageX - stageProgress)
+    const groundY = seg.groundY
+
+    // 地面の塗り
+    ctx.fillStyle = theme.groundColor
+    ctx.fillRect(canvasX, groundY + 3, seg.width, CANVAS_H - groundY - 3)
+
+    // 地面ライン（ダッシュ）
+    ctx.strokeStyle = theme.groundLineColor; ctx.lineWidth = 2
+    ctx.shadowColor = theme.groundLineColor; ctx.shadowBlur = 5
+    ctx.setLineDash([28, 14])
+    ctx.lineDashOffset = -(bg.frame * bg.speed * 0.4) % 42
+    ctx.beginPath()
+    ctx.moveTo(canvasX, groundY + 3)
+    ctx.lineTo(canvasX + seg.width, groundY + 3)
+    ctx.stroke()
+    ctx.setLineDash([]); ctx.shadowBlur = 0
+  }
 }

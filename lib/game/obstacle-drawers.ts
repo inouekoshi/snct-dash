@@ -1,7 +1,7 @@
 import type { Obstacle } from './engine-types'
 import type { AreaId } from './areas'
 import { AREAS } from './areas'
-import { GROUND_Y } from './constants'
+import { DEFAULT_GROUND_Y as GROUND_Y } from './constants'
 import { rrect } from './helpers'
 
 type Theme = typeof AREAS[AreaId]
