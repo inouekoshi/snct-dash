@@ -41,7 +41,10 @@ export default function ResultModal({ nickname, result, onRetry, onHome, onLeade
             clear_time_ms: result.timeMs,
           }),
         })
-        if (!res.ok) throw new Error('submit failed')
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}))
+          throw new Error(`HTTP ${res.status}: ${body.error ?? 'unknown'}`)
+        }
         setSubmitted(true)
 
         const rankRes = await fetch(`/api/leaderboard?department=${result.departmentId}`)
@@ -52,8 +55,8 @@ export default function ResultModal({ nickname, result, onRetry, onHome, onLeade
           )
           setRank(idx === -1 ? entries.length + 1 : idx + 1)
         }
-      } catch {
-        setError('クリアタイムの登録に失敗しました')
+      } catch (e) {
+        setError(`クリアタイムの登録に失敗しました (${e instanceof Error ? e.message : String(e)})`)
       } finally {
         setSubmitting(false)
       }
