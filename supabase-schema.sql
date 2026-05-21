@@ -1,17 +1,24 @@
--- 高専ダッシュ！スコアテーブル
-CREATE TABLE scores (
+-- 高専ダッシュ！クリアタイムテーブル
+-- 旧 scores テーブルは廃止。全データ削除の上このスキーマを適用すること。
+
+CREATE TABLE stage_clears (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+
+  -- プレイヤー名（最大20文字、空白のみ不可）
   nickname TEXT NOT NULL CHECK (length(nickname) <= 20 AND length(trim(nickname)) > 0),
-  score INTEGER NOT NULL CHECK (score >= 0 AND score <= 999999),
-  distance INTEGER NOT NULL CHECK (distance >= 0),
-  max_area INTEGER NOT NULL CHECK (max_area BETWEEN 1 AND 5),
-  created_at TIMESTAMPTZ DEFAULT now()
+
+  -- 学科ID（1=機械, 2=電気電子, 3=電子情報, 4=生物応用化学, 5=材料工学）
+  department INTEGER NOT NULL CHECK (department BETWEEN 1 AND 5),
+
+  -- クリアタイム（ミリ秒。小さいほど上位）
+  clear_time_ms INTEGER NOT NULL CHECK (clear_time_ms > 0),
+
+  played_at TIMESTAMPTZ DEFAULT now()
 );
 
--- ランキング取得を高速化するインデックス
-CREATE INDEX idx_scores_score ON scores(score DESC);
-CREATE INDEX idx_scores_created_at ON scores(created_at DESC);
+-- 学科別ランキング取得を高速化
+CREATE INDEX idx_stage_clears_dept_time ON stage_clears(department, clear_time_ms ASC);
 
--- スコアの読み取りは誰でもできるが、書き込みはAPIのみ（service role key使用）
-ALTER TABLE scores ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Anyone can read scores" ON scores FOR SELECT USING (true);
+-- 読み取りは誰でもできる。書き込みはAPIルート（service_role）経由のみ
+ALTER TABLE stage_clears ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Anyone can read stage_clears" ON stage_clears FOR SELECT USING (true);
