@@ -22,7 +22,7 @@ export const SPAWN_GAPS: [number, number][] = [
 export const COYOTE_FRAMES      = 5
 export const JUMP_BUFFER_FRAMES = 8
 export const HIT_STOP_FRAMES    = 6
-export const MISS_OVERLAY_FRAMES = 120
+export const MISS_OVERLAY_FRAMES = 90
 export const REVIVAL_FRAMES      = 75
 
 export const STEP_FOLLOW_SPEED = 8
