@@ -103,8 +103,9 @@ Canvas上のX座標 = PLAYER_X + (stageX - stageProgress)
 - プレイヤーは画面上 `PLAYER_X = 110` に固定（動かない）
 - 「世界がプレイヤーの方に流れてくる」表現
 - プレイヤー直下の `stageProgress` でどのセグメントにいるかを判定
-- `type === 'hole'` のセグメントでは着地判定なし → 落下 → ジュゲム処理
+- `type === 'hole'` のセグメントでは着地判定なし → 落下 → 穴落下演出 → MISS
 - 段差（`groundY` が変わるセグメント）は `currentGroundY` を `STEP_FOLLOW_SPEED` ずつなめらかに追随
+- 上り段差の縦面には `isBlockedByStep()` で壁判定 → ジャンプなしでは段差境界でスクロールが止まる
 
 ### 地形の追加（`lib/game/terrain.ts`）
 
@@ -150,6 +151,40 @@ revivalTimer (75f)  → effectiveSpeed が SPEED_START に固定される
 - `missOverlayTimer > 0` の間は jump() を受け付けない
 - `revivalTimer > 0` の間はスコア計算用の速度 `effectiveSpeed` が `SPEED_START` で固定される
 - `stageProgress` を戻すだけで全オブジェクトのCanvas座標は次フレームの `toCanvasX()` で自動修正される
+
+### 穴落下の専用フロー（`isFallingIntoHole`）
+
+障害物ヒットとは異なり、穴落下には視覚的な落下演出がある。
+
+```typescript
+// ①: 地面から30px落ちたらフラグをセット（スクロール停止）
+if (targetGroundY === Infinity && py > DEFAULT_GROUND_Y + 30 && !isFallingIntoHole) {
+  isFallingIntoHole = true
+}
+
+// ②: 画面外（CANVAS_H + 60 = 340px）まで落ちたら knockback 発火
+if (isFallingIntoHole && py > CANVAS_H + 60) {
+  isFallingIntoHole = false
+  knockback(HOLE_KNOCKBACK)
+  ...
+}
+```
+
+フラグがセットされている間は `stageProgress` を更新しない（`isBlockedByStep()` と同じ仕組み）。
+世界が静止した状態でプレイヤーだけが重力で落下し、画面外に消えてから MISS 処理が走る。
+
+### 段差壁ブロック（`isBlockedByStep()`）
+
+上り段差に対してジャンプなしで接近した場合、スクロールを止めて壁として機能させる。
+
+```typescript
+private isBlockedByStep(): boolean {
+  // 上り段差（20px以上）の境界に speed+3px 以内まで近づいており
+  // プレイヤーが段差の上面より低い位置（py > curr.groundY + 5）にいるとき true を返す
+}
+```
+
+`stageProgress` の更新条件: `!isFallingIntoHole && !isBlockedByStep()`
 
 **「世界が前に流れる = プレイヤーが後退した見た目」** になります。
 ノックバック量は `constants.ts` の `KNOCKBACK_AMOUNT` / `HOLE_KNOCKBACK` で調整できます。
@@ -277,6 +312,23 @@ export const KNOCKBACK_INVINCIBLE = 90 // ノックバック後の無敵フレ�
 export const MISS_OVERLAY_FRAMES = 90  // MISS オーバーレイ表示時間（1.5秒）
 export const REVIVAL_FRAMES      = 75  // 復活スロー時間（1.25秒）
 ```
+
+### 穴落下・段差の閾値（`engine.ts` 内）
+
+```typescript
+// 穴落下フラグ発動: 地面からこの px 下がったらスクロール停止
+DEFAULT_GROUND_Y + 30  // = 250px
+
+// 穴落下 MISS 発火: 画面下端からこの px 下がったら knockback
+CANVAS_H + 60          // = 340px
+
+// 段差壁の最小高さ: これ未満の groundY 差は無視する
+20 (px)
+```
+
+- 穴落下フラグを下げると落ちた感が減り、上げすぎると高速時に穴をスキップできる
+- MISS発火を下げるとプレイヤーが画面外に出る前に消えて見え、上げるとワープ感が残る
+- 段差壁の高さは `buildStageMech` の `DEFAULT_GROUND_Y - 60` に合わせている
 
 ---
 
