@@ -166,7 +166,7 @@ export class GameEngine {
     }
 
     // 穴落下判定
-    if (this.targetGroundY === Infinity && this.py > CANVAS_H + 30) {
+    if (this.targetGroundY === Infinity && this.py > DEFAULT_GROUND_Y + 15) {
       this.knockback(HOLE_KNOCKBACK)
       this.py = this.currentGroundY
       this.pvy = -4  // 少し弾む演出
@@ -211,7 +211,7 @@ export class GameEngine {
     if (--this.nextObs <= 0) {
       const nextStageX = this.stageProgress + CANVAS_W
       if (this.hasGroundAt(nextStageX) && this.hasGroundAt(nextStageX + 65) && this.hasGroundAt(nextStageX + 130)) {
-        spawnObstacle(this.departmentId, nextStageX, this.obstacles)
+        spawnObstacle(this.departmentId, nextStageX, this.obstacles, this.getGroundHeightAt(nextStageX))
       }
       const [mn, r] = SPAWN_GAPS[this.departmentId] ?? SPAWN_GAPS[1]
       this.nextObs = mn + Math.random() * r
@@ -286,6 +286,15 @@ export class GameEngine {
       }
     }
     return true
+  }
+
+  private getGroundHeightAt(stageX: number): number {
+    for (const seg of this.terrain) {
+      if (stageX >= seg.stageX && stageX < seg.stageX + seg.width) {
+        return seg.type === 'hole' ? DEFAULT_GROUND_Y : seg.groundY
+      }
+    }
+    return DEFAULT_GROUND_Y
   }
 
   private knockback(amount: number) {
