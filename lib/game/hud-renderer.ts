@@ -53,6 +53,69 @@ export function drawHUD(ctx: CanvasRenderingContext2D, theme: Theme, s: HudState
   }
 }
 
+export function renderMissOverlay(
+  ctx: CanvasRenderingContext2D,
+  theme: Theme,
+  progressLost: number,
+  timer: number,
+  maxTimer: number,
+) {
+  const fadeIn  = Math.min(1, (maxTimer - timer) / 10)
+  const fadeOut = Math.min(1, timer / 10)
+  const alpha   = Math.min(fadeIn, fadeOut)
+
+  ctx.save()
+  ctx.globalAlpha = alpha * 0.65
+  ctx.fillStyle = '#a00000'
+  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H)
+
+  const cy = CANVAS_H / 2
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+
+  const TRANSITION = 20
+  if (timer > TRANSITION) {
+    const missAlpha = Math.min(1, (timer - TRANSITION) / 5)
+    ctx.globalAlpha = alpha * missAlpha
+    ctx.font = 'bold 44px monospace'
+    ctx.fillStyle = '#ffffff'
+    ctx.shadowColor = '#ff4444'; ctx.shadowBlur = 20
+    ctx.fillText('MISS!', CANVAS_W / 2, cy - 24)
+    ctx.shadowBlur = 0
+    ctx.font = '20px monospace'
+    ctx.fillStyle = theme.groundLineColor
+    ctx.globalAlpha = alpha * missAlpha * 0.9
+    ctx.fillText(`← ${progressLost} pt 後退`, CANVAS_W / 2, cy + 24)
+  }
+
+  if (timer <= TRANSITION + 10) {
+    const readyAlpha = Math.min(1, (TRANSITION + 10 - timer) / 10)
+    ctx.globalAlpha = alpha * readyAlpha
+    ctx.font = 'bold 22px monospace'
+    ctx.fillStyle = theme.groundLineColor
+    ctx.shadowColor = theme.groundLineColor; ctx.shadowBlur = 10
+    ctx.fillText('GET READY...', CANVAS_W / 2, cy)
+    ctx.shadowBlur = 0
+  }
+
+  ctx.restore()
+}
+
+export function renderRevivalHint(
+  ctx: CanvasRenderingContext2D,
+  theme: Theme,
+  timer: number,
+  maxTimer: number,
+) {
+  ctx.save()
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+  ctx.font = 'bold 20px monospace'
+  ctx.fillStyle = theme.groundLineColor
+  ctx.shadowColor = theme.groundLineColor; ctx.shadowBlur = 8
+  ctx.globalAlpha = (timer / maxTimer) * 0.85
+  ctx.fillText('GET READY...', CANVAS_W / 2, CANVAS_H / 2)
+  ctx.restore()
+}
+
 export function renderPauseOverlay(ctx: CanvasRenderingContext2D) {
   ctx.fillStyle = 'rgba(0,0,0,0.55)'
   ctx.fillRect(0, 0, CANVAS_W, CANVAS_H)

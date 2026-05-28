@@ -7,7 +7,7 @@ import {
   STAGE_LENGTH, SPEED_START, SPEED_END,
   KNOCKBACK_AMOUNT, HOLE_KNOCKBACK, KNOCKBACK_INVINCIBLE,
   SPAWN_GAPS, COYOTE_FRAMES, JUMP_BUFFER_FRAMES, HIT_STOP_FRAMES,
-  STEP_FOLLOW_SPEED,
+  STEP_FOLLOW_SPEED, MISS_OVERLAY_FRAMES, REVIVAL_FRAMES,
 } from './constants'
 import type { PlayerState, Obstacle, TerrainSegment, Item, Particle } from './engine-types'
 import { overlaps, playerHitbox } from './helpers'
@@ -15,7 +15,7 @@ import { drawObstacle } from './obstacle-drawers'
 import { drawBg, drawGround, type BgContext } from './background-renderers'
 import { drawPlayer } from './player-renderer'
 import { drawGoal } from './goal-renderer'
-import { drawHUD, renderPauseOverlay } from './hud-renderer'
+import { drawHUD, renderPauseOverlay, renderMissOverlay, renderRevivalHint } from './hud-renderer'
 import { spawnObstacle, spawnCeilingObstacle } from './spawner'
 import { buildStage } from './terrain'
 
@@ -36,6 +36,9 @@ export class GameEngine {
   private coyoteTime = 0
   private jumpBuffer = 0
   private hitStopTimer = 0
+  private missOverlayTimer = 0
+  private revivalTimer = 0
+  private missProgressLost = 0
 
   // Stage progress & timing
   private stageProgress = 0
@@ -82,7 +85,7 @@ export class GameEngine {
   // ── 公開インターフェース ───────────────────────────────────────────────────
 
   jump() {
-    if (this.isCleared || this.isPaused) return
+    if (this.isCleared || this.isPaused || this.missOverlayTimer > 0) return
     if (this.jumpCount === 0 || (this.coyoteTime > 0 && this.jumpCount === 1)) {
       if (this.coyoteTime > 0 && this.jumpCount === 1) this.jumpCount = 0
       this.performJump()
@@ -128,12 +131,17 @@ export class GameEngine {
     // ヒットストップ中はタイマー以外を止める
     if (this.hitStopTimer > 0) { this.hitStopTimer--; return }
 
+    // MISS オーバーレイ中は物理を止める（frame は進みアニメ継続）
+    if (this.missOverlayTimer > 0) { this.missOverlayTimer--; return }
+
     // タイマー加算（time_stopアイテム中は止まる）
     if (this.itemEffect !== 'time_stop') {
       this.elapsedMs += 1000 / 60
     }
 
-    const speed = this.currentSpeed
+    // 復活スロー：revivalTimer 中は最低速度に固定
+    if (this.revivalTimer > 0) this.revivalTimer--
+    const speed = this.effectiveSpeed
     this.stageProgress += speed
     this.bgX -= speed * 0.25
 
@@ -251,6 +259,10 @@ export class GameEngine {
     return SPEED_START + (SPEED_END - SPEED_START) * t
   }
 
+  private get effectiveSpeed(): number {
+    return this.revivalTimer > 0 ? SPEED_START : this.currentSpeed
+  }
+
   // stageProgress基準のCanvas X座標変換
   private toCanvasX(stageX: number): number {
     return PLAYER_X + (stageX - this.stageProgress)
@@ -277,9 +289,12 @@ export class GameEngine {
   }
 
   private knockback(amount: number) {
-    this.stageProgress = Math.max(0, this.stageProgress - amount)
-    this.invincible = KNOCKBACK_INVINCIBLE
-    this.hitStopTimer = HIT_STOP_FRAMES
+    this.stageProgress    = Math.max(0, this.stageProgress - amount)
+    this.missProgressLost = amount
+    this.invincible       = KNOCKBACK_INVINCIBLE
+    this.hitStopTimer     = HIT_STOP_FRAMES
+    this.missOverlayTimer = MISS_OVERLAY_FRAMES
+    this.revivalTimer     = REVIVAL_FRAMES
     playKnockback()
     this.burst(PLAYER_X, this.py - 20, '#ff8800', 10)
   }
@@ -308,7 +323,7 @@ export class GameEngine {
   private render() {
     const ctx = this.ctx
     const theme = AREAS[this.departmentId as AreaId]
-    const bg: BgContext = { frame: this.frame, bgX: this.bgX, speed: this.currentSpeed }
+    const bg: BgContext = { frame: this.frame, bgX: this.bgX, speed: this.missOverlayTimer > 0 ? 0 : this.effectiveSpeed }
 
     ctx.save()
 
@@ -337,6 +352,13 @@ export class GameEngine {
       invincible: this.invincible,
       departmentId: this.departmentId,
     })
+
+    if (this.missOverlayTimer > 0) {
+      renderMissOverlay(ctx, theme, this.missProgressLost, this.missOverlayTimer, MISS_OVERLAY_FRAMES)
+    }
+    if (this.revivalTimer > 0) {
+      renderRevivalHint(ctx, theme, this.revivalTimer, REVIVAL_FRAMES)
+    }
 
     ctx.restore()
   }
