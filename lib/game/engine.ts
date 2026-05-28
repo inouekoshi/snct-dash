@@ -14,6 +14,7 @@ import { overlaps, playerHitbox } from './helpers'
 import { drawObstacle } from './obstacle-drawers'
 import { drawBg, drawGround, type BgContext } from './background-renderers'
 import { drawPlayer } from './player-renderer'
+import { drawGoal } from './goal-renderer'
 import { drawHUD, renderPauseOverlay } from './hud-renderer'
 import { spawnObstacle, spawnCeilingObstacle } from './spawner'
 import { buildStage } from './terrain'
@@ -180,9 +181,16 @@ export class GameEngine {
       if (this.itemEffectTimer === 0) this.itemEffect = null
     }
 
+    // ゴール直前スパーク
+    if (!this.isCleared && STAGE_LENGTH - this.stageProgress <= 60 && this.frame % 4 === 0) {
+      const goalTheme = AREAS[this.departmentId as AreaId]
+      this.burst(this.toCanvasX(STAGE_LENGTH), 30, goalTheme.groundLineColor, 3)
+    }
+
     // クリア判定
     if (this.stageProgress >= STAGE_LENGTH && !this.isCleared) {
       this.isCleared = true
+      this.burst(PLAYER_X, DEFAULT_GROUND_Y - 100, AREAS[this.departmentId as AreaId].groundLineColor, 20)
       cancelAnimationFrame(this.raf)
       this.render() // 最後のフレームを描画
       playClear()
@@ -306,6 +314,7 @@ export class GameEngine {
 
     drawBg(ctx, this.departmentId as AreaId, theme, bg)
     drawGround(ctx, theme, bg, this.terrain, this.stageProgress)
+    drawGoal(ctx, this.departmentId as AreaId, theme, this.stageProgress, this.frame)
 
     for (const o of this.obstacles) drawObstacle(ctx, o, theme, this.frame)
 
