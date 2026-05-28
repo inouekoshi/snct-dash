@@ -60,7 +60,7 @@ export function renderMissOverlay(
   timer: number,
   maxTimer: number,
 ) {
-  const fadeIn  = Math.min(1, (maxTimer - timer) / 10)
+  const fadeIn  = Math.min(1, (maxTimer - timer) / 3)
   const fadeOut = Math.min(1, timer / 10)
   const alpha   = Math.min(fadeIn, fadeOut)
 

@@ -171,11 +171,11 @@ export class GameEngine {
 
     // 穴落下判定（2段階）
     // ①: 地面レベルを超えたらフラグセット（スクロール停止、プレイヤーのみ落下継続）
-    if (this.targetGroundY === Infinity && this.py > DEFAULT_GROUND_Y + 5 && !this.isFallingIntoHole) {
+    if (this.targetGroundY === Infinity && this.py > DEFAULT_GROUND_Y + 30 && !this.isFallingIntoHole) {
       this.isFallingIntoHole = true
     }
     // ②: 画面外まで落ちたら MISS 処理
-    if (this.isFallingIntoHole && this.py > CANVAS_H + 20) {
+    if (this.isFallingIntoHole && this.py > CANVAS_H + 60) {
       this.isFallingIntoHole = false
       this.knockback(HOLE_KNOCKBACK)
       this.py = this.currentGroundY
