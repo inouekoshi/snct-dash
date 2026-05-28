@@ -29,21 +29,51 @@ export function drawBg(ctx: CanvasRenderingContext2D, area: AreaId, theme: Theme
 
 function bgMech(ctx: CanvasRenderingContext2D, theme: Theme, bg: BgContext) {
   ctx.strokeStyle = theme.groundLineColor; ctx.lineWidth = 2
-  for (let gx = (bg.bgX * 0.15 % 220) - 220; gx < CANVAS_W + 220; gx += 220) {
-    for (let i = 0; i < 2; i++) {
-      const gy = 70 + i * 115, r = 40 + i * 15
-      const rot = bg.frame * 0.004 * (i % 2 ? -1 : 1)
-      ctx.globalAlpha = 0.07
-      ctx.beginPath(); ctx.arc(gx + i * 100, gy, r, 0, Math.PI * 2); ctx.stroke()
-      for (let t = 0; t < 12; t++) {
-        const a = rot + t / 12 * Math.PI * 2
-        ctx.beginPath()
-        ctx.moveTo(gx + i * 100 + Math.cos(a) * r, gy + Math.sin(a) * r)
-        ctx.lineTo(gx + i * 100 + Math.cos(a) * (r + 9), gy + Math.sin(a) * (r + 9))
-        ctx.stroke()
+
+  // 歯車3層（奥行き感）
+  const GEAR_LAYERS = [
+    { spacing: 260, radii: [28, 42, 60], yBases: [60, 120, 80] },
+  ]
+  for (const layer of GEAR_LAYERS) {
+    for (let gx = (bg.bgX * 0.12 % layer.spacing) - layer.spacing; gx < CANVAS_W + layer.spacing; gx += layer.spacing) {
+      for (let i = 0; i < 3; i++) {
+        const r = layer.radii[i], gy = layer.yBases[i]
+        const rot = bg.frame * (0.003 + i * 0.002) * (i % 2 ? -1 : 1)
+        const alpha = 0.04 + i * 0.02
+        ctx.globalAlpha = alpha
+        ctx.beginPath(); ctx.arc(gx + i * 90, gy, r, 0, Math.PI * 2); ctx.stroke()
+        const teeth = 8 + i * 4
+        for (let t = 0; t < teeth; t++) {
+          const a = rot + t / teeth * Math.PI * 2
+          ctx.beginPath()
+          ctx.moveTo(gx + i * 90 + Math.cos(a) * r, gy + Math.sin(a) * r)
+          ctx.lineTo(gx + i * 90 + Math.cos(a) * (r + 7 + i * 2), gy + Math.sin(a) * (r + 7 + i * 2))
+          ctx.stroke()
+        }
       }
     }
   }
+
+  // ベルトライン（水平に流れる）
+  ctx.strokeStyle = theme.groundLineColor; ctx.lineWidth = 1.5
+  for (const by of [80, 140, 175]) {
+    const ox = (bg.bgX * 0.3) % 60
+    ctx.globalAlpha = 0.04
+    ctx.beginPath(); ctx.moveTo(0, by); ctx.lineTo(CANVAS_W, by); ctx.stroke()
+    ctx.globalAlpha = 0.06
+    for (let bx = -ox; bx < CANVAS_W; bx += 60) {
+      ctx.beginPath(); ctx.moveTo(bx, by - 4); ctx.lineTo(bx + 30, by - 4); ctx.stroke()
+    }
+  }
+
+  // 熱気グラデーション（画面下部）
+  const heatAlpha = 0.03 + Math.sin(bg.frame * 0.04) * 0.01
+  const hg = ctx.createLinearGradient(0, DEFAULT_GROUND_Y - 40, 0, DEFAULT_GROUND_Y)
+  hg.addColorStop(0, 'transparent')
+  hg.addColorStop(1, '#ff6600')
+  ctx.globalAlpha = heatAlpha; ctx.fillStyle = hg
+  ctx.fillRect(0, DEFAULT_GROUND_Y - 40, CANVAS_W, 40)
+
   ctx.globalAlpha = 1
 }
 

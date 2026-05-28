@@ -269,6 +269,81 @@ function dStalactite(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme) {
   ctx.setLineDash([])
 }
 
+function dWrench(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme) {
+  const cx = o.x + o.w / 2
+  const headR = o.w * 0.46, headY = o.y + headR + 2
+  ctx.beginPath(); ctx.arc(cx, headY, headR, 0, Math.PI * 2); ctx.fill(); ctx.stroke()
+  ctx.fillStyle = theme.bgTop || '#000'
+  ctx.beginPath(); ctx.arc(cx, headY, headR * 0.44, 0, Math.PI * 2); ctx.fill()
+  ctx.strokeStyle = theme.obstacleStroke; ctx.lineWidth = 2
+  ctx.beginPath(); ctx.arc(cx, headY, headR * 0.44, 0, Math.PI * 2); ctx.stroke()
+  ctx.fillStyle = theme.obstacleColor; ctx.strokeStyle = theme.obstacleStroke
+  const shaftW = o.w * 0.32, shaftY = headY + headR - 2, shaftH = o.h - (headR * 2 + 2)
+  ctx.fillRect(cx - shaftW / 2, shaftY, shaftW, shaftH)
+  ctx.strokeRect(cx - shaftW / 2, shaftY, shaftW, shaftH)
+  ctx.strokeStyle = theme.obstacleStroke + '77'; ctx.lineWidth = 1
+  for (let i = 0; i < 3; i++) {
+    const ny = shaftY + shaftH * (0.2 + i * 0.3)
+    ctx.beginPath(); ctx.moveTo(cx - shaftW / 2 + 2, ny); ctx.lineTo(cx + shaftW / 2 - 2, ny); ctx.stroke()
+  }
+}
+
+function dSpring(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme) {
+  const cx = o.x + o.w / 2
+  const plateH = 4, loops = 5
+  ctx.fillStyle = theme.obstacleColor; ctx.strokeStyle = theme.obstacleStroke
+  ctx.fillRect(o.x, o.y, o.w, plateH); ctx.strokeRect(o.x, o.y, o.w, plateH)
+  ctx.fillRect(o.x, o.y + o.h - plateH, o.w, plateH); ctx.strokeRect(o.x, o.y + o.h - plateH, o.w, plateH)
+  const coilH = o.h - plateH * 2
+  const segH = coilH / (loops * 2)
+  ctx.strokeStyle = theme.obstacleStroke; ctx.lineWidth = 3; ctx.lineCap = 'round'
+  ctx.beginPath(); ctx.moveTo(cx, o.y + plateH)
+  for (let i = 0; i < loops * 2; i++) {
+    const tx = i % 2 === 0 ? o.x + 3 : o.x + o.w - 3
+    ctx.lineTo(tx, o.y + plateH + segH * (i + 1))
+  }
+  ctx.lineTo(cx, o.y + o.h - plateH); ctx.stroke()
+}
+
+function dFlywheel(ctx: CanvasRenderingContext2D, o: Obstacle, _theme: Theme, frame: number) {
+  const cx = o.x + o.w / 2, cy = o.y + o.h / 2
+  const R = Math.min(o.w, o.h) / 2 - 2
+  ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill(); ctx.stroke()
+  ctx.strokeStyle = _theme.obstacleStroke + 'aa'; ctx.lineWidth = 2.5
+  ctx.beginPath(); ctx.arc(cx, cy, R * 0.72, 0, Math.PI * 2); ctx.stroke()
+  const rot = frame * 0.012
+  ctx.strokeStyle = _theme.obstacleStroke; ctx.lineWidth = 2
+  for (let i = 0; i < 3; i++) {
+    const a = rot + (i / 3) * Math.PI * 2
+    ctx.beginPath()
+    ctx.moveTo(cx + Math.cos(a) * R * 0.14, cy + Math.sin(a) * R * 0.14)
+    ctx.lineTo(cx + Math.cos(a) * R * 0.70, cy + Math.sin(a) * R * 0.70)
+    ctx.stroke()
+  }
+  ctx.fillStyle = _theme.obstacleStroke
+  ctx.beginPath(); ctx.arc(cx, cy, R * 0.16, 0, Math.PI * 2); ctx.fill()
+}
+
+function dRobotArm(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme) {
+  const cx = o.x + o.w / 2
+  const baseH = o.h * 0.18, arm1H = o.h * 0.38, elbowR = 5
+  const baseY = o.y + o.h - baseH
+  ctx.fillRect(o.x + 2, baseY, o.w - 4, baseH); ctx.strokeRect(o.x + 2, baseY, o.w - 4, baseH)
+  const arm1W = o.w * 0.28
+  ctx.fillRect(cx - arm1W / 2, baseY - arm1H, arm1W, arm1H); ctx.strokeRect(cx - arm1W / 2, baseY - arm1H, arm1W, arm1H)
+  const elbowY = baseY - arm1H
+  ctx.beginPath(); ctx.arc(cx, elbowY, elbowR, 0, Math.PI * 2)
+  ctx.fillStyle = theme.obstacleStroke; ctx.fill(); ctx.stroke()
+  const arm2H = o.h * 0.3, arm2W = o.w * 0.22
+  const arm2Y = elbowY - arm2W
+  ctx.fillStyle = theme.obstacleColor
+  ctx.fillRect(cx - o.w * 0.36, arm2Y, o.w * 0.36, arm2H); ctx.strokeRect(cx - o.w * 0.36, arm2Y, o.w * 0.36, arm2H)
+  const gripX = o.x + o.w * 0.06, gripY = arm2Y
+  ctx.strokeStyle = theme.obstacleStroke; ctx.lineWidth = 2
+  ctx.beginPath(); ctx.moveTo(gripX, gripY); ctx.lineTo(gripX - 4, gripY - 10); ctx.stroke()
+  ctx.beginPath(); ctx.moveTo(gripX, gripY); ctx.lineTo(gripX - 4, gripY + 10); ctx.stroke()
+}
+
 export const OBSTACLE_DRAWERS: Record<Obstacle['shape'], ObstacleDrawFn> = {
   gear: dGear,
   bolt: dBolt,
@@ -286,6 +361,10 @@ export const OBSTACLE_DRAWERS: Record<Obstacle['shape'], ObstacleDrawFn> = {
   ingot: dIngot,
   lattice: dLattice,
   stalactite: dStalactite,
+  wrench: dWrench,
+  spring: dSpring,
+  flywheel: dFlywheel,
+  robot_arm: dRobotArm,
 }
 
 export function drawObstacle(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme, frame: number) {

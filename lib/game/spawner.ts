@@ -37,22 +37,34 @@ export function spawnCeilingObstacle(stageX: number, obstacles: Obstacle[]) {
   }
 }
 
-// 機械工学科: gear / bolt / piston
+// 機械工学科: wrench / spring / flywheel / robot_arm / gear
 function spawnDept1(push: (o: ObstacleInit) => void) {
   const r = Math.random()
-  if (r < 0.32) {
+  if (r < 0.20) {
+    const h = 52 + Math.random() * 20
+    push({ x: CANVAS_W + 10, y: DEFAULT_GROUND_Y - h, w: 22 + Math.random() * 12, h, shape: 'wrench' })
+  } else if (r < 0.36) {
+    const h = 44 + Math.random() * 22
+    const baseY = DEFAULT_GROUND_Y - h
+    push({ x: CANVAS_W + 10, y: baseY, w: 20 + Math.random() * 10, h, shape: 'spring', moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 28 })
+  } else if (r < 0.52) {
+    const s = 38 + Math.random() * 18
+    push({ x: CANVAS_W + 10, y: DEFAULT_GROUND_Y - s, w: s, h: s, shape: 'flywheel' })
+  } else if (r < 0.64) {
+    const h = 60 + Math.random() * 20
+    push({ x: CANVAS_W + 10, y: DEFAULT_GROUND_Y - h, w: 34 + Math.random() * 10, h, shape: 'robot_arm' })
+  } else if (r < 0.76) {
     const h = 30 + Math.random() * 28
     push({ x: CANVAS_W + 10, y: DEFAULT_GROUND_Y - h, w: 28 + Math.random() * 16, h, shape: 'gear' })
-  } else if (r < 0.62) {
-    const h = 44 + Math.random() * 24
-    push({ x: CANVAS_W + 10, y: DEFAULT_GROUND_Y - h, w: 20 + Math.random() * 8, h, shape: 'bolt' })
-  } else if (r < 0.84) {
-    const h = 38 + Math.random() * 22
-    push({ x: CANVAS_W + 10, y: DEFAULT_GROUND_Y - h, w: 26 + Math.random() * 10, h, shape: 'piston' })
+  } else if (r < 0.88) {
+    const h1 = 52 + Math.random() * 16, h2 = 44 + Math.random() * 18
+    const baseY = DEFAULT_GROUND_Y - h2
+    push({ x: CANVAS_W + 10, y: DEFAULT_GROUND_Y - h1, w: 26, h: h1, shape: 'wrench' })
+    push({ x: CANVAS_W + 70, y: baseY, w: 22, h: h2, shape: 'spring', moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 28 })
   } else {
-    const h1 = 30 + Math.random() * 20, h2 = 44 + Math.random() * 18
-    push({ x: CANVAS_W + 10, y: DEFAULT_GROUND_Y - h1, w: 28, h: h1, shape: 'gear' })
-    push({ x: CANVAS_W + 66, y: DEFAULT_GROUND_Y - h2, w: 20, h: h2, shape: 'bolt' })
+    const s = 42 + Math.random() * 14, h2 = 58 + Math.random() * 18
+    push({ x: CANVAS_W + 10, y: DEFAULT_GROUND_Y - s, w: s, h: s, shape: 'flywheel' })
+    push({ x: CANVAS_W + 80, y: DEFAULT_GROUND_Y - h2, w: 32, h: h2, shape: 'robot_arm' })
   }
 }
 

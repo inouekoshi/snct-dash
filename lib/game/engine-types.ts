@@ -6,6 +6,7 @@ export interface Obstacle {
   shape: 'gear' | 'bolt' | 'piston' | 'circuit' | 'coil' | 'capacitor'
        | 'bug' | 'monitor' | 'chip' | 'bacteria' | 'flask' | 'mushroom'
        | 'crystal' | 'ingot' | 'lattice' | 'stalactite'
+       | 'wrench' | 'spring' | 'flywheel' | 'robot_arm'
   moving: boolean; phase: number; baseY: number; amplitude: number
 }
 
