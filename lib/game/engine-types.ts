@@ -7,6 +7,7 @@ export interface Obstacle {
        | 'bug' | 'monitor' | 'chip' | 'bacteria' | 'flask' | 'mushroom'
        | 'crystal' | 'ingot' | 'lattice' | 'stalactite'
        | 'wrench' | 'spring' | 'flywheel' | 'robot_arm'
+       | 'hammer' | 'conveyor'
   moving: boolean; phase: number; baseY: number; amplitude: number
 }
 

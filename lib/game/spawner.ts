@@ -37,34 +37,54 @@ export function spawnCeilingObstacle(stageX: number, obstacles: Obstacle[]) {
   }
 }
 
-// 機械工学科: wrench / spring / flywheel / robot_arm / gear
+// 機械工学科: wrench(小/大) / spring / flywheel(小/大) / robot_arm / hammer / conveyor / 複合
 function spawnDept1(push: (o: ObstacleInit) => void) {
   const r = Math.random()
-  if (r < 0.20) {
-    const h = 52 + Math.random() * 20
-    push({ x: CANVAS_W + 10, y: DEFAULT_GROUND_Y - h, w: 22 + Math.random() * 12, h, shape: 'wrench' })
-  } else if (r < 0.36) {
+  if (r < 0.10) {
+    // 小さいレンチ：地面スレスレ、見落としやすい
+    const h = 30 + Math.random() * 14
+    push({ x: CANVAS_W + 10, y: DEFAULT_GROUND_Y - h, w: 14 + Math.random() * 8, h, shape: 'wrench' })
+  } else if (r < 0.20) {
+    // 大きいレンチ：全ジャンプ必要
+    const h = 68 + Math.random() * 18
+    push({ x: CANVAS_W + 10, y: DEFAULT_GROUND_Y - h, w: 28 + Math.random() * 10, h, shape: 'wrench' })
+  } else if (r < 0.30) {
+    // スプリング：上下移動
     const h = 44 + Math.random() * 22
     const baseY = DEFAULT_GROUND_Y - h
-    push({ x: CANVAS_W + 10, y: baseY, w: 20 + Math.random() * 10, h, shape: 'spring', moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 28 })
-  } else if (r < 0.52) {
-    const s = 38 + Math.random() * 18
+    push({ x: CANVAS_W + 10, y: baseY, w: 22 + Math.random() * 10, h, shape: 'spring', moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 32 })
+  } else if (r < 0.39) {
+    // 小フライホイール
+    const s = 26 + Math.random() * 14
     push({ x: CANVAS_W + 10, y: DEFAULT_GROUND_Y - s, w: s, h: s, shape: 'flywheel' })
-  } else if (r < 0.64) {
-    const h = 60 + Math.random() * 20
-    push({ x: CANVAS_W + 10, y: DEFAULT_GROUND_Y - h, w: 34 + Math.random() * 10, h, shape: 'robot_arm' })
-  } else if (r < 0.76) {
-    const h = 30 + Math.random() * 28
-    push({ x: CANVAS_W + 10, y: DEFAULT_GROUND_Y - h, w: 28 + Math.random() * 16, h, shape: 'gear' })
-  } else if (r < 0.88) {
-    const h1 = 52 + Math.random() * 16, h2 = 44 + Math.random() * 18
+  } else if (r < 0.48) {
+    // 大フライホイール：広い当たり判定
+    const s = 60 + Math.random() * 18
+    push({ x: CANVAS_W + 10, y: DEFAULT_GROUND_Y - s, w: s, h: s, shape: 'flywheel' })
+  } else if (r < 0.57) {
+    // ロボットアーム
+    const h = 58 + Math.random() * 22
+    push({ x: CANVAS_W + 10, y: DEFAULT_GROUND_Y - h, w: 32 + Math.random() * 14, h, shape: 'robot_arm' })
+  } else if (r < 0.66) {
+    // ハンマー：幅広・高さ大の難関障害物
+    const h = 70 + Math.random() * 20
+    push({ x: CANVAS_W + 10, y: DEFAULT_GROUND_Y - h, w: 50 + Math.random() * 18, h, shape: 'hammer' })
+  } else if (r < 0.75) {
+    // コンベア：低くて幅広、ジャンプ距離が必要
+    const w = 86 + Math.random() * 38
+    const h = 20 + Math.random() * 10
+    push({ x: CANVAS_W + 10, y: DEFAULT_GROUND_Y - h, w, h, shape: 'conveyor' })
+  } else if (r < 0.87) {
+    // 複合：レンチ + スプリング
+    const h1 = 52 + Math.random() * 18, h2 = 42 + Math.random() * 18
     const baseY = DEFAULT_GROUND_Y - h2
-    push({ x: CANVAS_W + 10, y: DEFAULT_GROUND_Y - h1, w: 26, h: h1, shape: 'wrench' })
-    push({ x: CANVAS_W + 70, y: baseY, w: 22, h: h2, shape: 'spring', moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 28 })
+    push({ x: CANVAS_W + 10, y: DEFAULT_GROUND_Y - h1, w: 24, h: h1, shape: 'wrench' })
+    push({ x: CANVAS_W + 72, y: baseY, w: 22, h: h2, shape: 'spring', moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 30 })
   } else {
-    const s = 42 + Math.random() * 14, h2 = 58 + Math.random() * 18
+    // 複合：大フライホイール + ハンマー
+    const s = 50 + Math.random() * 16, h2 = 68 + Math.random() * 18
     push({ x: CANVAS_W + 10, y: DEFAULT_GROUND_Y - s, w: s, h: s, shape: 'flywheel' })
-    push({ x: CANVAS_W + 80, y: DEFAULT_GROUND_Y - h2, w: 32, h: h2, shape: 'robot_arm' })
+    push({ x: CANVAS_W + s + 22, y: DEFAULT_GROUND_Y - h2, w: 48, h: h2, shape: 'hammer' })
   }
 }
 

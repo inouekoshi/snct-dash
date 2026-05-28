@@ -40,11 +40,11 @@ function buildStageDefault(): TerrainSegment[] {
   return segments
 }
 
-// 機械工学科専用地形：段差あり・やや短い地面幅・穴多め
+// 機械工学科専用地形：短い地面・穴パターン3種（通常/精度/連続）で差別化
+// 注: エンジンの段差スナップ仕様上、高さ変化はジャンプ要求にならないため廃止
 function buildStageMech(): TerrainSegment[] {
   const segments: TerrainSegment[] = []
   let cursor = 0
-  let currentLevel = DEFAULT_GROUND_Y
 
   segments.push({ type: 'ground', stageX: 0, width: 500, groundY: DEFAULT_GROUND_Y })
   cursor = 500
@@ -52,22 +52,42 @@ function buildStageMech(): TerrainSegment[] {
   const SAFE_ZONE_END = STAGE_LENGTH - 600
 
   while (cursor < SAFE_ZONE_END) {
-    // 段差：30%確率で切り替え
-    if (Math.random() < 0.3) {
-      currentLevel = currentLevel === DEFAULT_GROUND_Y ? DEFAULT_GROUND_Y - 22 : DEFAULT_GROUND_Y
-    }
-
-    const groundWidth = 160 + Math.random() * 220
-    segments.push({ type: 'ground', stageX: cursor, width: groundWidth, groundY: currentLevel })
+    const groundWidth = 140 + Math.random() * 180
+    segments.push({ type: 'ground', stageX: cursor, width: groundWidth, groundY: DEFAULT_GROUND_Y })
     cursor += groundWidth
 
     if (cursor >= SAFE_ZONE_END) break
 
-    if (Math.random() < 0.45) {
-      const holeWidth = 110 + Math.random() * 90
-      segments.push({ type: 'hole', stageX: cursor, width: holeWidth })
-      cursor += holeWidth
-      currentLevel = DEFAULT_GROUND_Y
+    if (Math.random() < 0.52) {
+      const pat = Math.random()
+      if (pat < 0.45) {
+        // 通常の穴
+        const holeWidth = 110 + Math.random() * 70
+        segments.push({ type: 'hole', stageX: cursor, width: holeWidth })
+        cursor += holeWidth
+      } else if (pat < 0.75) {
+        // 精度が必要な狭い穴（着地タイミング要求）
+        const holeWidth = 65 + Math.random() * 30
+        segments.push({ type: 'hole', stageX: cursor, width: holeWidth })
+        cursor += holeWidth
+      } else if (cursor + 360 < SAFE_ZONE_END) {
+        // 連続穴：小さな足場を挟んだ2連ホール
+        const w1 = 95 + Math.random() * 45
+        const bridge = 65 + Math.random() * 45
+        const w2 = 95 + Math.random() * 45
+        segments.push({ type: 'hole', stageX: cursor, width: w1 })
+        cursor += w1
+        segments.push({ type: 'ground', stageX: cursor, width: bridge, groundY: DEFAULT_GROUND_Y })
+        cursor += bridge
+        if (cursor < SAFE_ZONE_END) {
+          segments.push({ type: 'hole', stageX: cursor, width: w2 })
+          cursor += w2
+        }
+      } else {
+        const holeWidth = 100 + Math.random() * 60
+        segments.push({ type: 'hole', stageX: cursor, width: holeWidth })
+        cursor += holeWidth
+      }
     }
   }
 

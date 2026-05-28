@@ -344,6 +344,52 @@ function dRobotArm(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme) {
   ctx.beginPath(); ctx.moveTo(gripX, gripY); ctx.lineTo(gripX - 4, gripY + 10); ctx.stroke()
 }
 
+function dHammer(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme) {
+  const cx = o.x + o.w / 2
+  const headH = Math.min(o.h * 0.32, 28)
+  const shaftH = o.h * 0.35
+  const baseH = o.h - headH - shaftH
+  const shaftW = o.w * 0.28
+
+  ctx.fillRect(o.x, o.y, o.w, headH); ctx.strokeRect(o.x, o.y, o.w, headH)
+  ctx.strokeStyle = theme.obstacleStroke + '66'; ctx.lineWidth = 1.5
+  for (let i = 1; i < 3; i++) {
+    const ly = o.y + headH * (i / 3)
+    ctx.beginPath(); ctx.moveTo(o.x + 4, ly); ctx.lineTo(o.x + o.w - 4, ly); ctx.stroke()
+  }
+  ctx.fillStyle = theme.obstacleColor; ctx.strokeStyle = theme.obstacleStroke; ctx.lineWidth = 2
+  ctx.fillRect(cx - shaftW / 2, o.y + headH, shaftW, shaftH)
+  ctx.strokeRect(cx - shaftW / 2, o.y + headH, shaftW, shaftH)
+  ctx.fillRect(o.x + 4, o.y + headH + shaftH, o.w - 8, baseH)
+  ctx.strokeRect(o.x + 4, o.y + headH + shaftH, o.w - 8, baseH)
+  ctx.strokeStyle = theme.obstacleStroke + '44'; ctx.lineWidth = 1.5
+  for (let i = 0; i < 3; i++) {
+    const ly = o.y + 4 + i * (headH * 0.28)
+    const len = 8 + i * 4
+    ctx.beginPath(); ctx.moveTo(o.x - 3, ly); ctx.lineTo(o.x - 3 - len, ly); ctx.stroke()
+    ctx.beginPath(); ctx.moveTo(o.x + o.w + 3, ly); ctx.lineTo(o.x + o.w + 3 + len, ly); ctx.stroke()
+  }
+}
+
+function dConveyor(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme, frame: number) {
+  rrect(ctx, o.x, o.y, o.w, o.h, 4); ctx.fill(); ctx.stroke()
+  const rr = Math.min(o.h * 0.42, 10)
+  ctx.fillStyle = theme.obstacleStroke
+  ctx.beginPath(); ctx.arc(o.x + rr + 3, o.y + o.h / 2, rr, 0, Math.PI * 2); ctx.fill(); ctx.stroke()
+  ctx.beginPath(); ctx.arc(o.x + o.w - rr - 3, o.y + o.h / 2, rr, 0, Math.PI * 2); ctx.fill(); ctx.stroke()
+  const beltX1 = o.x + rr * 2 + 6, beltX2 = o.x + o.w - rr * 2 - 6
+  if (beltX2 > beltX1) {
+    ctx.save()
+    ctx.beginPath(); ctx.rect(beltX1, o.y + 2, beltX2 - beltX1, o.h - 4); ctx.clip()
+    const stripeOff = (frame * 2) % 20
+    ctx.strokeStyle = theme.obstacleStroke + '77'; ctx.lineWidth = 2
+    for (let sx = beltX1 - stripeOff; sx < beltX2 + 20; sx += 20) {
+      ctx.beginPath(); ctx.moveTo(sx, o.y + 2); ctx.lineTo(sx + 7, o.y + o.h - 2); ctx.stroke()
+    }
+    ctx.restore()
+  }
+}
+
 export const OBSTACLE_DRAWERS: Record<Obstacle['shape'], ObstacleDrawFn> = {
   gear: dGear,
   bolt: dBolt,
@@ -365,6 +411,8 @@ export const OBSTACLE_DRAWERS: Record<Obstacle['shape'], ObstacleDrawFn> = {
   spring: dSpring,
   flywheel: dFlywheel,
   robot_arm: dRobotArm,
+  hammer: dHammer,
+  conveyor: dConveyor,
 }
 
 export function drawObstacle(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme, frame: number) {

@@ -194,7 +194,9 @@ export class GameEngine {
     const CEIL_GROUND_GAP = 90
     if (--this.nextObs <= 0) {
       const nextStageX = this.stageProgress + CANVAS_W
-      spawnObstacle(this.departmentId, nextStageX, this.obstacles)
+      if (this.hasGroundAt(nextStageX) && this.hasGroundAt(nextStageX + 65) && this.hasGroundAt(nextStageX + 130)) {
+        spawnObstacle(this.departmentId, nextStageX, this.obstacles)
+      }
       const [mn, r] = SPAWN_GAPS[this.departmentId] ?? SPAWN_GAPS[1]
       this.nextObs = mn + Math.random() * r
       this.nextCeilingObs = Math.max(this.nextCeilingObs, CEIL_GROUND_GAP)
@@ -255,6 +257,15 @@ export class GameEngine {
       }
     }
     return DEFAULT_GROUND_Y
+  }
+
+  private hasGroundAt(stageX: number): boolean {
+    for (const seg of this.terrain) {
+      if (stageX >= seg.stageX && stageX < seg.stageX + seg.width) {
+        return seg.type !== 'hole'
+      }
+    }
+    return true
   }
 
   private knockback(amount: number) {
