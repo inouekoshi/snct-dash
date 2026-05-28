@@ -6,7 +6,8 @@
 
 - [ゲームエンジンの構造](#ゲームエンジンの構造)
 - [地形システム](#地形システム)
-- [ノックバック処理](#ノックバック処理)
+- [ノックバック・MISSシステム](#ノックバックmissシステム)
+- [ゴールレンダラー](#ゴールレンダラー)
 - [新しいアイテムを追加する](#新しいアイテムを追加する)
 - [障害物の種類を追加する](#障害物の種類を追加する)
 - [ゲームバランスの調整](#ゲームバランスの調整)
@@ -117,23 +118,57 @@ export function buildStage(departmentId: number): TerrainSegment[] {
 
 ---
 
-## ノックバック処理
+## ノックバック・MISSシステム
 
-障害物ヒット時・穴落下時に呼ばれます。
+障害物ヒット時・穴落下時に `knockback(amount)` が呼ばれます。
 
 ```typescript
 private knockback(amount: number) {
-  this.stageProgress = Math.max(0, this.stageProgress - amount)
-  this.invincible = KNOCKBACK_INVINCIBLE  // 無敵フレーム（約1.5秒）
-  this.hitStopTimer = HIT_STOP_FRAMES
+  this.stageProgress    = Math.max(0, this.stageProgress - amount)
+  this.missProgressLost = amount              // オーバーレイに表示する後退量
+  this.invincible       = KNOCKBACK_INVINCIBLE
+  this.hitStopTimer     = HIT_STOP_FRAMES     // 6f = 0.1秒の衝撃感演出
+  this.missOverlayTimer = MISS_OVERLAY_FRAMES // 90f = 1.5秒の MISS 表示
+  this.revivalTimer     = REVIVAL_FRAMES      // 75f = 1.25秒の復活スロー
   playKnockback()
+  this.burst(PLAYER_X, this.py - 20, '#ff8800', 10)
 }
 ```
 
-`stageProgress` を戻すだけで完結します。`stageX` ベースの座標管理のため、全オブジェクトのCanvas座標は次フレームの `toCanvasX()` 呼び出しで自動的に正しい値になります。
+### ミス〜復活タイマーの流れ
+
+```
+hitStopTimer (6f)  → update() を丸ごとスキップ（frame は進む）
+  ↓ 完了
+missOverlayTimer (90f)  → 物理演算・スポーンをスキップ。赤オーバーレイを描画
+  ↓ 完了
+revivalTimer (75f)  → effectiveSpeed が SPEED_START に固定される
+  ↓ 完了
+通常速度に戻る
+```
+
+- `missOverlayTimer > 0` の間は jump() を受け付けない
+- `revivalTimer > 0` の間はスコア計算用の速度 `effectiveSpeed` が `SPEED_START` で固定される
+- `stageProgress` を戻すだけで全オブジェクトのCanvas座標は次フレームの `toCanvasX()` で自動修正される
 
 **「世界が前に流れる = プレイヤーが後退した見た目」** になります。
-ノックバック量は `constants.ts` の `KNOCKBACK_AMOUNT` で調整できます。
+ノックバック量は `constants.ts` の `KNOCKBACK_AMOUNT` / `HOLE_KNOCKBACK` で調整できます。
+
+---
+
+## ゴールレンダラー
+
+`lib/game/goal-renderer.ts` の `drawGoal()` がステージ終端のフラッグポールを描画します。
+
+```typescript
+drawGoal(ctx, areaId, theme, stageProgress, frame)
+```
+
+- `stageX = STAGE_LENGTH` の位置に台座・ポール・学科emoji入りの旗を描画
+- 750px 以内に近づくとグロー強度が増しパルスアニメーション
+- 450px 以内で「GOAL」テキストがフェードイン
+- 旗は `Math.sin(frame * 0.12 + t * 3.5)` の波打ちアニメーション
+- `canvasX < -100 || canvasX > 900` の範囲外は描画をスキップ
 
 ---
 
@@ -193,10 +228,20 @@ const drawFns: Record<Shape, DrawFn> = {
 ### 3. スポーン関数で使用（`spawner.ts`）
 
 ```typescript
-// stageX = スポーンのステージ座標（通常 stageProgress + CANVAS_W 付近）
-function spawnDept1(stageX: number, obstacles: Obstacle[]) {
-  mk(obstacles, { stageX, x: CANVAS_W + 10, y: DEFAULT_GROUND_Y - 50, w: 35, h: 50, shape: 'new_shape' })
+// push(o) は o.x の Canvas オフセット（CANVAS_W+10 基準）を stageX に変換して登録する
+// groundY は地形の高さ（段差上なら DEFAULT_GROUND_Y より小さい値が渡る）
+function spawnDept1(push: (o: ObstacleInit) => void, groundY: number) {
+  const h = 50
+  push({ x: CANVAS_W + 10, y: groundY - h, w: 35, h, shape: 'new_shape' })
 }
+```
+
+複合障害物の場合は `x` に異なる offset を渡すことで正しい間隔に配置される：
+
+```typescript
+push({ x: CANVAS_W + 10,  y: groundY - h1, w: 24, h: h1, shape: 'wrench' })
+push({ x: CANVAS_W + 72,  y: groundY - h2, w: 22, h: h2, shape: 'spring' })
+// → 2つ目の stageX は 1つ目から 62px 先になる
 ```
 
 ---
@@ -213,8 +258,8 @@ export const SPEED_START   = 4      // 序盤の速度（px/frame）
 export const SPEED_END     = 15     // 終盤の速度（px/frame）
 ```
 
-> **注意**: `STAGE_LENGTH = 6000` にすると約12秒でクリアになってしまう。
-> テスト時は `15000`（約30秒）、本番は `70000` を使うこと。
+> **注意**: `STAGE_LENGTH` は現在 `15000`（約30秒・テスト用）。本番リリース前に `70000` に戻すこと。
+> `6000` 以下にすると 10 秒程度でクリアになり、ゲームとして成立しない。
 
 ### ノックバック量
 
@@ -226,9 +271,11 @@ export const HOLE_KNOCKBACK   = 200  // 穴落下時の後退量
 ### フェアネス機構
 
 ```typescript
-export const COYOTE_FRAMES      = 5   // コヨーテタイム（地面を離れた後のジャンプ猶予）
-export const JUMP_BUFFER_FRAMES = 8   // 先行入力バッファ（着地直前のジャンプ入力保持）
+export const COYOTE_FRAMES       = 5   // コヨーテタイム（地面を離れた後のジャンプ猶予）
+export const JUMP_BUFFER_FRAMES  = 8   // 先行入力バッファ（着地直前のジャンプ入力保持）
 export const KNOCKBACK_INVINCIBLE = 90 // ノックバック後の無敵フレーム数
+export const MISS_OVERLAY_FRAMES = 90  // MISS オーバーレイ表示時間（1.5秒）
+export const REVIVAL_FRAMES      = 75  // 復活スロー時間（1.25秒）
 ```
 
 ---

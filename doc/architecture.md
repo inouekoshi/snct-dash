@@ -44,11 +44,12 @@ snct-dash/
         ├── terrain.ts               # 地形セグメント生成・管理（段差・穴）
         ├── areas.ts                 # 5学科のテーマ定義（色・名前・絵文字）
         ├── helpers.ts               # overlaps / hitCircle / playerHitbox / rrect
-        ├── spawner.ts               # spawnObstacle / spawnItem
+        ├── spawner.ts               # spawnObstacle(stageX, obstacles, groundY) / spawnCeilingObstacle
         ├── obstacle-drawers.ts      # drawObstacle（Record<Shape, DrawFn> によるデータ駆動描画）
         ├── background-renderers.ts  # drawBg / drawGround（地形対応版）
         ├── player-renderer.ts       # drawPlayer
-        ├── hud-renderer.ts          # drawHUD（タイム表示・進捗バー等）/ drawTransition
+        ├── goal-renderer.ts         # drawGoal（ゴールフラッグポール・旗波打ちアニメ）
+        ├── hud-renderer.ts          # drawHUD / renderMissOverlay / renderRevivalHint / renderPauseOverlay
         └── sound.ts                 # Web Audio API によるプロシージャル効果音
 ```
 
