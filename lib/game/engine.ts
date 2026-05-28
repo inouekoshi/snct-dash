@@ -39,6 +39,7 @@ export class GameEngine {
   private missOverlayTimer = 0
   private revivalTimer = 0
   private missProgressLost = 0
+  private isFallingIntoHole = false
 
   // Stage progress & timing
   private stageProgress = 0
@@ -142,8 +143,11 @@ export class GameEngine {
     // 復活スロー：revivalTimer 中は最低速度に固定
     if (this.revivalTimer > 0) this.revivalTimer--
     const speed = this.effectiveSpeed
-    this.stageProgress += speed
-    this.bgX -= speed * 0.25
+    // 穴落下中はスクロールを停止し、プレイヤーだけが落ちていく演出にする
+    if (!this.isFallingIntoHole) {
+      this.stageProgress += speed
+      this.bgX -= speed * 0.25
+    }
 
     // 地形判定
     this.targetGroundY = this.getGroundY()
@@ -165,11 +169,17 @@ export class GameEngine {
       if (this.jumpBuffer > 0) this.jumpBuffer--
     }
 
-    // 穴落下判定
-    if (this.targetGroundY === Infinity && this.py > DEFAULT_GROUND_Y + 15) {
+    // 穴落下判定（2段階）
+    // ①: 地面レベルを超えたらフラグセット（スクロール停止、プレイヤーのみ落下継続）
+    if (this.targetGroundY === Infinity && this.py > DEFAULT_GROUND_Y + 5 && !this.isFallingIntoHole) {
+      this.isFallingIntoHole = true
+    }
+    // ②: 画面外まで落ちたら MISS 処理
+    if (this.isFallingIntoHole && this.py > CANVAS_H + 20) {
+      this.isFallingIntoHole = false
       this.knockback(HOLE_KNOCKBACK)
       this.py = this.currentGroundY
-      this.pvy = -4  // 少し弾む演出
+      this.pvy = -4
       this.pState = 'jumping'
       this.jumpCount = 1
     }
@@ -249,6 +259,7 @@ export class GameEngine {
           return
         }
       }
+      this.checkStepWallCollision()
     }
   }
 
@@ -295,6 +306,24 @@ export class GameEngine {
       }
     }
     return DEFAULT_GROUND_Y
+  }
+
+  private checkStepWallCollision() {
+    const speed = this.effectiveSpeed
+    for (let i = 1; i < this.terrain.length; i++) {
+      const prev = this.terrain[i - 1]
+      const curr = this.terrain[i]
+      if (prev.type !== 'ground' || curr.type !== 'ground') continue
+      const stepHeight = prev.groundY - curr.groundY  // 正なら上り段差
+      if (stepHeight < 20) continue
+      const dist = curr.stageX - this.stageProgress
+      if (dist >= 0 && dist <= speed + 3) {
+        if (this.py > curr.groundY + 5) {
+          this.knockback(KNOCKBACK_AMOUNT)
+          return
+        }
+      }
+    }
   }
 
   private knockback(amount: number) {

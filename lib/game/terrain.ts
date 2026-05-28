@@ -62,7 +62,7 @@ function buildStageMech(): TerrainSegment[] {
     if (pat < 0.22) {
       // 段差（上/下トグル）
       currentLevel = currentLevel === DEFAULT_GROUND_Y
-        ? DEFAULT_GROUND_Y - 35
+        ? DEFAULT_GROUND_Y - 60  // ジャンプ必要な高さ
         : DEFAULT_GROUND_Y
     } else if (pat < 0.62) {
       // 通常の穴
