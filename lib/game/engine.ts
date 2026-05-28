@@ -143,8 +143,8 @@ export class GameEngine {
     // 復活スロー：revivalTimer 中は最低速度に固定
     if (this.revivalTimer > 0) this.revivalTimer--
     const speed = this.effectiveSpeed
-    // 穴落下中はスクロールを停止し、プレイヤーだけが落ちていく演出にする
-    if (!this.isFallingIntoHole) {
+    // 穴落下中・段差壁ブロック中はスクロールを停止
+    if (!this.isFallingIntoHole && !this.isBlockedByStep()) {
       this.stageProgress += speed
       this.bgX -= speed * 0.25
     }
@@ -259,7 +259,6 @@ export class GameEngine {
           return
         }
       }
-      this.checkStepWallCollision()
     }
   }
 
@@ -308,7 +307,7 @@ export class GameEngine {
     return DEFAULT_GROUND_Y
   }
 
-  private checkStepWallCollision() {
+  private isBlockedByStep(): boolean {
     const speed = this.effectiveSpeed
     for (let i = 1; i < this.terrain.length; i++) {
       const prev = this.terrain[i - 1]
@@ -318,12 +317,10 @@ export class GameEngine {
       if (stepHeight < 20) continue
       const dist = curr.stageX - this.stageProgress
       if (dist >= 0 && dist <= speed + 3) {
-        if (this.py > curr.groundY + 5) {
-          this.knockback(KNOCKBACK_AMOUNT)
-          return
-        }
+        if (this.py > curr.groundY + 5) return true
       }
     }
+    return false
   }
 
   private knockback(amount: number) {
