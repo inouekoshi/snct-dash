@@ -16,7 +16,7 @@ export const KNOCKBACK_INVINCIBLE = 90
 
 // [最小frames, ランダム幅frames]。インデックス0は未使用、1〜5がdepartmentId対応
 export const SPAWN_GAPS: [number, number][] = [
-  [0, 0], [110, 60], [85, 50], [65, 40], [50, 32], [36, 26],
+  [0, 0], [44, 28], [85, 50], [65, 40], [50, 32], [36, 26],
 ]
 
 export const COYOTE_FRAMES      = 5

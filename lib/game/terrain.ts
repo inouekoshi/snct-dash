@@ -40,11 +40,11 @@ function buildStageDefault(): TerrainSegment[] {
   return segments
 }
 
-// 機械工学科専用地形：穴は無し。段差を積み上げた「山登り（上って下る）」階段で差別化
+// 機械工学科専用地形：穴は無し。段差を積み上げた「山登り」階段で差別化
 const STEP_H = 40  // 1段の高さ。1ジャンプ（最大約140px）で余裕を持って越えられる
 
 // 山型階段を1まとまり生成して新しい cursor を返す。
-// level 段（2〜4段）上って頂上で平坦、同じ段数を下って基準高さへ戻る。
+// 段（2〜4段）を上って頂上の平坦部に達する。下りは無く、頂上の端から基準高さへ急落下する。
 function pushMountain(segments: TerrainSegment[], startCursor: number): number {
   let cursor = startCursor
   const steps = 2 + Math.floor(Math.random() * 3)  // 2〜4段
@@ -56,17 +56,10 @@ function pushMountain(segments: TerrainSegment[], startCursor: number): number {
     segments.push({ type: 'ground', stageX: cursor, width, groundY })
     cursor += width
   }
-  // 頂上の平坦部
+  // 頂上の平坦部（この端から次の基準高さ地面へ急落下する）
   const topWidth = 120 + Math.random() * 60
   segments.push({ type: 'ground', stageX: cursor, width: topWidth, groundY: DEFAULT_GROUND_Y - STEP_H * steps })
   cursor += topWidth
-  // 下り
-  for (let i = steps - 1; i >= 1; i--) {
-    const groundY = DEFAULT_GROUND_Y - STEP_H * i
-    const width = 90 + Math.random() * 50
-    segments.push({ type: 'ground', stageX: cursor, width, groundY })
-    cursor += width
-  }
 
   return cursor
 }
