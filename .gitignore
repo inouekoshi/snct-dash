@@ -9,6 +9,7 @@ out/
 .env
 .env.local
 .env.production
+.env*.backup
 
 # Vercel
 .vercel/
@@ -20,3 +21,4 @@ Thumbs.db
 # Editor
 .vscode/
 .idea/
+.vercel
