@@ -220,7 +220,8 @@ export class GameEngine {
     const CEIL_GROUND_GAP = 90
     if (--this.nextObs <= 0) {
       const nextStageX = this.stageProgress + CANVAS_W
-      if (this.hasGroundAt(nextStageX) && this.hasGroundAt(nextStageX + 65) && this.hasGroundAt(nextStageX + 130)) {
+      if (this.hasGroundAt(nextStageX) && this.hasGroundAt(nextStageX + 65) && this.hasGroundAt(nextStageX + 130)
+          && this.isFlatAt(nextStageX, 130)) {
         spawnObstacle(this.departmentId, nextStageX, this.obstacles, this.getGroundHeightAt(nextStageX))
       }
       const [mn, r] = SPAWN_GAPS[this.departmentId] ?? SPAWN_GAPS[1]
@@ -305,6 +306,15 @@ export class GameEngine {
       }
     }
     return DEFAULT_GROUND_Y
+  }
+
+  // 区間 [stageX, stageX+width] が同じ高さの平坦な地面か（段差・階段の途中に障害物を出さないため）
+  private isFlatAt(stageX: number, width: number): boolean {
+    const base = this.getGroundHeightAt(stageX)
+    for (let dx = 30; dx <= width; dx += 30) {
+      if (this.getGroundHeightAt(stageX + dx) !== base) return false
+    }
+    return true
   }
 
   private isBlockedByStep(): boolean {

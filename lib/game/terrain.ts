@@ -40,11 +40,41 @@ function buildStageDefault(): TerrainSegment[] {
   return segments
 }
 
-// 機械工学科専用地形：穴パターン2種（通常/連続）＋段差で差別化
+// 機械工学科専用地形：穴は無し。段差を積み上げた「山登り（上って下る）」階段で差別化
+const STEP_H = 40  // 1段の高さ。1ジャンプ（最大約140px）で余裕を持って越えられる
+
+// 山型階段を1まとまり生成して新しい cursor を返す。
+// level 段（2〜4段）上って頂上で平坦、同じ段数を下って基準高さへ戻る。
+function pushMountain(segments: TerrainSegment[], startCursor: number): number {
+  let cursor = startCursor
+  const steps = 2 + Math.floor(Math.random() * 3)  // 2〜4段
+
+  // 上り
+  for (let i = 1; i <= steps; i++) {
+    const groundY = DEFAULT_GROUND_Y - STEP_H * i
+    const width = 90 + Math.random() * 50
+    segments.push({ type: 'ground', stageX: cursor, width, groundY })
+    cursor += width
+  }
+  // 頂上の平坦部
+  const topWidth = 120 + Math.random() * 60
+  segments.push({ type: 'ground', stageX: cursor, width: topWidth, groundY: DEFAULT_GROUND_Y - STEP_H * steps })
+  cursor += topWidth
+  // 下り
+  for (let i = steps - 1; i >= 1; i--) {
+    const groundY = DEFAULT_GROUND_Y - STEP_H * i
+    const width = 90 + Math.random() * 50
+    segments.push({ type: 'ground', stageX: cursor, width, groundY })
+    cursor += width
+  }
+
+  return cursor
+}
+
 function buildStageMech(): TerrainSegment[] {
   const segments: TerrainSegment[] = []
   let cursor = 0
-  let currentLevel = DEFAULT_GROUND_Y  // 現在の地面高さ（段差で変化）
+  let currentLevel = DEFAULT_GROUND_Y  // 現在の地面高さ（単段差で変化）
 
   segments.push({ type: 'ground', stageX: 0, width: 500, groundY: DEFAULT_GROUND_Y })
   cursor = 500
@@ -59,32 +89,15 @@ function buildStageMech(): TerrainSegment[] {
     if (cursor >= SAFE_ZONE_END) break
 
     const pat = Math.random()
-    if (pat < 0.22) {
-      // 段差（上/下トグル）
+    if (pat < 0.45 && cursor + 700 < SAFE_ZONE_END) {
+      // 山登り（メインギミック）：上って下る山型階段
+      cursor = pushMountain(segments, cursor)
+      currentLevel = DEFAULT_GROUND_Y  // 山型の後は必ず基準高さへ戻る
+    } else if (pat < 0.70) {
+      // 単段差（軽い起伏）：1段だけ上下トグル
       currentLevel = currentLevel === DEFAULT_GROUND_Y
-        ? DEFAULT_GROUND_Y - 60  // ジャンプ必要な高さ
+        ? DEFAULT_GROUND_Y - STEP_H
         : DEFAULT_GROUND_Y
-    } else if (pat < 0.62) {
-      // 通常の穴
-      const holeWidth = 110 + Math.random() * 70
-      segments.push({ type: 'hole', stageX: cursor, width: holeWidth })
-      cursor += holeWidth
-      currentLevel = DEFAULT_GROUND_Y  // 穴後は基準高さへ
-    } else if (pat < 0.82 && cursor + 360 < SAFE_ZONE_END) {
-      // 連続穴：小さな足場を挟んだ2連ホール
-      const w1 = 110 + Math.random() * 50
-      const bridge = 65 + Math.random() * 45
-      const w2 = 110 + Math.random() * 50
-      segments.push({ type: 'hole', stageX: cursor, width: w1 })
-      cursor += w1
-      segments.push({ type: 'ground', stageX: cursor, width: bridge, groundY: DEFAULT_GROUND_Y })
-      cursor += bridge
-      currentLevel = DEFAULT_GROUND_Y
-      if (cursor < SAFE_ZONE_END) {
-        segments.push({ type: 'hole', stageX: cursor, width: w2 })
-        cursor += w2
-        currentLevel = DEFAULT_GROUND_Y
-      }
     }
     // else: 特に変化なし（地形継続）
   }

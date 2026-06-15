@@ -40,52 +40,45 @@ export function spawnCeilingObstacle(stageX: number, obstacles: Obstacle[]) {
   }
 }
 
-// 機械工学科: wrench(小/大) / spring / flywheel(小/大) / robot_arm / hammer / conveyor / 複合
+// 機械工学科: 6種をサイズ帯・動きで明確に差別化（低=conveyor/wrench, 中=spring/robot_arm, 大=flywheel/hammer）
 function spawnDept1(push: (o: ObstacleInit) => void, groundY: number) {
   const r = Math.random()
-  if (r < 0.10) {
-    // 小さいレンチ：地面スレスレ、見落としやすい
-    const h = 30 + Math.random() * 14
-    push({ x: CANVAS_W + 10, y: groundY - h, w: 14 + Math.random() * 8, h, shape: 'wrench' })
-  } else if (r < 0.20) {
-    // 大きいレンチ：全ジャンプ必要
-    const h = 68 + Math.random() * 18
-    push({ x: CANVAS_W + 10, y: groundY - h, w: 28 + Math.random() * 10, h, shape: 'wrench' })
-  } else if (r < 0.30) {
-    // スプリング：上下移動
-    const h = 44 + Math.random() * 22
-    const baseY = groundY - h
-    push({ x: CANVAS_W + 10, y: baseY, w: 22 + Math.random() * 10, h, shape: 'spring', moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 32 })
-  } else if (r < 0.39) {
-    // 小フライホイール
-    const s = 26 + Math.random() * 14
-    push({ x: CANVAS_W + 10, y: groundY - s, w: s, h: s, shape: 'flywheel' })
-  } else if (r < 0.48) {
-    // 大フライホイール：広い当たり判定
-    const s = 60 + Math.random() * 18
-    push({ x: CANVAS_W + 10, y: groundY - s, w: s, h: s, shape: 'flywheel' })
-  } else if (r < 0.57) {
-    // ロボットアーム
-    const h = 58 + Math.random() * 22
-    push({ x: CANVAS_W + 10, y: groundY - h, w: 32 + Math.random() * 14, h, shape: 'robot_arm' })
-  } else if (r < 0.66) {
-    // ハンマー：幅広・高さ大の難関障害物
-    const h = 70 + Math.random() * 20
-    push({ x: CANVAS_W + 10, y: groundY - h, w: 50 + Math.random() * 18, h, shape: 'hammer' })
-  } else if (r < 0.75) {
-    // コンベア：低くて幅広、ジャンプ距離が必要
-    const w = 86 + Math.random() * 38
+  if (r < 0.16) {
+    // コンベア：低くて幅広。距離を稼ぐジャンプが必要
+    const w = 90 + Math.random() * 40
     const h = 20 + Math.random() * 10
     push({ x: CANVAS_W + 10, y: groundY - h, w, h, shape: 'conveyor' })
-  } else if (r < 0.87) {
-    // 複合：レンチ + スプリング
-    const h1 = 52 + Math.random() * 18, h2 = 42 + Math.random() * 18
+  } else if (r < 0.32) {
+    // レンチ：低くて細い。地面スレスレで素早いジャンプ
+    const h = 28 + Math.random() * 14
+    push({ x: CANVAS_W + 10, y: groundY - h, w: 16 + Math.random() * 8, h, shape: 'wrench' })
+  } else if (r < 0.48) {
+    // スプリング：中サイズ。上下に伸び縮みするタイミング障害
+    const h = 44 + Math.random() * 20
+    const baseY = groundY - h
+    push({ x: CANVAS_W + 10, y: baseY, w: 22 + Math.random() * 10, h, shape: 'spring', moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 36 })
+  } else if (r < 0.64) {
+    // ロボットアーム：中高で細い縦壁。アームが伸縮する
+    const h = 58 + Math.random() * 24
+    const baseY = groundY - h
+    push({ x: CANVAS_W + 10, y: baseY, w: 28 + Math.random() * 14, h, shape: 'robot_arm', moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 18 })
+  } else if (r < 0.78) {
+    // フライホイール：大きく回転する円。広い当たり判定で大ジャンプ
+    const s = 56 + Math.random() * 18
+    push({ x: CANVAS_W + 10, y: groundY - s, w: s, h: s, shape: 'flywheel' })
+  } else if (r < 0.90) {
+    // ハンマー：最も高い壁。フルジャンプ必須
+    const h = 72 + Math.random() * 20
+    push({ x: CANVAS_W + 10, y: groundY - h, w: 50 + Math.random() * 16, h, shape: 'hammer' })
+  } else if (r < 0.95) {
+    // 複合：レンチ（低）＋スプリング（中・上下）
+    const h1 = 30 + Math.random() * 12, h2 = 44 + Math.random() * 18
     const baseY = groundY - h2
-    push({ x: CANVAS_W + 10, y: groundY - h1, w: 24, h: h1, shape: 'wrench' })
-    push({ x: CANVAS_W + 72, y: baseY, w: 22, h: h2, shape: 'spring', moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 30 })
+    push({ x: CANVAS_W + 10, y: groundY - h1, w: 20, h: h1, shape: 'wrench' })
+    push({ x: CANVAS_W + 72, y: baseY, w: 22, h: h2, shape: 'spring', moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 34 })
   } else {
-    // 複合：大フライホイール + ハンマー
-    const s = 50 + Math.random() * 16, h2 = 68 + Math.random() * 18
+    // 複合：大フライホイール＋ハンマー
+    const s = 56 + Math.random() * 14, h2 = 72 + Math.random() * 16
     push({ x: CANVAS_W + 10, y: groundY - s, w: s, h: s, shape: 'flywheel' })
     push({ x: CANVAS_W + s + 22, y: groundY - h2, w: 48, h: h2, shape: 'hammer' })
   }
