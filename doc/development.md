@@ -24,8 +24,8 @@
 ```typescript
 const engine = new GameEngine(
   canvasElement,
-  departmentId,         // 1〜5 の学科ID
-  (timeMs) => { ... }   // クリア時コールバック
+  departmentId,                       // 1〜5 の学科ID
+  (result: GameClearResult) => { ... } // クリア時コールバック（{ timeMs, departmentId }）
 )
 ```
 
@@ -69,7 +69,8 @@ y (280)
 overlaps(ph, { x: o.x + 4, y: o.y + 4, w: o.w - 8, h: o.h - 8 })
 ```
 
-アイテムとの衝突は円形（`hitCircle()`）で判定します。
+アイテム（電気電子の🔋電池）との衝突も AABB（`overlaps()`）で判定します。
+円形判定の `hitCircle()` も `helpers.ts` に用意されています（現在は未使用）。
 
 ---
 
@@ -109,13 +110,19 @@ Canvas上のX座標 = PLAYER_X + (stageX - stageProgress)
 
 ### 地形の追加（`lib/game/terrain.ts`）
 
-学科ごとの地形パターンはこのファイルで定義します。
+学科ごとの地形パターンはこのファイルで定義します。`buildStage()` が `departmentId` で分岐します。
 
 ```typescript
 export function buildStage(departmentId: number): TerrainSegment[] {
-  // departmentId に応じて段差・穴の配置を返す
+  if (departmentId === 1) return buildStageMech()  // 機械：穴なし・山登り階段
+  if (departmentId === 2) return buildStageElec()  // 電気電子：完全な平坦（充電サバイバル）
+  return buildStageDefault()                       // その他：標準の穴配置
 }
 ```
+
+- `buildStageMech()`：落とし穴を使わず、2〜4段の「山型階段」を積み上げる（`STEP_H = 40`）
+- `buildStageElec()`：穴も段差も無い1本の平坦地面。プレイヤーは充電維持＋障害物回避に集中する
+- `buildStageDefault()`：平坦な地面と穴（幅110px以上）を交互に配置
 
 ---
 
@@ -207,35 +214,66 @@ drawGoal(ctx, areaId, theme, stageProgress, frame)
 
 ---
 
-## 新しいアイテムを追加する
+## アイテムシステム（電気電子=充電サバイバルの実装）
 
-### 1. `ItemEffect` 型に追加（`engine-types.ts`）
+アイテムは `Item` 型（`engine-types.ts`）で定義され、`engine.ts` の `items: Item[]` で管理されます。
+電気電子工学科の🔋電池（`effect: 'charge'`）が実装の参照例です。新しいアイテムも同じ流れで追加します。
+
+### 1. `Item.effect` に種別を追加（`engine-types.ts`）
 
 ```typescript
-type ItemEffect = 'time_stop' | 'invincible' | 'speed_down'  // 追加例
+export interface Item {
+  stageX: number
+  x: number; y: number
+  effect: 'time_stop' | 'invincible' | 'charge'  // ← ここに追加
+  wobble: number
+}
 ```
 
-### 2. 効果の処理を `engine.ts` に追加
+### 2. スポーンする（`engine.ts` の `update()`）
+
+スポーンタイマーをカウントダウンし、`stageX`（画面右端＝`stageProgress + CANVAS_W`）に push します。
+電池は学科限定（`departmentId === 2`）でスポーンします。
 
 ```typescript
-private applyItem(effect: ItemEffect) {
-  switch (effect) {
-    case 'speed_down':
-      this.speedModifier = 0.5
-      this.itemEffectTimer = 180  // 3秒
-      break
-    // ...
+if (this.isElec && --this.nextBattery <= 0) {
+  const nextStageX = this.stageProgress + CANVAS_W
+  const y = this.getGroundHeightAt(nextStageX) - (12 + Math.random() * 50)
+  this.items.push({ stageX: nextStageX, x: CANVAS_W + 10, y, effect: 'charge', wobble: Math.random() * Math.PI * 2 })
+  const [mn, r] = BATTERY_GAP
+  this.nextBattery = mn + Math.random() * r
+}
+```
+
+### 3. 取得判定と効果（`engine.ts` の衝突判定ブロック）
+
+毎フレーム `playerHitbox` と AABB（`overlaps()`）で重なりを判定し、効果を適用して配列から除去します。
+
+```typescript
+this.items = this.items.filter(it => {
+  if (it.effect === 'charge' && overlaps(ph, { x: it.x - 11, y: it.y - 15, w: 22, h: 30 })) {
+    this.charge = Math.min(CHARGE_MAX, this.charge + BATTERY_REFILL)
+    this.burst(it.x, it.y, AREAS[2].coinColor, 8)  // 取得エフェクト
+    return false
   }
-}
+  return true
+})
 ```
 
-### 3. スポーン関数に登録（`spawner.ts`）
+`time_stop` / `invincible` のような時間効果型は `itemEffect` / `itemEffectTimer` を使う
+（`time_stop` 中は `elapsedMs` を加算しない仕組みが既にある）。
+
+### 4. 描画する（`item-renderer.ts` + `engine.ts` の `render()`）
+
+`item-renderer.ts` に描画関数を追加し、`render()` の `items` ループから呼びます。
 
 ```typescript
-export function spawnItem(departmentId: number, items: Item[]) {
-  // departmentId に応じてアイテムを出現させる
+for (const it of this.items) {
+  if (it.effect === 'charge') drawBattery(ctx, it, theme, this.frame)
 }
 ```
+
+`it.x` / `it.y` は毎フレーム `toCanvasX()` で Canvas 座標に更新済み。`wobble` で上下のふわふわ揺れを付けます。
 
 ---
 
@@ -312,6 +350,20 @@ export const KNOCKBACK_INVINCIBLE = 90 // ノックバック後の無敵フレ�
 export const MISS_OVERLAY_FRAMES = 90  // MISS オーバーレイ表示時間（1.5秒）
 export const REVIVAL_FRAMES      = 75  // 復活スロー時間（1.25秒）
 ```
+
+### 充電サバイバル（電気電子工学科 = dept 2 のみ）
+
+```typescript
+export const CHARGE_MAX      = 100   // 充電ゲージ最大値
+export const CHARGE_DRAIN    = 0.18  // /frame。常時減少（満タン→空 ≈ 9秒）
+export const CHARGE_HIT_COST = 30    // 障害物被弾時のチャージ減（ノックバックと二重ペナルティ）
+export const CHARGE_REVIVE   = 50    // チャージ0でのミス復活後の残量
+export const BATTERY_REFILL  = 35    // 🔋電池1個の回復量
+export const BATTERY_GAP: [number, number] = [110, 80]  // 電池スポーン間隔 [最小, ランダム幅] frames
+```
+
+> **バランス調整の指針**: 「電池をほぼ全部拾えばギリギリ完走できる」密度を狙う。
+> `STAGE_LENGTH` を本番（70000）に戻した際は `BATTERY_GAP` / `CHARGE_DRAIN` の再調整が必要。
 
 ### 穴落下・段差の閾値（`engine.ts` 内）
 

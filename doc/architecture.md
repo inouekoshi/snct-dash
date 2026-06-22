@@ -49,7 +49,8 @@ snct-dash/
         ├── background-renderers.ts  # drawBg / drawGround（地形対応版）
         ├── player-renderer.ts       # drawPlayer
         ├── goal-renderer.ts         # drawGoal（ゴールフラッグポール・旗波打ちアニメ）
-        ├── hud-renderer.ts          # drawHUD / renderMissOverlay / renderRevivalHint / renderPauseOverlay
+        ├── item-renderer.ts         # drawBattery（電気電子=充電サバイバルの🔋電池）
+        ├── hud-renderer.ts          # drawHUD（充電ゲージ含む）/ renderMissOverlay / renderRevivalHint / renderPauseOverlay
         └── sound.ts                 # Web Audio API によるプロシージャル効果音
 ```
 
@@ -62,7 +63,7 @@ snct-dash/
     ↓ jump() / togglePause() 呼び出し
     ↓ departmentId を GameEngine に渡す
 [GameEngine (engine.ts)]
-    ↓ onClear コールバック（timeMs: number）
+    ↓ onClear コールバック（GameClearResult: { timeMs, departmentId }）
 [ResultModal.tsx]
     ↓ POST /api/stage-clears（nickname, department, clear_time_ms）
 [stage_clears テーブル]
@@ -85,8 +86,8 @@ snct-dash/
 | 変数名 | 必須 | 説明 |
 |--------|------|------|
 | `NEXT_PUBLIC_SUPABASE_URL` | ✅ | Supabase API URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅ | 匿名キー（公開可・クライアント/サーバー両用） |
-| `SUPABASE_SERVICE_ROLE_KEY` | ❌ | 現在不使用（RLS ポリシーで anon キーからの INSERT を許可済み） |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅ | 匿名キー（公開可・クライアントの読み取り用） |
+| `SUPABASE_SERVICE_ROLE_KEY` | ✅ | サービスロールキー（APIルート専用・秘密）。`stage_clears` には INSERT 用 RLS ポリシーが無く、`lib/supabase-server.ts` がこのキーで RLS をバイパスして書き込む |
 
 ### Vercel 設定の注意点
 

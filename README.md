@@ -22,11 +22,12 @@
 
 | ファイル | 内容 |
 |---------|------|
-| [doc/game_spec.md](doc/game_spec.md) | ゲーム仕様（タイムアタック制・地形・ノックバック） |
+| [doc/game_spec.md](doc/game_spec.md) | ゲーム仕様（タイムアタック制・地形・ノックバック・学科別ギミック） |
 | [doc/architecture.md](doc/architecture.md) | アーキテクチャと技術スタック |
-| [doc/database.md](doc/database.md) | DBスキーマ（stage_clearsテーブル） |
-| [doc/development.md](doc/development.md) | 開発ガイド（エンジン構造・障害物追加方法など） |
+| [doc/database.md](doc/database.md) | DBスキーマ（stage_clearsテーブル・RLS） |
+| [doc/development.md](doc/development.md) | 開発ガイド（エンジン構造・地形/アイテム/障害物の追加方法・バランス調整） |
 | [doc/roadmap.md](doc/roadmap.md) | ロードマップ（Phase 2〜6） |
+| [doc/design_phase2.md](doc/design_phase2.md) | Phase 2 実装設計書（旧仕様→タイムアタック制への移行・履歴） |
 
 ---
 
