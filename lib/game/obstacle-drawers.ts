@@ -390,6 +390,129 @@ function dConveyor(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme, fra
   }
 }
 
+// ── 電気電子工学科の追加障害物 ───────────────────────────────────────────────
+
+// 抵抗器：低くて幅広。両端にリード線、本体にカラーバンド3本。距離ジャンプ向け。
+function dResistor(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme) {
+  const midY = o.y + o.h / 2
+  ctx.strokeStyle = theme.obstacleStroke; ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.moveTo(o.x - 6, midY); ctx.lineTo(o.x + 5, midY)
+  ctx.moveTo(o.x + o.w - 5, midY); ctx.lineTo(o.x + o.w + 6, midY)
+  ctx.stroke()
+  ctx.fillStyle = theme.obstacleColor
+  rrect(ctx, o.x + 4, o.y, o.w - 8, o.h, Math.min(o.h * 0.42, 9)); ctx.fill(); ctx.stroke()
+  ctx.fillStyle = theme.obstacleStroke
+  for (let i = 0; i < 3; i++) {
+    ctx.fillRect(o.x + o.w * (0.32 + i * 0.16), o.y + 2, 3, o.h - 4)
+  }
+}
+
+// トランジスタ：中サイズ。半円ボディ（TO-92風）＋3本足。
+function dTransistor(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme) {
+  const cx = o.x + o.w / 2
+  const pinH = 9
+  const bodyH = o.h - pinH
+  const arcCy = o.y + o.w * 0.5
+  ctx.fillStyle = theme.obstacleColor
+  ctx.beginPath()
+  ctx.moveTo(o.x, o.y + bodyH)
+  ctx.lineTo(o.x, arcCy)
+  ctx.arc(cx, arcCy, o.w / 2, Math.PI, 0)
+  ctx.lineTo(o.x + o.w, o.y + bodyH)
+  ctx.closePath(); ctx.fill(); ctx.stroke()
+  ctx.strokeStyle = theme.obstacleStroke + '66'; ctx.lineWidth = 1.5
+  ctx.beginPath(); ctx.moveTo(o.x + 3, o.y + bodyH * 0.62); ctx.lineTo(o.x + o.w - 3, o.y + bodyH * 0.62); ctx.stroke()
+  ctx.strokeStyle = theme.obstacleStroke; ctx.lineWidth = 2
+  for (let i = 0; i < 3; i++) {
+    const px = cx + (i - 1) * o.w * 0.26
+    ctx.beginPath(); ctx.moveTo(px, o.y + bodyH); ctx.lineTo(px, o.y + o.h); ctx.stroke()
+  }
+}
+
+// 電子：発光する球が上下に浮遊（moving）。回転する軌道リング＋電子点。
+function dElectron(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme, frame: number) {
+  const cx = o.x + o.w / 2, cy = o.y + o.h / 2
+  const r = Math.min(o.w, o.h) / 2 - 3
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke()
+  ctx.fillStyle = theme.coinColor
+  ctx.globalAlpha = 0.7
+  ctx.beginPath(); ctx.arc(cx - r * 0.28, cy - r * 0.28, r * 0.42, 0, Math.PI * 2); ctx.fill()
+  ctx.globalAlpha = 1
+  const a = frame * 0.09
+  for (let k = 0; k < 2; k++) {
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(a + k * Math.PI / 2)
+    ctx.strokeStyle = theme.obstacleStroke; ctx.lineWidth = 1.5
+    ctx.beginPath(); ctx.ellipse(0, 0, r + 5, (r + 5) * 0.38, 0, 0, Math.PI * 2); ctx.stroke()
+    ctx.fillStyle = theme.obstacleStroke
+    const ex = Math.cos(a * 2 + k * 2) * (r + 5), ey = Math.sin(a * 2 + k * 2) * ((r + 5) * 0.38)
+    ctx.beginPath(); ctx.arc(ex, ey, 2.5, 0, Math.PI * 2); ctx.fill()
+    ctx.restore()
+  }
+}
+
+// テスラコイル：最も高い壁。台形タワー＋頂部トロイド球＋フリッカーする放電アーク。
+function dTesla(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme, frame: number) {
+  const cx = o.x + o.w / 2
+  const sphereR = o.w * 0.42
+  const sphereY = o.y + sphereR + 2
+  const towerTop = sphereY + sphereR * 0.5
+  ctx.fillStyle = theme.obstacleColor
+  ctx.beginPath()
+  ctx.moveTo(cx - o.w * 0.16, towerTop)
+  ctx.lineTo(cx + o.w * 0.16, towerTop)
+  ctx.lineTo(o.x + o.w, o.y + o.h)
+  ctx.lineTo(o.x, o.y + o.h)
+  ctx.closePath(); ctx.fill(); ctx.stroke()
+  ctx.strokeStyle = theme.obstacleStroke + '66'; ctx.lineWidth = 1.5
+  for (let i = 1; i < 6; i++) {
+    const t = i / 6
+    const yy = towerTop + (o.y + o.h - towerTop) * t
+    const halfW = o.w * 0.16 + o.w * 0.34 * t
+    ctx.beginPath(); ctx.moveTo(cx - halfW, yy); ctx.lineTo(cx + halfW, yy); ctx.stroke()
+  }
+  ctx.fillStyle = theme.obstacleColor; ctx.strokeStyle = theme.obstacleStroke; ctx.lineWidth = 2
+  ctx.beginPath(); ctx.ellipse(cx, sphereY, sphereR, sphereR * 0.62, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke()
+  ctx.strokeStyle = theme.obstacleStroke; ctx.lineWidth = 1.5
+  ctx.globalAlpha = 0.5 + Math.sin(frame * 0.3) * 0.4
+  for (let k = -1; k <= 1; k += 2) {
+    let px = cx, py = sphereY - sphereR * 0.5
+    ctx.beginPath(); ctx.moveTo(px, py)
+    for (let s = 0; s < 4; s++) {
+      px += k * (4 + Math.random() * 6)
+      py -= 3 + Math.random() * 5
+      ctx.lineTo(px, py)
+    }
+    ctx.stroke()
+  }
+  ctx.globalAlpha = 1
+}
+
+// 放電リング：大きく回転。外輪・内輪をつなぐ放電ジグザグが回る。広い当たり判定。
+function dArcRing(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme, frame: number) {
+  const cx = o.x + o.w / 2, cy = o.y + o.h / 2
+  const R = Math.min(o.w, o.h) / 2 - 2
+  ctx.strokeStyle = theme.obstacleColor; ctx.lineWidth = 4
+  ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke()
+  ctx.strokeStyle = theme.obstacleStroke + 'aa'; ctx.lineWidth = 2
+  ctx.beginPath(); ctx.arc(cx, cy, R * 0.62, 0, Math.PI * 2); ctx.stroke()
+  const rot = frame * 0.05
+  ctx.strokeStyle = theme.obstacleStroke; ctx.lineWidth = 1.5
+  for (let i = 0; i < 6; i++) {
+    const a = rot + (i / 6) * Math.PI * 2
+    const a2 = a + 0.18
+    ctx.beginPath()
+    ctx.moveTo(cx + Math.cos(a) * R * 0.62, cy + Math.sin(a) * R * 0.62)
+    ctx.lineTo(cx + Math.cos((a + a2) / 2) * R * 0.88, cy + Math.sin((a + a2) / 2) * R * 0.88)
+    ctx.lineTo(cx + Math.cos(a2) * R * 0.62, cy + Math.sin(a2) * R * 0.62)
+    ctx.stroke()
+  }
+  ctx.fillStyle = theme.obstacleStroke
+  ctx.globalAlpha = 0.5 + Math.sin(frame * 0.2) * 0.4
+  ctx.beginPath(); ctx.arc(cx, cy, R * 0.18, 0, Math.PI * 2); ctx.fill()
+  ctx.globalAlpha = 1
+}
+
 export const OBSTACLE_DRAWERS: Record<Obstacle['shape'], ObstacleDrawFn> = {
   gear: dGear,
   bolt: dBolt,
@@ -413,6 +536,11 @@ export const OBSTACLE_DRAWERS: Record<Obstacle['shape'], ObstacleDrawFn> = {
   robot_arm: dRobotArm,
   hammer: dHammer,
   conveyor: dConveyor,
+  resistor: dResistor,
+  transistor: dTransistor,
+  electron: dElectron,
+  tesla: dTesla,
+  arc_ring: dArcRing,
 }
 
 export function drawObstacle(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme, frame: number) {

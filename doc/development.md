@@ -238,7 +238,8 @@ export interface Item {
 ```typescript
 if (this.isElec && --this.nextBattery <= 0) {
   const nextStageX = this.stageProgress + CANVAS_W
-  const y = this.getGroundHeightAt(nextStageX) - (12 + Math.random() * 50)
+  // 必ずジャンプしないと届かない高さ（74〜120px）に置く。走行中の判定上端は groundY-46 付近
+  const y = this.getGroundHeightAt(nextStageX) - (74 + Math.random() * 46)
   this.items.push({ stageX: nextStageX, x: CANVAS_W + 10, y, effect: 'charge', wobble: Math.random() * Math.PI * 2 })
   const [mn, r] = BATTERY_GAP
   this.nextBattery = mn + Math.random() * r

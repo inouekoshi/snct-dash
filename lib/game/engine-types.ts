@@ -8,6 +8,7 @@ export interface Obstacle {
        | 'crystal' | 'ingot' | 'lattice' | 'stalactite'
        | 'wrench' | 'spring' | 'flywheel' | 'robot_arm'
        | 'hammer' | 'conveyor'
+       | 'resistor' | 'transistor' | 'electron' | 'tesla' | 'arc_ring'
   moving: boolean; phase: number; baseY: number; amplitude: number
 }
 

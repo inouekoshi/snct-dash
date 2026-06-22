@@ -255,11 +255,12 @@ export class GameEngine {
       this.nextObs = Math.max(this.nextObs, CEIL_GROUND_GAP)
     }
 
-    // 電池スポーン（電気電子工学科）：平坦な地面に充電アイテムを配置
+    // 電池スポーン（電気電子工学科）：必ずジャンプしないと届かない高さに配置する。
+    // 走行中のプレイヤー判定上端は groundY-46 付近なので、それより十分上（74〜120px）に置く。
     if (this.isElec && --this.nextBattery <= 0) {
       const nextStageX = this.stageProgress + CANVAS_W
       const groundY = this.getGroundHeightAt(nextStageX)
-      const y = groundY - (12 + Math.random() * 50) // 地上〜やや高め（ジャンプ取得）
+      const y = groundY - (74 + Math.random() * 46) // ジャンプの上昇〜頂点で取れる高さ
       this.items.push({ stageX: nextStageX, x: CANVAS_W + 10, y, effect: 'charge', wobble: Math.random() * Math.PI * 2 })
       const [mn, r] = BATTERY_GAP
       this.nextBattery = mn + Math.random() * r

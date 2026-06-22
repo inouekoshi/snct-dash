@@ -84,22 +84,54 @@ function spawnDept1(push: (o: ObstacleInit) => void, groundY: number) {
   }
 }
 
-// 電気電子工学科: circuit / coil / capacitor
+// 電気電子工学科: 8種をサイズ帯・動きで個性化（低=resistor/coil, 中=circuit/transistor/capacitor,
+// 中・上下=electron, 大・回転=arc_ring, 高壁=tesla）。複合パターンあり。
 function spawnDept2(push: (o: ObstacleInit) => void, groundY: number) {
   const r = Math.random()
-  if (r < 0.28) {
-    const h = 36 + Math.random() * 26
+  if (r < 0.13) {
+    // 抵抗器：低くて幅広。距離を稼ぐジャンプ
+    const w = 84 + Math.random() * 40, h = 22 + Math.random() * 10
+    push({ x: CANVAS_W + 10, y: groundY - h, w, h, shape: 'resistor' })
+  } else if (r < 0.26) {
+    // コイル：低〜中の細い縦。地面スレスレの素早いジャンプ
+    const h = 40 + Math.random() * 22
+    push({ x: CANVAS_W + 10, y: groundY - h, w: 18 + Math.random() * 6, h, shape: 'coil' })
+  } else if (r < 0.39) {
+    // 回路基板：中サイズの壁
+    const h = 40 + Math.random() * 22
     push({ x: CANVAS_W + 10, y: groundY - h, w: 30 + Math.random() * 14, h, shape: 'circuit' })
   } else if (r < 0.52) {
-    const h = 44 + Math.random() * 24
-    push({ x: CANVAS_W + 10, y: groundY - h, w: 18 + Math.random() * 6, h, shape: 'coil' })
-  } else if (r < 0.74) {
-    const h = 44 + Math.random() * 26
-    push({ x: CANVAS_W + 10, y: groundY - h, w: 22 + Math.random() * 8, h, shape: 'capacitor' })
+    // トランジスタ：中サイズの半円ボディ
+    const h = 46 + Math.random() * 20
+    push({ x: CANVAS_W + 10, y: groundY - h, w: 34 + Math.random() * 12, h, shape: 'transistor' })
+  } else if (r < 0.64) {
+    // コンデンサ：やや高め
+    const h = 46 + Math.random() * 24
+    push({ x: CANVAS_W + 10, y: groundY - h, w: 24 + Math.random() * 8, h, shape: 'capacitor' })
+  } else if (r < 0.77) {
+    // 電子：中サイズの球が上下に浮遊するタイミング障害
+    const s = 30 + Math.random() * 10
+    const baseY = groundY - s - 6
+    push({ x: CANVAS_W + 10, y: baseY, w: s, h: s, shape: 'electron', moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 46 })
+  } else if (r < 0.88) {
+    // 放電リング：大きく回転する円。広い当たり判定で大ジャンプ
+    const s = 54 + Math.random() * 16
+    push({ x: CANVAS_W + 10, y: groundY - s, w: s, h: s, shape: 'arc_ring' })
+  } else if (r < 0.95) {
+    // テスラコイル：最も高い壁。フルジャンプ必須
+    const h = 72 + Math.random() * 20
+    push({ x: CANVAS_W + 10, y: groundY - h, w: 40 + Math.random() * 12, h, shape: 'tesla' })
+  } else if (r < 0.975) {
+    // 複合：抵抗器（低）＋電子（中・上下）
+    const h1 = 22 + Math.random() * 8
+    const s = 30 + Math.random() * 8, baseY = groundY - s - 6
+    push({ x: CANVAS_W + 10, y: groundY - h1, w: 80, h: h1, shape: 'resistor' })
+    push({ x: CANVAS_W + 98, y: baseY, w: s, h: s, shape: 'electron', moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 42 })
   } else {
-    const h1 = 36 + Math.random() * 22, h2 = 32 + Math.random() * 20
-    push({ x: CANVAS_W + 10, y: groundY - h1, w: 28, h: h1, shape: 'circuit' })
-    push({ x: CANVAS_W + 74, y: groundY - h2, w: 26, h: h2, shape: 'circuit' })
+    // 複合：放電リング（大）＋テスラ（高壁）
+    const s = 52 + Math.random() * 12, h2 = 70 + Math.random() * 14
+    push({ x: CANVAS_W + 10, y: groundY - s, w: s, h: s, shape: 'arc_ring' })
+    push({ x: CANVAS_W + s + 24, y: groundY - h2, w: 38, h: h2, shape: 'tesla' })
   }
 }
 
