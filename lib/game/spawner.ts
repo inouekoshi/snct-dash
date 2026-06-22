@@ -1,12 +1,12 @@
 import type { Obstacle } from './engine-types'
 import { CANVAS_W, DEFAULT_GROUND_Y } from './constants'
 
-type ObstacleInit = Pick<Obstacle, 'x' | 'y' | 'w' | 'h' | 'shape'> & Partial<Pick<Obstacle, 'moving' | 'phase' | 'baseY' | 'amplitude'>>
+type ObstacleInit = Pick<Obstacle, 'x' | 'y' | 'w' | 'h' | 'shape'> & Partial<Pick<Obstacle, 'moving' | 'phase' | 'baseY' | 'amplitude' | 'stompable'>>
 
 // stageX は呼び出し側（engine.ts）が指定する
 function makeObstacle(stageX: number, o: ObstacleInit): Obstacle {
   return {
-    moving: false, phase: 0, baseY: o.y, amplitude: 0,
+    moving: false, phase: 0, baseY: o.y, amplitude: 0, stompable: false,
     ...o,
     stageX,
   }
@@ -135,25 +135,49 @@ function spawnDept2(push: (o: ObstacleInit) => void, groundY: number) {
   }
 }
 
-// 電子情報工学科: bug / monitor / chip
+// 電子情報工学科（デバッグ踏みつけ型）: 踏める敵（bug/virus/glitch）と
+// 踏めない壁（firewall/data_block）を混在。踏む／越えるを使い分けさせる。
 function spawnDept3(push: (o: ObstacleInit) => void, groundY: number) {
   const r = Math.random()
-  if (r < 0.35) {
-    const baseY = groundY - 32
-    push({ x: CANVAS_W + 10, y: baseY, w: 30, h: 30, shape: 'bug', moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 52 })
-  } else if (r < 0.55) {
-    const h = 44 + Math.random() * 20
-    push({ x: CANVAS_W + 10, y: groundY - h, w: 44 + Math.random() * 16, h, shape: 'monitor' })
-  } else if (r < 0.74) {
-    const h = 26 + Math.random() * 16
-    push({ x: CANVAS_W + 10, y: groundY - h, w: 46 + Math.random() * 18, h, shape: 'chip' })
-  } else if (r < 0.88) {
-    const h = 34 + Math.random() * 22
-    push({ x: CANVAS_W + 10, y: groundY - h, w: 32, h, shape: 'bug' })
+  if (r < 0.20) {
+    // バグ（地上・踏める）：低い敵。踏むか飛び越える
+    const s = 28 + Math.random() * 8
+    push({ x: CANVAS_W + 10, y: groundY - s, w: s, h: s, shape: 'bug', stompable: true })
+  } else if (r < 0.40) {
+    // バグ（空中で上下・踏める）：タイミングよく踏んでコンボ
+    const s = 26 + Math.random() * 8
+    const baseY = groundY - 48 - Math.random() * 24
+    push({ x: CANVAS_W + 10, y: baseY, w: s, h: s, shape: 'bug', stompable: true, moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 30 })
+  } else if (r < 0.56) {
+    // ウイルス（踏める）：やや大きい敵
+    const s = 36 + Math.random() * 12
+    push({ x: CANVAS_W + 10, y: groundY - s, w: s, h: s, shape: 'virus', stompable: true })
+  } else if (r < 0.70) {
+    // グリッチ（踏める）：小さく低い敵
+    const w = 30 + Math.random() * 14, h = 26 + Math.random() * 10
+    push({ x: CANVAS_W + 10, y: groundY - h, w, h, shape: 'glitch', stompable: true })
+  } else if (r < 0.83) {
+    // ファイアウォール（踏めない壁）：縦の壁。ジャンプで越える
+    const h = 50 + Math.random() * 26
+    push({ x: CANVAS_W + 10, y: groundY - h, w: 26 + Math.random() * 12, h, shape: 'firewall' })
+  } else if (r < 0.92) {
+    // データブロック（踏めない壁）：中サイズの塊
+    const h = 40 + Math.random() * 22
+    push({ x: CANVAS_W + 10, y: groundY - h, w: 40 + Math.random() * 16, h, shape: 'data_block' })
+  } else if (r < 0.97) {
+    // 複合：バグの連続（コンボチェイン）。空中に2〜3体並べる
+    const n = Math.random() < 0.5 ? 2 : 3
+    for (let i = 0; i < n; i++) {
+      const s = 26
+      const baseY = groundY - 50 - (i % 2) * 16
+      push({ x: CANVAS_W + 10 + i * 52, y: baseY, w: s, h: s, shape: 'bug', stompable: true, moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 22 })
+    }
   } else {
-    const h1 = 34 + Math.random() * 14, h2 = 26 + Math.random() * 14
-    push({ x: CANVAS_W + 10, y: groundY - h1, w: 30, h: h1, shape: 'bug' })
-    push({ x: CANVAS_W + 72, y: groundY - h2, w: 44, h: h2, shape: 'chip' })
+    // 複合：壁＋その先に踏める敵（壁を越えてから踏む）
+    const h = 48 + Math.random() * 20
+    push({ x: CANVAS_W + 10, y: groundY - h, w: 26, h, shape: 'firewall' })
+    const s = 30, baseY = groundY - 52
+    push({ x: CANVAS_W + 78, y: baseY, w: s, h: s, shape: 'virus', stompable: true, moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 20 })
   }
 }
 

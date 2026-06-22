@@ -9,6 +9,7 @@ export interface BgContext {
   frame: number
   bgX: number
   speed: number
+  debug?: boolean  // 電子情報：デバッグモード中はコード雨を強化
 }
 
 export function drawBg(ctx: CanvasRenderingContext2D, area: AreaId, theme: Theme, bg: BgContext) {
@@ -94,14 +95,28 @@ function bgElec(ctx: CanvasRenderingContext2D, theme: Theme, bg: BgContext) {
 }
 
 function bgCode(ctx: CanvasRenderingContext2D, theme: Theme, bg: BgContext) {
-  ctx.fillStyle = theme.groundLineColor
+  // デバッグモード中はコード雨を高密度・高速化し、サイバー色ティントを重ねる
+  const debug = bg.debug
+  const colGap = debug ? 14 : 22
+  const fall = debug ? 1.6 : 0.5
+  const span = debug ? 60 : 80
+  const baseAlpha = debug ? 0.34 : 0.18
+
+  if (debug) {
+    ctx.fillStyle = '#00ffcc'
+    ctx.globalAlpha = 0.06 + Math.sin(bg.frame * 0.2) * 0.03
+    ctx.fillRect(0, 0, CANVAS_W, DEFAULT_GROUND_Y)
+    ctx.globalAlpha = 1
+  }
+
+  ctx.fillStyle = debug ? '#5effd6' : theme.groundLineColor
   ctx.font = '10px monospace'; ctx.textAlign = 'center'
-  for (let col = 0; col < CANVAS_W; col += 22) {
-    const drop = ((bg.frame * 0.5 + col * 3.7) % 80)
-    ctx.globalAlpha = Math.max(0, 0.18 - drop * 0.003)
+  for (let col = 0; col < CANVAS_W; col += colGap) {
+    const drop = ((bg.frame * fall + col * 3.7) % span)
+    ctx.globalAlpha = Math.max(0, baseAlpha - drop * 0.003)
     const bit = Math.floor(Math.sin(col * 13.7 + drop) * 100) % 2 === 0 ? '1' : '0'
     ctx.fillText(bit, col, drop + 10)
-    ctx.globalAlpha = Math.max(0, 0.10 - drop * 0.002)
+    ctx.globalAlpha = Math.max(0, baseAlpha * 0.55 - drop * 0.002)
     ctx.fillText(bit === '1' ? '0' : '1', col, drop + 24)
   }
   ctx.globalAlpha = 1

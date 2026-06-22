@@ -513,6 +513,105 @@ function dArcRing(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme, fram
   ctx.globalAlpha = 1
 }
 
+// ── 電子情報工学科の追加障害物 ───────────────────────────────────────────────
+
+// ウイルス：踏める敵。トゲ付きの球体＋怒り目。サイバー色。
+function dVirus(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme, frame: number) {
+  const cx = o.x + o.w / 2, cy = o.y + o.h / 2
+  const r = Math.min(o.w, o.h) / 2 - 4
+  // トゲ
+  ctx.strokeStyle = theme.obstacleStroke; ctx.lineWidth = 2
+  const spikes = 8
+  for (let i = 0; i < spikes; i++) {
+    const a = (i / spikes) * Math.PI * 2 + frame * 0.02
+    ctx.beginPath()
+    ctx.moveTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r)
+    ctx.lineTo(cx + Math.cos(a) * (r + 5), cy + Math.sin(a) * (r + 5))
+    ctx.stroke()
+  }
+  // 本体
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke()
+  // 目（×まなこ）
+  ctx.strokeStyle = '#ff4466'; ctx.lineWidth = 2
+  const es = r * 0.22
+  for (const ox of [-r * 0.34, r * 0.34]) {
+    const ex = cx + ox, ey = cy - r * 0.1
+    ctx.beginPath(); ctx.moveTo(ex - es, ey - es); ctx.lineTo(ex + es, ey + es)
+    ctx.moveTo(ex + es, ey - es); ctx.lineTo(ex - es, ey + es); ctx.stroke()
+  }
+  // 口
+  ctx.beginPath(); ctx.arc(cx, cy + r * 0.35, r * 0.3, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke()
+}
+
+// グリッチ：踏める敵。RGBずれと走査線で点滅する四角。
+function dGlitch(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme, frame: number) {
+  const shift = Math.sin(frame * 0.5) * 3
+  // RGBずれ（赤シアンのゴースト）
+  ctx.globalAlpha = 0.5
+  ctx.fillStyle = '#ff2266'
+  ctx.fillRect(o.x - shift, o.y, o.w, o.h)
+  ctx.fillStyle = '#22ffee'
+  ctx.fillRect(o.x + shift, o.y, o.w, o.h)
+  ctx.globalAlpha = 1
+  // 本体
+  ctx.fillStyle = theme.obstacleColor
+  rrect(ctx, o.x, o.y, o.w, o.h, 2); ctx.fill(); ctx.stroke()
+  // 走査線
+  ctx.strokeStyle = theme.obstacleStroke + '88'; ctx.lineWidth = 1
+  for (let sy = o.y + 3; sy < o.y + o.h - 2; sy += 5) {
+    ctx.beginPath(); ctx.moveTo(o.x + 2, sy); ctx.lineTo(o.x + o.w - 2, sy); ctx.stroke()
+  }
+  // ランダムにずれるブロック
+  if (Math.floor(frame * 0.2) % 3 === 0) {
+    ctx.fillStyle = theme.obstacleStroke
+    ctx.fillRect(o.x + 4, o.y + o.h * 0.4, o.w * 0.5, 4)
+  }
+}
+
+// ファイアウォール：踏めない壁。赤いレンガ＋揺らめく炎。ジャンプで越える。
+function dFirewall(ctx: CanvasRenderingContext2D, o: Obstacle, _theme: Theme, frame: number) {
+  // レンガ壁
+  ctx.fillStyle = '#aa2200'; ctx.strokeStyle = '#ff5522'; ctx.lineWidth = 2
+  rrect(ctx, o.x, o.y, o.w, o.h, 2); ctx.fill(); ctx.stroke()
+  ctx.strokeStyle = '#ff552288'; ctx.lineWidth = 1
+  const brickH = 9
+  for (let i = 0, by = o.y + brickH; by < o.y + o.h; by += brickH, i++) {
+    ctx.beginPath(); ctx.moveTo(o.x, by); ctx.lineTo(o.x + o.w, by); ctx.stroke()
+    const offset = i % 2 === 0 ? o.w / 2 : o.w / 4
+    ctx.beginPath(); ctx.moveTo(o.x + offset, by - brickH); ctx.lineTo(o.x + offset, by); ctx.stroke()
+  }
+  // 上端の炎
+  ctx.fillStyle = '#ff7722'
+  const flames = Math.max(2, Math.round(o.w / 12))
+  for (let i = 0; i < flames; i++) {
+    const fx = o.x + (i + 0.5) * (o.w / flames)
+    const fh = 8 + Math.abs(Math.sin(frame * 0.3 + i)) * 8
+    ctx.beginPath()
+    ctx.moveTo(fx - 4, o.y); ctx.quadraticCurveTo(fx, o.y - fh, fx + 4, o.y); ctx.closePath(); ctx.fill()
+  }
+}
+
+// データブロック：踏めない壁。0/1が縦に流れるソリッドなブロック。
+function dDataBlock(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme, frame: number) {
+  rrect(ctx, o.x, o.y, o.w, o.h, 3); ctx.fill(); ctx.stroke()
+  ctx.save()
+  ctx.beginPath(); ctx.rect(o.x + 2, o.y + 2, o.w - 4, o.h - 4); ctx.clip()
+  ctx.fillStyle = theme.groundLineColor
+  ctx.font = '10px monospace'; ctx.textAlign = 'center'
+  const cols = Math.max(1, Math.floor(o.w / 12))
+  for (let c = 0; c < cols; c++) {
+    const colX = o.x + (c + 0.5) * (o.w / cols)
+    for (let r = 0; r < Math.ceil(o.h / 12) + 1; r++) {
+      const drop = (frame * 0.8 + c * 17 + r * 12) % (o.h + 12)
+      ctx.globalAlpha = 0.35 + ((c + r) % 2) * 0.25
+      const bit = (Math.floor(frame * 0.1 + c * 3 + r * 7) % 2) === 0 ? '0' : '1'
+      ctx.fillText(bit, colX, o.y + drop)
+    }
+  }
+  ctx.globalAlpha = 1
+  ctx.restore()
+}
+
 export const OBSTACLE_DRAWERS: Record<Obstacle['shape'], ObstacleDrawFn> = {
   gear: dGear,
   bolt: dBolt,
@@ -541,6 +640,10 @@ export const OBSTACLE_DRAWERS: Record<Obstacle['shape'], ObstacleDrawFn> = {
   electron: dElectron,
   tesla: dTesla,
   arc_ring: dArcRing,
+  virus: dVirus,
+  glitch: dGlitch,
+  firewall: dFirewall,
+  data_block: dDataBlock,
 }
 
 export function drawObstacle(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme, frame: number) {

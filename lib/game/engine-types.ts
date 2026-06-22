@@ -9,7 +9,9 @@ export interface Obstacle {
        | 'wrench' | 'spring' | 'flywheel' | 'robot_arm'
        | 'hammer' | 'conveyor'
        | 'resistor' | 'transistor' | 'electron' | 'tesla' | 'arc_ring'
+       | 'virus' | 'glitch' | 'firewall' | 'data_block'
   moving: boolean; phase: number; baseY: number; amplitude: number
+  stompable?: boolean  // 電子情報工学科：上から踏んで倒せる敵か
 }
 
 export type TerrainSegment =

@@ -10,6 +10,8 @@ import {
   STEP_FOLLOW_SPEED, MISS_OVERLAY_FRAMES, REVIVAL_FRAMES,
   CHARGE_MAX, CHARGE_DRAIN, CHARGE_HIT_COST, CHARGE_REVIVE,
   BATTERY_REFILL, BATTERY_GAP,
+  COMBO_NEEDED, COMBO_WINDOW, DEBUG_FRAMES, DEBUG_SPEED_MULT,
+  STOMP_BOUNCE, STOMP_MARGIN,
 } from './constants'
 import type { PlayerState, Obstacle, TerrainSegment, Item, Particle } from './engine-types'
 import { overlaps, playerHitbox } from './helpers'
@@ -74,6 +76,12 @@ export class GameEngine {
   private isElec = false
   private charge = CHARGE_MAX
 
+  // デバッグ踏みつけ（電子情報工学科 = departmentId 3 のみ稼働）
+  private isCode = false
+  private combo = 0
+  private comboTimer = 0
+  private debugMode = 0
+
   // Background scroll
   private bgX = 0
 
@@ -88,6 +96,7 @@ export class GameEngine {
     canvas.height = CANVAS_H
     this.departmentId = departmentId
     this.isElec = departmentId === 2
+    this.isCode = departmentId === 3
     this.onClear = onClear
     this.terrain = buildStage(departmentId)
   }
@@ -218,6 +227,12 @@ export class GameEngine {
       }
     }
 
+    // デバッグ踏みつけ（電子情報工学科）：コンボ減衰・デバッグモード残り時間
+    if (this.isCode) {
+      if (this.comboTimer > 0 && --this.comboTimer === 0) this.combo = 0
+      if (this.debugMode > 0) this.debugMode--
+    }
+
     // ゴール直前スパーク
     if (!this.isCleared && STAGE_LENGTH - this.stageProgress <= 60 && this.frame % 4 === 0) {
       const goalTheme = AREAS[this.departmentId as AreaId]
@@ -283,15 +298,30 @@ export class GameEngine {
 
     // 衝突判定
     const ph = playerHitbox(this.py)
-    if (this.invincible === 0) {
+    if (this.invincible === 0 && this.debugMode === 0) {
       for (const o of this.obstacles) {
-        if (overlaps(ph, { x: o.x + 4, y: o.y + 4, w: o.w - 8, h: o.h - 8 })) {
-          // 被弾：チャージ大幅減（電気電子）＋ノックバックの二重ペナルティ
-          if (this.isElec) this.charge = Math.max(0, this.charge - CHARGE_HIT_COST)
-          this.knockback(KNOCKBACK_AMOUNT)
-          return
+        if (!overlaps(ph, { x: o.x + 4, y: o.y + 4, w: o.w - 8, h: o.h - 8 })) continue
+        // 踏みつけ（電子情報）：落下中に踏める敵の上面へ着地したら成立
+        if (this.isCode && o.stompable && this.pvy > 0 && (this.py - this.pvy) <= o.y + STOMP_MARGIN) {
+          this.stomp(o)
+          break
         }
+        // 通常被弾：チャージ大幅減（電気電子）＋ノックバック
+        if (this.isElec) this.charge = Math.max(0, this.charge - CHARGE_HIT_COST)
+        this.knockback(KNOCKBACK_AMOUNT)
+        return
       }
+    }
+
+    // デバッグモード中（電子情報）：踏める敵はすり抜けつつ自動処理（壁はすり抜け）
+    if (this.isCode && this.debugMode > 0) {
+      this.obstacles = this.obstacles.filter(o => {
+        if (o.stompable && overlaps(ph, { x: o.x, y: o.y, w: o.w, h: o.h })) {
+          this.burst(o.x + o.w / 2, o.y + o.h / 2, AREAS[3].groundLineColor, 6)
+          return false
+        }
+        return true
+      })
     }
 
     // 電池取得判定（電気電子工学科）
@@ -315,7 +345,9 @@ export class GameEngine {
   }
 
   private get effectiveSpeed(): number {
-    return this.revivalTimer > 0 ? SPEED_START : this.currentSpeed
+    if (this.revivalTimer > 0) return SPEED_START
+    // デバッグモード中（電子情報）はスクロール加速＝タイム短縮ボーナス
+    return this.debugMode > 0 ? this.currentSpeed * DEBUG_SPEED_MULT : this.currentSpeed
   }
 
   // stageProgress基準のCanvas X座標変換
@@ -397,6 +429,23 @@ export class GameEngine {
     this.burst(PLAYER_X, this.py, '#ffffff', 4)
   }
 
+  // 踏みつけ（電子情報）：敵を倒してバウンド、コンボを伸ばす。満タンでデバッグモード突入。
+  private stomp(o: Obstacle) {
+    this.obstacles = this.obstacles.filter(x => x !== o)
+    this.pvy = STOMP_BOUNCE
+    this.jumpCount = 1
+    this.pState = 'jumping'
+    this.combo++
+    this.comboTimer = COMBO_WINDOW
+    this.burst(o.x + o.w / 2, o.y, AREAS[3].groundLineColor, 8)
+    playJump()
+    if (this.combo >= COMBO_NEEDED) {
+      this.debugMode = DEBUG_FRAMES
+      this.combo = 0
+      this.burst(PLAYER_X, this.py - 30, '#00ffcc', 18)
+    }
+  }
+
   private burst(x: number, y: number, color: string, n: number) {
     for (let i = 0; i < n; i++) {
       const a = Math.random() * Math.PI * 2, s = 1.5 + Math.random() * 3.5
@@ -412,7 +461,7 @@ export class GameEngine {
   private render() {
     const ctx = this.ctx
     const theme = AREAS[this.departmentId as AreaId]
-    const bg: BgContext = { frame: this.frame, bgX: this.bgX, speed: this.missOverlayTimer > 0 ? 0 : this.effectiveSpeed }
+    const bg: BgContext = { frame: this.frame, bgX: this.bgX, speed: this.missOverlayTimer > 0 ? 0 : this.effectiveSpeed, debug: this.debugMode > 0 }
 
     ctx.save()
 
@@ -446,6 +495,9 @@ export class GameEngine {
       departmentId: this.departmentId,
       charge: this.isElec ? this.charge : undefined,
       chargeMax: this.isElec ? CHARGE_MAX : undefined,
+      combo: this.isCode ? this.combo : undefined,
+      comboNeeded: this.isCode ? COMBO_NEEDED : undefined,
+      debugMode: this.isCode ? this.debugMode : undefined,
     })
 
     if (this.missOverlayTimer > 0) {

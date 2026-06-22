@@ -1,6 +1,6 @@
 import type { AreaId } from './areas'
 import { AREAS } from './areas'
-import { CANVAS_W, CANVAS_H, STAGE_LENGTH } from './constants'
+import { CANVAS_W, CANVAS_H, STAGE_LENGTH, DEBUG_FRAMES } from './constants'
 
 type Theme = typeof AREAS[AreaId]
 
@@ -11,6 +11,9 @@ export interface HudState {
   departmentId: number
   charge?: number      // 電気電子工学科：充電ゲージ残量
   chargeMax?: number
+  combo?: number       // 電子情報工学科：踏みつけコンボ
+  comboNeeded?: number
+  debugMode?: number   // デバッグモード残りフレーム
 }
 
 function formatTime(ms: number): string {
@@ -75,6 +78,36 @@ export function drawHUD(ctx: CanvasRenderingContext2D, theme: Theme, s: HudState
 
     ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 1
     ctx.strokeRect(gx + 0.5, gy + 0.5, gw - 1, gh - 1)
+  }
+
+  // コンボゲージ／デバッグモード（電子情報工学科のみ）
+  if (s.combo !== undefined && s.comboNeeded) {
+    const gx = 110, gy = 15, gh = 12, gw = 130
+    if (s.debugMode && s.debugMode > 0) {
+      // DEBUG MODE バナー＋残り時間バー
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle'
+      ctx.font = 'bold 13px monospace'
+      ctx.fillStyle = '#00ffcc'; ctx.shadowColor = '#00ffcc'; ctx.shadowBlur = 8
+      ctx.fillText('⚡ DEBUG MODE', gx - 18, gy + gh / 2)
+      ctx.shadowBlur = 0
+      const ratio = Math.min(1, s.debugMode / DEBUG_FRAMES)
+      ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(gx, gy + gh + 1, gw, 3)
+      ctx.fillStyle = '#00ffcc'; ctx.fillRect(gx, gy + gh + 1, gw * ratio, 3)
+    } else {
+      // コンボ進捗（セグメント表示）
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.font = '14px monospace'
+      ctx.fillStyle = theme.groundLineColor
+      ctx.fillText('💻', gx - 18, gy + gh / 2)
+      const segGap = 4, segW = (gw - segGap * (s.comboNeeded - 1)) / s.comboNeeded
+      for (let i = 0; i < s.comboNeeded; i++) {
+        const sx = gx + i * (segW + segGap)
+        const on = i < s.combo
+        ctx.fillStyle = on ? theme.groundLineColor : 'rgba(255,255,255,0.12)'
+        if (on) { ctx.shadowColor = theme.groundLineColor; ctx.shadowBlur = 4 }
+        ctx.fillRect(sx, gy, segW, gh)
+        ctx.shadowBlur = 0
+      }
+    }
   }
 
   // 無敵フラッシュ

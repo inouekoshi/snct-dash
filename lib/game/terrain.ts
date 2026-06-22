@@ -5,7 +5,19 @@ import { STAGE_LENGTH, CANVAS_W, DEFAULT_GROUND_Y } from './constants'
 export function buildStage(departmentId: number): TerrainSegment[] {
   if (departmentId === 1) return buildStageMech()
   if (departmentId === 2) return buildStageElec()
+  if (departmentId === 3) return buildStageCode()
   return buildStageDefault()
+}
+
+// 電子情報工学科専用地形：踏みつけのテンポと公平性を優先し、穴も段差も無い平坦。
+// 踏み損ね＋穴落下の二重ミスを避け、「踏む／壁を越える」に集中させる。
+function buildStageCode(): TerrainSegment[] {
+  return [{
+    type: 'ground',
+    stageX: 0,
+    width: STAGE_LENGTH + CANVAS_W + 200,
+    groundY: DEFAULT_GROUND_Y,
+  }]
 }
 
 // 電気電子工学科専用地形：穴も段差も無い完全な平坦。
