@@ -4,7 +4,19 @@ import { STAGE_LENGTH, CANVAS_W, DEFAULT_GROUND_Y } from './constants'
 // ステージ開始時に全地形を一括生成する。
 export function buildStage(departmentId: number): TerrainSegment[] {
   if (departmentId === 1) return buildStageMech()
+  if (departmentId === 2) return buildStageElec()
   return buildStageDefault()
+}
+
+// 電気電子工学科専用地形：穴も段差も無い完全な平坦。
+// プレイヤーは「充電維持＋障害物回避」に集中する。機械工学科の山登り階段とも差別化。
+function buildStageElec(): TerrainSegment[] {
+  return [{
+    type: 'ground',
+    stageX: 0,
+    width: STAGE_LENGTH + CANVAS_W + 200,
+    groundY: DEFAULT_GROUND_Y,
+  }]
 }
 
 function buildStageDefault(): TerrainSegment[] {

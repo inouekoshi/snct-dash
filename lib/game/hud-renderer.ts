@@ -9,6 +9,8 @@ export interface HudState {
   stageProgress: number
   invincible: number
   departmentId: number
+  charge?: number      // 電気電子工学科：充電ゲージ残量
+  chargeMax?: number
 }
 
 function formatTime(ms: number): string {
@@ -44,6 +46,36 @@ export function drawHUD(ctx: CanvasRenderingContext2D, theme: Theme, s: HudState
   ctx.shadowColor = theme.groundLineColor; ctx.shadowBlur = 4
   ctx.fillRect(bx, by, bw * Math.min(s.stageProgress / STAGE_LENGTH, 1), 5)
   ctx.shadowBlur = 0
+
+  // 充電ゲージ（電気電子工学科のみ）
+  if (s.charge !== undefined && s.chargeMax) {
+    const ratio = Math.max(0, Math.min(1, s.charge / s.chargeMax))
+    const gx = 110, gy = 15, gw = 130, gh = 12
+    const low = ratio < 0.25
+
+    // ⚡アイコン（低残量時は点滅）
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle'
+    ctx.font = '14px monospace'
+    ctx.globalAlpha = low && Math.floor(Date.now() / 150) % 2 === 0 ? 0.35 : 1
+    ctx.fillStyle = '#ffff66'
+    ctx.fillText('⚡', gx - 18, gy + gh / 2)
+    ctx.globalAlpha = 1
+
+    // 枠
+    ctx.fillStyle = 'rgba(255,255,255,0.12)'
+    ctx.fillRect(gx, gy, gw, gh)
+
+    // 残量に応じた色（緑→黄→赤）
+    const barColor = ratio > 0.5 ? '#33dd55' : ratio > 0.25 ? '#ffdd33' : '#ff4444'
+    ctx.fillStyle = barColor
+    ctx.shadowColor = barColor
+    ctx.shadowBlur = low ? 6 + Math.sin(Date.now() / 80) * 6 : 4
+    ctx.fillRect(gx, gy, gw * ratio, gh)
+    ctx.shadowBlur = 0
+
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 1
+    ctx.strokeRect(gx + 0.5, gy + 0.5, gw - 1, gh - 1)
+  }
 
   // 無敵フラッシュ
   if (s.invincible > 0 && Math.floor(s.invincible / 6) % 2 === 0) {

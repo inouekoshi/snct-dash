@@ -8,10 +8,13 @@ import {
   KNOCKBACK_AMOUNT, HOLE_KNOCKBACK, KNOCKBACK_INVINCIBLE,
   SPAWN_GAPS, COYOTE_FRAMES, JUMP_BUFFER_FRAMES, HIT_STOP_FRAMES,
   STEP_FOLLOW_SPEED, MISS_OVERLAY_FRAMES, REVIVAL_FRAMES,
+  CHARGE_MAX, CHARGE_DRAIN, CHARGE_HIT_COST, CHARGE_REVIVE,
+  BATTERY_REFILL, BATTERY_GAP,
 } from './constants'
 import type { PlayerState, Obstacle, TerrainSegment, Item, Particle } from './engine-types'
 import { overlaps, playerHitbox } from './helpers'
 import { drawObstacle } from './obstacle-drawers'
+import { drawBattery } from './item-renderer'
 import { drawBg, drawGround, type BgContext } from './background-renderers'
 import { drawPlayer } from './player-renderer'
 import { drawGoal } from './goal-renderer'
@@ -65,6 +68,11 @@ export class GameEngine {
   // Spawn timers
   private nextObs = 120
   private nextCeilingObs = 300
+  private nextBattery = 90
+
+  // 充電サバイバル（電気電子工学科 = departmentId 2 のみ稼働）
+  private isElec = false
+  private charge = CHARGE_MAX
 
   // Background scroll
   private bgX = 0
@@ -79,6 +87,7 @@ export class GameEngine {
     canvas.width = CANVAS_W
     canvas.height = CANVAS_H
     this.departmentId = departmentId
+    this.isElec = departmentId === 2
     this.onClear = onClear
     this.terrain = buildStage(departmentId)
   }
@@ -199,6 +208,16 @@ export class GameEngine {
       if (this.itemEffectTimer === 0) this.itemEffect = null
     }
 
+    // 充電ドレイン（電気電子工学科）：常に減少し、0でミス
+    if (this.isElec) {
+      this.charge -= CHARGE_DRAIN
+      if (this.charge <= 0) {
+        this.charge = CHARGE_REVIVE
+        this.knockback(KNOCKBACK_AMOUNT)
+        return
+      }
+    }
+
     // ゴール直前スパーク
     if (!this.isCleared && STAGE_LENGTH - this.stageProgress <= 60 && this.frame % 4 === 0) {
       const goalTheme = AREAS[this.departmentId as AreaId]
@@ -236,6 +255,16 @@ export class GameEngine {
       this.nextObs = Math.max(this.nextObs, CEIL_GROUND_GAP)
     }
 
+    // 電池スポーン（電気電子工学科）：平坦な地面に充電アイテムを配置
+    if (this.isElec && --this.nextBattery <= 0) {
+      const nextStageX = this.stageProgress + CANVAS_W
+      const groundY = this.getGroundHeightAt(nextStageX)
+      const y = groundY - (12 + Math.random() * 50) // 地上〜やや高め（ジャンプ取得）
+      this.items.push({ stageX: nextStageX, x: CANVAS_W + 10, y, effect: 'charge', wobble: Math.random() * Math.PI * 2 })
+      const [mn, r] = BATTERY_GAP
+      this.nextBattery = mn + Math.random() * r
+    }
+
     // オブジェクトのCanvas座標を更新・画面外を除去
     for (const o of this.obstacles) {
       o.x = this.toCanvasX(o.stageX)
@@ -243,7 +272,7 @@ export class GameEngine {
     }
     this.obstacles = this.obstacles.filter(o => o.x > -150)
 
-    for (const it of this.items) it.x = this.toCanvasX(it.stageX)
+    for (const it of this.items) { it.x = this.toCanvasX(it.stageX); it.wobble += 0.1 }
     this.items = this.items.filter(it => it.x > -20)
 
     this.particles = this.particles.filter(p => {
@@ -256,10 +285,24 @@ export class GameEngine {
     if (this.invincible === 0) {
       for (const o of this.obstacles) {
         if (overlaps(ph, { x: o.x + 4, y: o.y + 4, w: o.w - 8, h: o.h - 8 })) {
+          // 被弾：チャージ大幅減（電気電子）＋ノックバックの二重ペナルティ
+          if (this.isElec) this.charge = Math.max(0, this.charge - CHARGE_HIT_COST)
           this.knockback(KNOCKBACK_AMOUNT)
           return
         }
       }
+    }
+
+    // 電池取得判定（電気電子工学科）
+    if (this.isElec && this.items.length) {
+      this.items = this.items.filter(it => {
+        if (it.effect === 'charge' && overlaps(ph, { x: it.x - 11, y: it.y - 15, w: 22, h: 30 })) {
+          this.charge = Math.min(CHARGE_MAX, this.charge + BATTERY_REFILL)
+          this.burst(it.x, it.y, AREAS[2].coinColor, 8)
+          return false
+        }
+        return true
+      })
     }
   }
 
@@ -378,6 +421,10 @@ export class GameEngine {
 
     for (const o of this.obstacles) drawObstacle(ctx, o, theme, this.frame)
 
+    for (const it of this.items) {
+      if (it.effect === 'charge') drawBattery(ctx, it, theme, this.frame)
+    }
+
     for (const p of this.particles) {
       ctx.globalAlpha = p.life / p.maxLife
       ctx.fillStyle = p.color
@@ -396,6 +443,8 @@ export class GameEngine {
       stageProgress: this.stageProgress,
       invincible: this.invincible,
       departmentId: this.departmentId,
+      charge: this.isElec ? this.charge : undefined,
+      chargeMax: this.isElec ? CHARGE_MAX : undefined,
     })
 
     if (this.missOverlayTimer > 0) {
