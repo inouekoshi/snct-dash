@@ -37,9 +37,8 @@ export const BATTERY_REFILL  = 35    // 🔋電池1個の回復量
 export const BATTERY_GAP: [number, number] = [110, 80]
 
 // 電子情報工学科（デバッグ踏みつけ型）専用
-export const COMBO_NEEDED     = 4    // 連続踏み数でデバッグモード発動
-export const COMBO_WINDOW     = 75   // 踏み猶予frames。超えるとコンボリセット
+export const COMBO_NEEDED     = 3    // 累積踏み数でデバッグモード発動（時間でリセットしない）
 export const DEBUG_FRAMES     = 180  // デバッグモード持続（3秒）
 export const DEBUG_SPEED_MULT = 1.7  // デバッグモード中のスクロール加速倍率
 export const STOMP_BOUNCE     = -10  // 踏んだ後のバウンド初速（px/frame）
-export const STOMP_MARGIN     = 12   // 上面接触判定の許容px
+export const STOMP_MARGIN     = 26   // 上面接触判定の許容px（広めにして踏みやすく）

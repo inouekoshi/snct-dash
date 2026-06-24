@@ -140,21 +140,21 @@ function spawnDept2(push: (o: ObstacleInit) => void, groundY: number) {
 function spawnDept3(push: (o: ObstacleInit) => void, groundY: number) {
   const r = Math.random()
   if (r < 0.20) {
-    // バグ（地上・踏める）：低い敵。踏むか飛び越える
-    const s = 28 + Math.random() * 8
+    // バグ（地上・踏める）：大きめの敵。踏むか飛び越える
+    const s = 44 + Math.random() * 12
     push({ x: CANVAS_W + 10, y: groundY - s, w: s, h: s, shape: 'bug', stompable: true })
   } else if (r < 0.40) {
     // バグ（空中で上下・踏める）：タイミングよく踏んでコンボ
-    const s = 26 + Math.random() * 8
-    const baseY = groundY - 48 - Math.random() * 24
-    push({ x: CANVAS_W + 10, y: baseY, w: s, h: s, shape: 'bug', stompable: true, moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 30 })
+    const s = 42 + Math.random() * 12
+    const baseY = groundY - 44 - Math.random() * 20
+    push({ x: CANVAS_W + 10, y: baseY, w: s, h: s, shape: 'bug', stompable: true, moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 24 })
   } else if (r < 0.56) {
-    // ウイルス（踏める）：やや大きい敵
-    const s = 36 + Math.random() * 12
+    // ウイルス（踏める）：かなり大きい敵
+    const s = 52 + Math.random() * 16
     push({ x: CANVAS_W + 10, y: groundY - s, w: s, h: s, shape: 'virus', stompable: true })
   } else if (r < 0.70) {
-    // グリッチ（踏める）：小さく低い敵
-    const w = 30 + Math.random() * 14, h = 26 + Math.random() * 10
+    // グリッチ（踏める）：横長で踏みやすい敵
+    const w = 46 + Math.random() * 18, h = 38 + Math.random() * 12
     push({ x: CANVAS_W + 10, y: groundY - h, w, h, shape: 'glitch', stompable: true })
   } else if (r < 0.83) {
     // ファイアウォール（踏めない壁）：縦の壁。ジャンプで越える
@@ -168,16 +168,16 @@ function spawnDept3(push: (o: ObstacleInit) => void, groundY: number) {
     // 複合：バグの連続（コンボチェイン）。空中に2〜3体並べる
     const n = Math.random() < 0.5 ? 2 : 3
     for (let i = 0; i < n; i++) {
-      const s = 26
-      const baseY = groundY - 50 - (i % 2) * 16
-      push({ x: CANVAS_W + 10 + i * 52, y: baseY, w: s, h: s, shape: 'bug', stompable: true, moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 22 })
+      const s = 40
+      const baseY = groundY - 48 - (i % 2) * 16
+      push({ x: CANVAS_W + 10 + i * 64, y: baseY, w: s, h: s, shape: 'bug', stompable: true, moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 18 })
     }
   } else {
     // 複合：壁＋その先に踏める敵（壁を越えてから踏む）
     const h = 48 + Math.random() * 20
     push({ x: CANVAS_W + 10, y: groundY - h, w: 26, h, shape: 'firewall' })
-    const s = 30, baseY = groundY - 52
-    push({ x: CANVAS_W + 78, y: baseY, w: s, h: s, shape: 'virus', stompable: true, moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 20 })
+    const s = 46, baseY = groundY - 52
+    push({ x: CANVAS_W + 88, y: baseY, w: s, h: s, shape: 'virus', stompable: true, moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 16 })
   }
 }
 

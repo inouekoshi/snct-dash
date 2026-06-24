@@ -10,7 +10,7 @@ import {
   STEP_FOLLOW_SPEED, MISS_OVERLAY_FRAMES, REVIVAL_FRAMES,
   CHARGE_MAX, CHARGE_DRAIN, CHARGE_HIT_COST, CHARGE_REVIVE,
   BATTERY_REFILL, BATTERY_GAP,
-  COMBO_NEEDED, COMBO_WINDOW, DEBUG_FRAMES, DEBUG_SPEED_MULT,
+  COMBO_NEEDED, DEBUG_FRAMES, DEBUG_SPEED_MULT,
   STOMP_BOUNCE, STOMP_MARGIN,
 } from './constants'
 import type { PlayerState, Obstacle, TerrainSegment, Item, Particle } from './engine-types'
@@ -79,7 +79,6 @@ export class GameEngine {
   // デバッグ踏みつけ（電子情報工学科 = departmentId 3 のみ稼働）
   private isCode = false
   private combo = 0
-  private comboTimer = 0
   private debugMode = 0
 
   // Background scroll
@@ -227,9 +226,9 @@ export class GameEngine {
       }
     }
 
-    // デバッグ踏みつけ（電子情報工学科）：コンボ減衰・デバッグモード残り時間
+    // デバッグ踏みつけ（電子情報工学科）：デバッグモード残り時間
+    // コンボは時間でリセットせず、踏んだ数を累積する
     if (this.isCode) {
-      if (this.comboTimer > 0 && --this.comboTimer === 0) this.combo = 0
       if (this.debugMode > 0) this.debugMode--
     }
 
@@ -436,7 +435,6 @@ export class GameEngine {
     this.jumpCount = 1
     this.pState = 'jumping'
     this.combo++
-    this.comboTimer = COMBO_WINDOW
     this.burst(o.x + o.w / 2, o.y, AREAS[3].groundLineColor, 8)
     playJump()
     if (this.combo >= COMBO_NEEDED) {
