@@ -135,49 +135,72 @@ function spawnDept2(push: (o: ObstacleInit) => void, groundY: number) {
   }
 }
 
-// 電子情報工学科（デバッグ踏みつけ型）: 踏める敵（bug/virus/glitch）と
-// 踏めない壁（firewall/data_block）を混在。踏む／越えるを使い分けさせる。
+// 電子情報工学科（デバッグ踏みつけ型）: 踏める「バグ」（exception/memory_leak/zombie_process）と、
+// 踏めない「コードの障害」（syntax_error/infinite_loop/stack_overflow/null_pointer/merge_conflict/segfault）を
+// 混在。踏む＝デバッグ／越えるを使い分けさせる。踏める敵は種類でゲージ加算量が異なる（STOMP_GAUGE）。
 function spawnDept3(push: (o: ObstacleInit) => void, groundY: number) {
   const r = Math.random()
-  if (r < 0.20) {
-    // バグ（地上・踏める）：大きめの敵。踏むか飛び越える
-    const s = 44 + Math.random() * 12
-    push({ x: CANVAS_W + 10, y: groundY - s, w: s, h: s, shape: 'bug', stompable: true })
-  } else if (r < 0.40) {
-    // バグ（空中で上下・踏める）：タイミングよく踏んでコンボ
-    const s = 42 + Math.random() * 12
-    const baseY = groundY - 44 - Math.random() * 20
-    push({ x: CANVAS_W + 10, y: baseY, w: s, h: s, shape: 'bug', stompable: true, moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 24 })
-  } else if (r < 0.56) {
-    // ウイルス（踏める）：かなり大きい敵
+  // ── 踏める敵（デバッグ対象）──
+  if (r < 0.15) {
+    // 例外（地上・踏める）：大きめのダイヤ。踏んで握り潰す
+    const s = 46 + Math.random() * 12
+    push({ x: CANVAS_W + 10, y: groundY - s, w: s, h: s, shape: 'exception', stompable: true })
+  } else if (r < 0.28) {
+    // 例外（空中で上下・踏める）：throwされて飛んでくる
+    const s = 42 + Math.random() * 10
+    const baseY = groundY - 50 - Math.random() * 22
+    push({ x: CANVAS_W + 10, y: baseY, w: s, h: s, shape: 'exception', stompable: true, moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 26 })
+  } else if (r < 0.38) {
+    // メモリリーク（踏める）：大きく踏みやすい。ゲージ加算が多い（+2）
+    const s = 54 + Math.random() * 16
+    push({ x: CANVAS_W + 10, y: groundY - s, w: s, h: s, shape: 'memory_leak', stompable: true })
+  } else if (r < 0.48) {
+    // ゾンビプロセス（踏める）：低くて横長の雑魚
+    const w = 48 + Math.random() * 16, h = 38 + Math.random() * 10
+    push({ x: CANVAS_W + 10, y: groundY - h, w, h, shape: 'zombie_process', stompable: true })
+  }
+  // ── 踏めない障壁（越えるしかない）──
+  else if (r < 0.57) {
+    // 構文エラー（空中で上下）：閉じ忘れの } が浮遊。タイミングで越える
+    const s = 40 + Math.random() * 12
+    const baseY = groundY - 54 - Math.random() * 20
+    push({ x: CANVAS_W + 10, y: baseY, w: s, h: s, shape: 'syntax_error', moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 22 })
+  } else if (r < 0.65) {
+    // 無限ループ：回転する大きな円。広い当たり判定で大ジャンプ
     const s = 52 + Math.random() * 16
-    push({ x: CANVAS_W + 10, y: groundY - s, w: s, h: s, shape: 'virus', stompable: true })
-  } else if (r < 0.70) {
-    // グリッチ（踏める）：横長で踏みやすい敵
-    const w = 46 + Math.random() * 18, h = 38 + Math.random() * 12
-    push({ x: CANVAS_W + 10, y: groundY - h, w, h, shape: 'glitch', stompable: true })
-  } else if (r < 0.83) {
-    // ファイアウォール（踏めない壁）：縦の壁。ジャンプで越える
-    const h = 50 + Math.random() * 26
-    push({ x: CANVAS_W + 10, y: groundY - h, w: 26 + Math.random() * 12, h, shape: 'firewall' })
-  } else if (r < 0.92) {
-    // データブロック（踏めない壁）：中サイズの塊
-    const h = 40 + Math.random() * 22
-    push({ x: CANVAS_W + 10, y: groundY - h, w: 40 + Math.random() * 16, h, shape: 'data_block' })
-  } else if (r < 0.97) {
-    // 複合：バグの連続（コンボチェイン）。空中に2〜3体並べる
+    push({ x: CANVAS_W + 10, y: groundY - s, w: s, h: s, shape: 'infinite_loop' })
+  } else if (r < 0.73) {
+    // ヌルポインタ：空中にぶら下がる縦長の障害
+    const w = 38 + Math.random() * 10, h = 56 + Math.random() * 16
+    push({ x: CANVAS_W + 10, y: groundY - h, w, h, shape: 'null_pointer' })
+  } else if (r < 0.81) {
+    // マージコンフリクト：幅広・低中。距離を稼ぐジャンプ
+    const w = 70 + Math.random() * 30, h = 40 + Math.random() * 14
+    push({ x: CANVAS_W + 10, y: groundY - h, w, h, shape: 'merge_conflict' })
+  } else if (r < 0.88) {
+    // セグフォ：中サイズの崩れるブロック
+    const w = 48 + Math.random() * 16, h = 46 + Math.random() * 16
+    push({ x: CANVAS_W + 10, y: groundY - h, w, h, shape: 'segfault' })
+  } else if (r < 0.95) {
+    // スタックオーバーフロー：最も高い壁。フルジャンプ必須
+    const h = 74 + Math.random() * 22
+    push({ x: CANVAS_W + 10, y: groundY - h, w: 40 + Math.random() * 12, h, shape: 'stack_overflow' })
+  }
+  // ── 複合パターン ──
+  else if (r < 0.98) {
+    // 複合：例外の連続（コンボチェイン）。空中に2〜3体並べる
     const n = Math.random() < 0.5 ? 2 : 3
     for (let i = 0; i < n; i++) {
       const s = 40
-      const baseY = groundY - 48 - (i % 2) * 16
-      push({ x: CANVAS_W + 10 + i * 64, y: baseY, w: s, h: s, shape: 'bug', stompable: true, moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 18 })
+      const baseY = groundY - 50 - (i % 2) * 16
+      push({ x: CANVAS_W + 10 + i * 64, y: baseY, w: s, h: s, shape: 'exception', stompable: true, moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 18 })
     }
   } else {
-    // 複合：壁＋その先に踏める敵（壁を越えてから踏む）
-    const h = 48 + Math.random() * 20
-    push({ x: CANVAS_W + 10, y: groundY - h, w: 26, h, shape: 'firewall' })
-    const s = 46, baseY = groundY - 52
-    push({ x: CANVAS_W + 88, y: baseY, w: s, h: s, shape: 'virus', stompable: true, moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 16 })
+    // 複合：壁（無限ループ）＋その先に踏めるメモリリーク（越えてから踏む）
+    const s1 = 50 + Math.random() * 12
+    push({ x: CANVAS_W + 10, y: groundY - s1, w: s1, h: s1, shape: 'infinite_loop' })
+    const s = 50, baseY = groundY - 56
+    push({ x: CANVAS_W + s1 + 36, y: baseY, w: s, h: s, shape: 'memory_leak', stompable: true, moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 16 })
   }
 }
 

@@ -612,6 +612,198 @@ function dDataBlock(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme, fr
   ctx.restore()
 }
 
+// ── 電子情報工学科：踏める敵（コードの不具合をデバッグして潰す）────────────
+
+// 例外：未捕捉の throw。赤い警告ダイヤに「!」。踏む＝try/catchで握り潰す。
+function dException(ctx: CanvasRenderingContext2D, o: Obstacle, _theme: Theme, frame: number) {
+  const cx = o.x + o.w / 2, cy = o.y + o.h / 2
+  const r = Math.min(o.w, o.h) / 2
+  const pulse = 0.6 + Math.sin(frame * 0.2) * 0.4
+  ctx.fillStyle = '#cc2233'; ctx.strokeStyle = '#ff5566'; ctx.lineWidth = 2.5
+  ctx.shadowColor = '#ff3344'; ctx.shadowBlur = 8 * pulse
+  ctx.beginPath()
+  ctx.moveTo(cx, o.y); ctx.lineTo(o.x + o.w, cy); ctx.lineTo(cx, o.y + o.h); ctx.lineTo(o.x, cy)
+  ctx.closePath(); ctx.fill(); ctx.stroke()
+  ctx.shadowBlur = 0
+  ctx.fillStyle = '#fff'
+  ctx.font = `bold ${Math.floor(r * 1.1)}px monospace`
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+  ctx.fillText('!', cx, cy)
+  ctx.globalAlpha = pulse
+  ctx.fillStyle = '#ffaaaa'; ctx.font = '8px monospace'
+  ctx.fillText('throw', cx, o.y - 7)
+  ctx.globalAlpha = 1
+}
+
+// メモリリーク：脈動して膨らむ半透明の塊。下に雫が漏れる。踏む＝free()。
+function dMemoryLeak(ctx: CanvasRenderingContext2D, o: Obstacle, _theme: Theme, frame: number) {
+  const cx = o.x + o.w / 2, cy = o.y + o.h / 2
+  const swell = Math.sin(frame * 0.12) * (o.w * 0.08)
+  ctx.fillStyle = 'rgba(51,221,170,0.33)'; ctx.strokeStyle = '#33ffcc'; ctx.lineWidth = 2
+  ctx.shadowColor = '#33ffcc'; ctx.shadowBlur = 10
+  ctx.beginPath()
+  ctx.ellipse(cx, cy, o.w / 2 + swell, o.h / 2 - swell * 0.5, 0, 0, Math.PI * 2)
+  ctx.fill(); ctx.stroke()
+  ctx.shadowBlur = 0
+  ctx.fillStyle = '#aaffee'; ctx.font = `bold ${Math.floor(o.h * 0.3)}px monospace`
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+  ctx.fillText('RAM', cx, cy)
+  const t = (frame * 1.5) % 20
+  ctx.fillStyle = '#33ffcc'; ctx.globalAlpha = 1 - t / 20
+  ctx.beginPath(); ctx.arc(cx, o.y + o.h + t * 0.6, 3, 0, Math.PI * 2); ctx.fill()
+  ctx.globalAlpha = 1
+}
+
+// ゾンビプロセス：<defunct> のうつろな顔。踏む＝kill -9。
+function dZombieProcess(ctx: CanvasRenderingContext2D, o: Obstacle, _theme: Theme, frame: number) {
+  const cx = o.x + o.w / 2, cy = o.y + o.h / 2
+  ctx.fillStyle = '#6f8f4f'; ctx.strokeStyle = '#3f5f2f'; ctx.lineWidth = 2
+  rrect(ctx, o.x, o.y, o.w, o.h, 4); ctx.fill(); ctx.stroke()
+  ctx.strokeStyle = '#1f2f1f'; ctx.lineWidth = 2
+  const eyR = o.w * 0.11
+  for (const ox of [-o.w * 0.2, o.w * 0.2]) {
+    const ex = cx + ox, ey = cy - o.h * 0.1
+    ctx.beginPath(); ctx.moveTo(ex - eyR, ey - eyR); ctx.lineTo(ex + eyR, ey + eyR)
+    ctx.moveTo(ex + eyR, ey - eyR); ctx.lineTo(ex - eyR, ey + eyR); ctx.stroke()
+  }
+  ctx.beginPath()
+  const my = cy + o.h * 0.22
+  ctx.moveTo(o.x + o.w * 0.25, my)
+  for (let i = 1; i <= 4; i++) ctx.lineTo(o.x + o.w * (0.25 + 0.125 * i), my + (i % 2 ? -4 : 4))
+  ctx.stroke()
+  ctx.fillStyle = '#cfe0bf'; ctx.font = '8px monospace'
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+  ctx.globalAlpha = 0.6 + Math.sin(frame * 0.15) * 0.4
+  ctx.fillText('<defunct>', cx, o.y - 7)
+  ctx.globalAlpha = 1
+}
+
+// ── 電子情報工学科：踏めない障壁（コードを止めるエラー・概念）────────────────
+
+// 構文エラー：宙に浮く閉じ忘れの「}」＋赤い波線(squiggly)＋unexpected。
+function dSyntaxError(ctx: CanvasRenderingContext2D, o: Obstacle, _theme: Theme, frame: number) {
+  const cx = o.x + o.w / 2, cy = o.y + o.h / 2
+  ctx.fillStyle = '#ffdddd'
+  ctx.font = `bold ${Math.floor(o.h * 0.95)}px monospace`
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+  ctx.shadowColor = '#ff4455'; ctx.shadowBlur = 6
+  ctx.fillText('}', cx, cy)
+  ctx.shadowBlur = 0
+  ctx.strokeStyle = '#ff3344'; ctx.lineWidth = 2
+  const wy = o.y + o.h + 4, amp = 3, step = 4
+  ctx.beginPath()
+  let first = true
+  for (let x = o.x - 4; x <= o.x + o.w + 4; x += step) {
+    const yy = wy + (Math.round((x - o.x) / step) % 2 === 0 ? -amp : amp)
+    if (first) { ctx.moveTo(x, yy); first = false } else ctx.lineTo(x, yy)
+  }
+  ctx.stroke()
+  if (Math.floor(frame * 0.1) % 2 === 0) {
+    ctx.fillStyle = '#ff5566'; ctx.font = '8px monospace'
+    ctx.fillText('unexpected', cx, o.y - 8)
+  }
+}
+
+// 無限ループ：回転し続ける円形矢印＋中心に∞。赤熱グロー。
+function dInfiniteLoop(ctx: CanvasRenderingContext2D, o: Obstacle, _theme: Theme, frame: number) {
+  const cx = o.x + o.w / 2, cy = o.y + o.h / 2
+  const r = Math.min(o.w, o.h) / 2 - 4
+  const rot = frame * 0.18
+  ctx.save()
+  ctx.translate(cx, cy); ctx.rotate(rot)
+  ctx.strokeStyle = '#ff7733'; ctx.lineWidth = 4
+  ctx.shadowColor = '#ff5500'; ctx.shadowBlur = 12
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 1.5); ctx.stroke()
+  ctx.shadowBlur = 0; ctx.fillStyle = '#ff7733'
+  const ax = Math.cos(Math.PI * 1.5) * r, ay = Math.sin(Math.PI * 1.5) * r
+  ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(ax - 8, ay - 5); ctx.lineTo(ax - 3, ay + 8)
+  ctx.closePath(); ctx.fill()
+  ctx.rotate(-rot)
+  ctx.fillStyle = '#ffddaa'; ctx.font = `bold ${Math.floor(r * 0.95)}px monospace`
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+  ctx.fillText('∞', 0, 0)
+  ctx.restore()
+}
+
+// スタックオーバーフロー：スタックフレームの箱を積み上げ、上ほど崩れそうに揺れる高壁。
+function dStackOverflow(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme, frame: number) {
+  const frames = Math.max(3, Math.floor(o.h / 16))
+  const fh = o.h / frames
+  ctx.lineWidth = 1.5; ctx.strokeStyle = theme.obstacleStroke
+  ctx.font = `${Math.floor(fh * 0.5)}px monospace`
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+  for (let i = 0; i < frames; i++) {
+    const t = i / frames
+    const fy = o.y + o.h - (i + 1) * fh
+    const sway = Math.sin(frame * 0.12 + i * 0.5) * (t * t * 11)
+    const top = i === frames - 1
+    ctx.fillStyle = top ? '#ff5555' : theme.obstacleColor
+    rrect(ctx, o.x + sway, fy, o.w, fh - 2, 2); ctx.fill(); ctx.stroke()
+    ctx.fillStyle = top ? '#fff' : theme.obstacleStroke
+    ctx.fillText('call()', o.x + sway + o.w / 2, fy + fh / 2)
+  }
+}
+
+// ヌルポインタ参照：nullラベルから伸びた矢印が虚空(×)を指してブラ下がる。
+function dNullPointer(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme, frame: number) {
+  const cx = o.x + o.w / 2
+  const sway = Math.sin(frame * 0.13) * 5
+  const boxH = o.h * 0.42
+  ctx.fillStyle = theme.obstacleColor; ctx.strokeStyle = theme.obstacleStroke; ctx.lineWidth = 2
+  rrect(ctx, o.x, o.y, o.w, boxH, 3); ctx.fill(); ctx.stroke()
+  ctx.fillStyle = '#ff5566'; ctx.font = `bold ${Math.floor(boxH * 0.5)}px monospace`
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+  ctx.fillText('null', cx, o.y + boxH / 2)
+  ctx.strokeStyle = '#ff5566'; ctx.lineWidth = 2
+  const ax = cx + sway, bot = o.y + o.h - 8
+  ctx.beginPath(); ctx.moveTo(cx, o.y + boxH); ctx.lineTo(ax, bot); ctx.stroke()
+  ctx.beginPath(); ctx.moveTo(ax, bot); ctx.lineTo(ax - 5, bot - 7); ctx.moveTo(ax, bot); ctx.lineTo(ax + 5, bot - 7); ctx.stroke()
+  const vy = o.y + o.h - 2, vs = 4
+  ctx.strokeStyle = '#888'
+  ctx.beginPath(); ctx.moveTo(ax - vs, vy - vs); ctx.lineTo(ax + vs, vy + vs)
+  ctx.moveTo(ax + vs, vy - vs); ctx.lineTo(ax - vs, vy + vs); ctx.stroke()
+}
+
+// マージコンフリクト：HEAD(緑)とincoming(赤)で割れたブロック。境界の=======がグリッチ。
+function dMergeConflict(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme, frame: number) {
+  const halfH = o.h / 2
+  ctx.lineWidth = 1.5; ctx.strokeStyle = theme.obstacleStroke
+  ctx.font = `${Math.min(11, Math.floor(o.h * 0.16))}px monospace`
+  ctx.textAlign = 'left'; ctx.textBaseline = 'middle'
+  ctx.fillStyle = '#1f7a3f'
+  ctx.fillRect(o.x, o.y, o.w, halfH); ctx.strokeRect(o.x, o.y, o.w, halfH)
+  ctx.fillStyle = '#cfffdf'; ctx.fillText('<<<<<<< HEAD', o.x + 4, o.y + halfH * 0.5)
+  ctx.fillStyle = '#9a2a3a'
+  ctx.fillRect(o.x, o.y + halfH, o.w, halfH); ctx.strokeRect(o.x, o.y + halfH, o.w, halfH)
+  ctx.fillStyle = '#ffd0d8'; ctx.fillText('>>>>>>>', o.x + 4, o.y + halfH * 1.5)
+  const gshift = (Math.floor(frame * 0.3) % 2) * 2
+  ctx.fillStyle = '#ffff66'; ctx.fillRect(o.x - 2 + gshift, o.y + halfH - 2, o.w + 4, 4)
+  ctx.fillStyle = '#000'; ctx.fillText('=======', o.x + 4 + gshift, o.y + halfH)
+}
+
+// セグフォ：SIGSEGV＋16進ダンプが崩落し、ブロックが欠ける。
+function dSegfault(ctx: CanvasRenderingContext2D, o: Obstacle, _theme: Theme, frame: number) {
+  ctx.fillStyle = '#222'; ctx.strokeStyle = '#ff3333'; ctx.lineWidth = 2
+  ctx.shadowColor = '#ff0000'; ctx.shadowBlur = 6
+  rrect(ctx, o.x, o.y, o.w, o.h, 2); ctx.fill(); ctx.stroke()
+  ctx.shadowBlur = 0
+  ctx.fillStyle = '#ff4444'; ctx.font = `bold ${Math.min(13, Math.floor(o.w * 0.16))}px monospace`
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top'
+  ctx.fillText('SIGSEGV', o.x + o.w / 2, o.y + 4)
+  const hex = ['0xDEAD', 'BEEF', '0x0000', 'FFFF', 'core']
+  ctx.font = '9px monospace'; ctx.textAlign = 'left'
+  for (let i = 0; i < hex.length; i++) {
+    const fall = (frame * 1.2 + i * 23) % o.h
+    ctx.globalAlpha = 0.4 + 0.4 * Math.sin(frame * 0.1 + i)
+    ctx.fillStyle = '#ff6666'
+    ctx.fillText(hex[i], o.x + 5 + (i % 2) * o.w * 0.45, o.y + 18 + fall * 0.4)
+  }
+  ctx.globalAlpha = 1
+  if (Math.floor(frame * 0.15) % 3 === 0) {
+    ctx.fillStyle = '#000'; ctx.fillRect(o.x + o.w * 0.3, o.y + o.h * 0.5, o.w * 0.3, 6)
+  }
+}
+
 export const OBSTACLE_DRAWERS: Record<Obstacle['shape'], ObstacleDrawFn> = {
   gear: dGear,
   bolt: dBolt,
@@ -644,6 +836,15 @@ export const OBSTACLE_DRAWERS: Record<Obstacle['shape'], ObstacleDrawFn> = {
   glitch: dGlitch,
   firewall: dFirewall,
   data_block: dDataBlock,
+  exception: dException,
+  memory_leak: dMemoryLeak,
+  zombie_process: dZombieProcess,
+  syntax_error: dSyntaxError,
+  infinite_loop: dInfiniteLoop,
+  stack_overflow: dStackOverflow,
+  null_pointer: dNullPointer,
+  merge_conflict: dMergeConflict,
+  segfault: dSegfault,
 }
 
 export function drawObstacle(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme, frame: number) {

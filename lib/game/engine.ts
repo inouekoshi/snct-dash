@@ -10,7 +10,7 @@ import {
   STEP_FOLLOW_SPEED, MISS_OVERLAY_FRAMES, REVIVAL_FRAMES,
   CHARGE_MAX, CHARGE_DRAIN, CHARGE_HIT_COST, CHARGE_REVIVE,
   BATTERY_REFILL, BATTERY_GAP,
-  COMBO_NEEDED, DEBUG_FRAMES, DEBUG_SPEED_MULT,
+  COMBO_NEEDED, STOMP_GAUGE, DEBUG_FRAMES, DEBUG_SPEED_MULT,
   STOMP_BOUNCE, STOMP_MARGIN,
 } from './constants'
 import type { PlayerState, Obstacle, TerrainSegment, Item, Particle } from './engine-types'
@@ -428,13 +428,14 @@ export class GameEngine {
     this.burst(PLAYER_X, this.py, '#ffffff', 4)
   }
 
-  // 踏みつけ（電子情報）：敵を倒してバウンド、コンボを伸ばす。満タンでデバッグモード突入。
+  // 踏みつけ（電子情報）：敵を倒してバウンド、ゲージを伸ばす。満タンでデバッグモード突入。
+  // 敵の種類ごとにゲージ加算量が異なる（STOMP_GAUGE。未定義は1）。
   private stomp(o: Obstacle) {
     this.obstacles = this.obstacles.filter(x => x !== o)
     this.pvy = STOMP_BOUNCE
     this.jumpCount = 1
     this.pState = 'jumping'
-    this.combo++
+    this.combo += STOMP_GAUGE[o.shape] ?? 1
     this.burst(o.x + o.w / 2, o.y, AREAS[3].groundLineColor, 8)
     playJump()
     if (this.combo >= COMBO_NEEDED) {
