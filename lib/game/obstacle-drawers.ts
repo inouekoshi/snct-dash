@@ -92,17 +92,46 @@ function dCapacitor(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme) {
   ctx.stroke()
 }
 
-function dBug(ctx: CanvasRenderingContext2D, o: Obstacle) {
-  ctx.beginPath(); ctx.ellipse(o.x + o.w / 2, o.y + o.h / 2, o.w / 2, o.h / 2, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke()
-  ctx.lineWidth = 1.5
+// バグ（電子情報で踏める唯一の敵）：緑色＝「踏んでOK」の合図。つぶらな目で愛嬌のある雑魚。
+// 頭上で点滅・上下する下向き矢印▼が「ここを踏め」を一目で伝える。障壁（赤系）と色で明確に区別。
+function dBug(ctx: CanvasRenderingContext2D, o: Obstacle, _theme: Theme, frame: number) {
+  const cx = o.x + o.w / 2, cy = o.y + o.h / 2
+  const rx = o.w / 2, ry = o.h / 2
+  const pulse = 0.5 + Math.sin(frame * 0.18) * 0.5
+  // 脚（うねうね動く）
+  ctx.strokeStyle = '#1f9b4e'; ctx.lineWidth = 2
+  for (let i = -1; i <= 1; i++) {
+    const ly = cy + i * ry * 0.5
+    const wig = Math.sin(frame * 0.3 + i) * 3
+    ctx.beginPath(); ctx.moveTo(cx - rx, ly); ctx.lineTo(cx - rx - 8, ly + wig); ctx.stroke()
+    ctx.beginPath(); ctx.moveTo(cx + rx, ly); ctx.lineTo(cx + rx + 8, ly - wig); ctx.stroke()
+  }
+  // 本体（緑＝踏んでOK）
+  ctx.fillStyle = '#3dd66e'; ctx.strokeStyle = '#1f9b4e'; ctx.lineWidth = 2.5
+  ctx.shadowColor = '#3dd66e'; ctx.shadowBlur = 8
+  ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke()
+  ctx.shadowBlur = 0
+  // 触角
+  ctx.strokeStyle = '#1f9b4e'; ctx.lineWidth = 1.5
   ctx.beginPath()
-  ctx.moveTo(o.x + o.w * 0.35, o.y); ctx.lineTo(o.x + o.w * 0.25, o.y - 10)
-  ctx.moveTo(o.x + o.w * 0.65, o.y); ctx.lineTo(o.x + o.w * 0.75, o.y - 10); ctx.stroke()
-  ctx.strokeStyle = '#ff4444'; ctx.lineWidth = 2
-  const ex = o.x + o.w * 0.35, ey = o.y + o.h * 0.38, es = 5
-  ctx.beginPath(); ctx.moveTo(ex - es, ey - es); ctx.lineTo(ex + es, ey + es); ctx.moveTo(ex + es, ey - es); ctx.lineTo(ex - es, ey + es); ctx.stroke()
-  const ex2 = o.x + o.w * 0.65
-  ctx.beginPath(); ctx.moveTo(ex2 - es, ey - es); ctx.lineTo(ex2 + es, ey + es); ctx.moveTo(ex2 + es, ey - es); ctx.lineTo(ex2 - es, ey + es); ctx.stroke()
+  ctx.moveTo(cx - rx * 0.3, o.y + 2); ctx.lineTo(cx - rx * 0.5, o.y - 9)
+  ctx.moveTo(cx + rx * 0.3, o.y + 2); ctx.lineTo(cx + rx * 0.5, o.y - 9); ctx.stroke()
+  ctx.fillStyle = '#1f9b4e'
+  ctx.beginPath(); ctx.arc(cx - rx * 0.5, o.y - 9, 2, 0, Math.PI * 2); ctx.fill()
+  ctx.beginPath(); ctx.arc(cx + rx * 0.5, o.y - 9, 2, 0, Math.PI * 2); ctx.fill()
+  // つぶらな丸い目（やられ役の愛嬌）
+  const eo = rx * 0.34, eyY = cy - ry * 0.05, eR = Math.max(4, rx * 0.2)
+  ctx.fillStyle = '#fff'
+  for (const ox of [-eo, eo]) { ctx.beginPath(); ctx.arc(cx + ox, eyY, eR, 0, Math.PI * 2); ctx.fill() }
+  ctx.fillStyle = '#222'
+  for (const ox of [-eo, eo]) { ctx.beginPath(); ctx.arc(cx + ox, eyY + 1, eR * 0.5, 0, Math.PI * 2); ctx.fill() }
+  // ▼ 踏めるサイン（頭上で点滅・上下にバウンド）
+  const ay = o.y - 16 - pulse * 4
+  ctx.globalAlpha = 0.4 + pulse * 0.6
+  ctx.fillStyle = '#9dffb0'
+  ctx.shadowColor = '#3dff7e'; ctx.shadowBlur = 6
+  ctx.beginPath(); ctx.moveTo(cx - 6, ay); ctx.lineTo(cx + 6, ay); ctx.lineTo(cx, ay + 8); ctx.closePath(); ctx.fill()
+  ctx.shadowBlur = 0; ctx.globalAlpha = 1
 }
 
 function dMonitor(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme, frame: number) {
@@ -612,72 +641,6 @@ function dDataBlock(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme, fr
   ctx.restore()
 }
 
-// ── 電子情報工学科：踏める敵（コードの不具合をデバッグして潰す）────────────
-
-// 例外：未捕捉の throw。赤い警告ダイヤに「!」。踏む＝try/catchで握り潰す。
-function dException(ctx: CanvasRenderingContext2D, o: Obstacle, _theme: Theme, frame: number) {
-  const cx = o.x + o.w / 2, cy = o.y + o.h / 2
-  const r = Math.min(o.w, o.h) / 2
-  const pulse = 0.6 + Math.sin(frame * 0.2) * 0.4
-  ctx.fillStyle = '#cc2233'; ctx.strokeStyle = '#ff5566'; ctx.lineWidth = 2.5
-  ctx.shadowColor = '#ff3344'; ctx.shadowBlur = 8 * pulse
-  ctx.beginPath()
-  ctx.moveTo(cx, o.y); ctx.lineTo(o.x + o.w, cy); ctx.lineTo(cx, o.y + o.h); ctx.lineTo(o.x, cy)
-  ctx.closePath(); ctx.fill(); ctx.stroke()
-  ctx.shadowBlur = 0
-  ctx.fillStyle = '#fff'
-  ctx.font = `bold ${Math.floor(r * 1.1)}px monospace`
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-  ctx.fillText('!', cx, cy)
-  ctx.globalAlpha = pulse
-  ctx.fillStyle = '#ffaaaa'; ctx.font = '8px monospace'
-  ctx.fillText('throw', cx, o.y - 7)
-  ctx.globalAlpha = 1
-}
-
-// メモリリーク：脈動して膨らむ半透明の塊。下に雫が漏れる。踏む＝free()。
-function dMemoryLeak(ctx: CanvasRenderingContext2D, o: Obstacle, _theme: Theme, frame: number) {
-  const cx = o.x + o.w / 2, cy = o.y + o.h / 2
-  const swell = Math.sin(frame * 0.12) * (o.w * 0.08)
-  ctx.fillStyle = 'rgba(51,221,170,0.33)'; ctx.strokeStyle = '#33ffcc'; ctx.lineWidth = 2
-  ctx.shadowColor = '#33ffcc'; ctx.shadowBlur = 10
-  ctx.beginPath()
-  ctx.ellipse(cx, cy, o.w / 2 + swell, o.h / 2 - swell * 0.5, 0, 0, Math.PI * 2)
-  ctx.fill(); ctx.stroke()
-  ctx.shadowBlur = 0
-  ctx.fillStyle = '#aaffee'; ctx.font = `bold ${Math.floor(o.h * 0.3)}px monospace`
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-  ctx.fillText('RAM', cx, cy)
-  const t = (frame * 1.5) % 20
-  ctx.fillStyle = '#33ffcc'; ctx.globalAlpha = 1 - t / 20
-  ctx.beginPath(); ctx.arc(cx, o.y + o.h + t * 0.6, 3, 0, Math.PI * 2); ctx.fill()
-  ctx.globalAlpha = 1
-}
-
-// ゾンビプロセス：<defunct> のうつろな顔。踏む＝kill -9。
-function dZombieProcess(ctx: CanvasRenderingContext2D, o: Obstacle, _theme: Theme, frame: number) {
-  const cx = o.x + o.w / 2, cy = o.y + o.h / 2
-  ctx.fillStyle = '#6f8f4f'; ctx.strokeStyle = '#3f5f2f'; ctx.lineWidth = 2
-  rrect(ctx, o.x, o.y, o.w, o.h, 4); ctx.fill(); ctx.stroke()
-  ctx.strokeStyle = '#1f2f1f'; ctx.lineWidth = 2
-  const eyR = o.w * 0.11
-  for (const ox of [-o.w * 0.2, o.w * 0.2]) {
-    const ex = cx + ox, ey = cy - o.h * 0.1
-    ctx.beginPath(); ctx.moveTo(ex - eyR, ey - eyR); ctx.lineTo(ex + eyR, ey + eyR)
-    ctx.moveTo(ex + eyR, ey - eyR); ctx.lineTo(ex - eyR, ey + eyR); ctx.stroke()
-  }
-  ctx.beginPath()
-  const my = cy + o.h * 0.22
-  ctx.moveTo(o.x + o.w * 0.25, my)
-  for (let i = 1; i <= 4; i++) ctx.lineTo(o.x + o.w * (0.25 + 0.125 * i), my + (i % 2 ? -4 : 4))
-  ctx.stroke()
-  ctx.fillStyle = '#cfe0bf'; ctx.font = '8px monospace'
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-  ctx.globalAlpha = 0.6 + Math.sin(frame * 0.15) * 0.4
-  ctx.fillText('<defunct>', cx, o.y - 7)
-  ctx.globalAlpha = 1
-}
-
 // ── 電子情報工学科：踏めない障壁（コードを止めるエラー・概念）────────────────
 
 // 構文エラー：宙に浮く閉じ忘れの「}」＋赤い波線(squiggly)＋unexpected。
@@ -811,7 +774,7 @@ export const OBSTACLE_DRAWERS: Record<Obstacle['shape'], ObstacleDrawFn> = {
   circuit: dCircuit,
   coil: dCoil,
   capacitor: dCapacitor,
-  bug: (ctx, o) => dBug(ctx, o),
+  bug: dBug,
   monitor: dMonitor,
   chip: dChip,
   bacteria: dBacteria,
@@ -836,9 +799,6 @@ export const OBSTACLE_DRAWERS: Record<Obstacle['shape'], ObstacleDrawFn> = {
   glitch: dGlitch,
   firewall: dFirewall,
   data_block: dDataBlock,
-  exception: dException,
-  memory_leak: dMemoryLeak,
-  zombie_process: dZombieProcess,
   syntax_error: dSyntaxError,
   infinite_loop: dInfiniteLoop,
   stack_overflow: dStackOverflow,

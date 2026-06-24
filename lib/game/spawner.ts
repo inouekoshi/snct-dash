@@ -135,29 +135,25 @@ function spawnDept2(push: (o: ObstacleInit) => void, groundY: number) {
   }
 }
 
-// 電子情報工学科（デバッグ踏みつけ型）: 踏める「バグ」（exception/memory_leak/zombie_process）と、
-// 踏めない「コードの障害」（syntax_error/infinite_loop/stack_overflow/null_pointer/merge_conflict/segfault）を
-// 混在。踏む＝デバッグ／越えるを使い分けさせる。踏める敵は種類でゲージ加算量が異なる（STOMP_GAUGE）。
+// 電子情報工学科（デバッグ踏みつけ型）: 踏めるのは緑色の「バグ」1種のみ（一目で踏めると分かる）。
+// 踏めない「コードの障害」（syntax_error/infinite_loop/stack_overflow/null_pointer/merge_conflict/segfault）は
+// すべて赤系の危険色。踏む＝デバッグ／越えるを色で明確に使い分けさせる。
 function spawnDept3(push: (o: ObstacleInit) => void, groundY: number) {
   const r = Math.random()
-  // ── 踏める敵（デバッグ対象）──
-  if (r < 0.15) {
-    // 例外（地上・踏める）：大きめのダイヤ。踏んで握り潰す
+  // ── 踏める敵（緑のバグ＝デバッグ対象。1種のみ）──
+  if (r < 0.18) {
+    // バグ（地上・踏める）：大きめで踏みやすい
     const s = 46 + Math.random() * 12
-    push({ x: CANVAS_W + 10, y: groundY - s, w: s, h: s, shape: 'exception', stompable: true })
-  } else if (r < 0.28) {
-    // 例外（空中で上下・踏める）：throwされて飛んでくる
+    push({ x: CANVAS_W + 10, y: groundY - s, w: s, h: s, shape: 'bug', stompable: true })
+  } else if (r < 0.34) {
+    // バグ（空中で上下・踏める）：タイミングよく踏む
     const s = 42 + Math.random() * 10
     const baseY = groundY - 50 - Math.random() * 22
-    push({ x: CANVAS_W + 10, y: baseY, w: s, h: s, shape: 'exception', stompable: true, moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 26 })
-  } else if (r < 0.38) {
-    // メモリリーク（踏める）：大きく踏みやすい。ゲージ加算が多い（+2）
-    const s = 54 + Math.random() * 16
-    push({ x: CANVAS_W + 10, y: groundY - s, w: s, h: s, shape: 'memory_leak', stompable: true })
+    push({ x: CANVAS_W + 10, y: baseY, w: s, h: s, shape: 'bug', stompable: true, moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 26 })
   } else if (r < 0.48) {
-    // ゾンビプロセス（踏める）：低くて横長の雑魚
-    const w = 48 + Math.random() * 16, h = 38 + Math.random() * 10
-    push({ x: CANVAS_W + 10, y: groundY - h, w, h, shape: 'zombie_process', stompable: true })
+    // バグ（地上・大きめ）：のっそりした大物バグ
+    const s = 54 + Math.random() * 14
+    push({ x: CANVAS_W + 10, y: groundY - s, w: s, h: s, shape: 'bug', stompable: true })
   }
   // ── 踏めない障壁（越えるしかない）──
   else if (r < 0.57) {
@@ -188,19 +184,19 @@ function spawnDept3(push: (o: ObstacleInit) => void, groundY: number) {
   }
   // ── 複合パターン ──
   else if (r < 0.98) {
-    // 複合：例外の連続（コンボチェイン）。空中に2〜3体並べる
+    // 複合：バグの連続（コンボチェイン）。空中に2〜3体並べる
     const n = Math.random() < 0.5 ? 2 : 3
     for (let i = 0; i < n; i++) {
       const s = 40
       const baseY = groundY - 50 - (i % 2) * 16
-      push({ x: CANVAS_W + 10 + i * 64, y: baseY, w: s, h: s, shape: 'exception', stompable: true, moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 18 })
+      push({ x: CANVAS_W + 10 + i * 64, y: baseY, w: s, h: s, shape: 'bug', stompable: true, moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 18 })
     }
   } else {
-    // 複合：壁（無限ループ）＋その先に踏めるメモリリーク（越えてから踏む）
+    // 複合：壁（無限ループ）＋その先に踏めるバグ（越えてから踏む）
     const s1 = 50 + Math.random() * 12
     push({ x: CANVAS_W + 10, y: groundY - s1, w: s1, h: s1, shape: 'infinite_loop' })
     const s = 50, baseY = groundY - 56
-    push({ x: CANVAS_W + s1 + 36, y: baseY, w: s, h: s, shape: 'memory_leak', stompable: true, moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 16 })
+    push({ x: CANVAS_W + s1 + 36, y: baseY, w: s, h: s, shape: 'bug', stompable: true, moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 16 })
   }
 }
 

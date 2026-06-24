@@ -12,7 +12,6 @@ export interface Obstacle {
        | 'virus' | 'glitch' | 'firewall' | 'data_block'
        | 'syntax_error' | 'infinite_loop' | 'stack_overflow'
        | 'null_pointer' | 'merge_conflict' | 'segfault'
-       | 'exception' | 'memory_leak' | 'zombie_process'
   moving: boolean; phase: number; baseY: number; amplitude: number
   stompable?: boolean  // 電子情報工学科：上から踏んで倒せる敵か
 }

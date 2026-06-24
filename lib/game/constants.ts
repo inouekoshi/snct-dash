@@ -37,13 +37,7 @@ export const BATTERY_REFILL  = 35    // 🔋電池1個の回復量
 export const BATTERY_GAP: [number, number] = [110, 80]
 
 // 電子情報工学科（デバッグ踏みつけ型）専用
-export const COMBO_NEEDED     = 4    // 必要な累積デバッグポイント（敵ごとに加算量が違う／時間でリセットしない）
-// 踏める敵ごとのゲージ加算量。小型の雑魚=1、大型・高難度=2。
-export const STOMP_GAUGE: Record<string, number> = {
-  exception: 1,       // 例外：基本の雑魚
-  zombie_process: 1,  // ゾンビ：低くて踏みやすい雑魚
-  memory_leak: 2,     // メモリリーク：大きく踏み応えあり＝ゲージ多め
-}
+export const COMBO_NEEDED     = 3    // バグを踏んだ累積数でデバッグモード発動（時間でリセットしない）
 export const DEBUG_FRAMES     = 180  // デバッグモード持続（3秒）
 export const DEBUG_SPEED_MULT = 1.7  // デバッグモード中のスクロール加速倍率
 export const STOMP_BOUNCE     = -10  // 踏んだ後のバウンド初速（px/frame）
