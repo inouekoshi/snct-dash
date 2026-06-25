@@ -21,7 +21,7 @@ import { drawBg, drawGround, type BgContext } from './background-renderers'
 import { drawPlayer } from './player-renderer'
 import { drawGoal } from './goal-renderer'
 import { drawHUD, renderPauseOverlay, renderMissOverlay, renderRevivalHint } from './hud-renderer'
-import { spawnObstacle, spawnCeilingObstacle } from './spawner'
+import { spawnObstacle, spawnCeilingObstacle, resetSpawnerBags } from './spawner'
 import { buildStage } from './terrain'
 
 export class GameEngine {
@@ -97,6 +97,7 @@ export class GameEngine {
     this.isElec = departmentId === 2
     this.isCode = departmentId === 3
     this.onClear = onClear
+    resetSpawnerBags()
     this.terrain = buildStage(departmentId)
   }
 

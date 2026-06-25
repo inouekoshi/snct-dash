@@ -40,163 +40,251 @@ export function spawnCeilingObstacle(stageX: number, obstacles: Obstacle[]) {
   }
 }
 
-// 機械工学科: 6種をサイズ帯・動きで明確に差別化（低=conveyor/wrench, 中=spring/robot_arm, 大=flywheel/hammer）
-function spawnDept1(push: (o: ObstacleInit) => void, groundY: number) {
-  const r = Math.random()
-  if (r < 0.16) {
-    // コンベア：低くて幅広。距離を稼ぐジャンプが必要
-    const w = 90 + Math.random() * 40
-    const h = 20 + Math.random() * 10
+class ShuffleBag<T> {
+  private items: T[] = []
+  private bag: T[] = []
+
+  constructor(items: T[]) {
+    this.items = items
+  }
+
+  next(): T {
+    if (this.bag.length === 0) {
+      this.bag = [...this.items]
+      for (let i = this.bag.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1))
+        ;[this.bag[i], this.bag[j]] = [this.bag[j], this.bag[i]]
+      }
+    }
+    return this.bag.pop()!
+  }
+
+  reset() {
+    this.bag = []
+  }
+}
+
+type SpawnFn = (push: (o: ObstacleInit) => void, groundY: number) => void
+
+const dept1Spawners: SpawnFn[] = [
+  (push, groundY) => {
+    const w = 90 + Math.random() * 40; const h = 20 + Math.random() * 10
     push({ x: CANVAS_W + 10, y: groundY - h, w, h, shape: 'conveyor' })
-  } else if (r < 0.32) {
-    // レンチ：低くて細い。地面スレスレで素早いジャンプ
+  },
+  (push, groundY) => {
     const h = 28 + Math.random() * 14
     push({ x: CANVAS_W + 10, y: groundY - h, w: 16 + Math.random() * 8, h, shape: 'wrench' })
-  } else if (r < 0.48) {
-    // スプリング：中サイズ。上下に伸び縮みするタイミング障害
-    const h = 44 + Math.random() * 20
-    const baseY = groundY - h
+  },
+  (push, groundY) => {
+    const h = 44 + Math.random() * 20; const baseY = groundY - h
     push({ x: CANVAS_W + 10, y: baseY, w: 22 + Math.random() * 10, h, shape: 'spring', moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 36 })
-  } else if (r < 0.64) {
-    // ロボットアーム：中高で細い縦壁。アームが伸縮する
-    const h = 58 + Math.random() * 24
-    const baseY = groundY - h
+  },
+  (push, groundY) => {
+    const h = 58 + Math.random() * 24; const baseY = groundY - h
     push({ x: CANVAS_W + 10, y: baseY, w: 28 + Math.random() * 14, h, shape: 'robot_arm', moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 18 })
-  } else if (r < 0.78) {
-    // フライホイール：大きく回転する円。広い当たり判定で大ジャンプ
+  },
+  (push, groundY) => {
     const s = 56 + Math.random() * 18
     push({ x: CANVAS_W + 10, y: groundY - s, w: s, h: s, shape: 'flywheel' })
-  } else if (r < 0.90) {
-    // ハンマー：最も高い壁。フルジャンプ必須
+  },
+  (push, groundY) => {
     const h = 72 + Math.random() * 20
     push({ x: CANVAS_W + 10, y: groundY - h, w: 50 + Math.random() * 16, h, shape: 'hammer' })
-  } else if (r < 0.95) {
-    // 複合：レンチ（低）＋スプリング（中・上下）
-    const h1 = 30 + Math.random() * 12, h2 = 44 + Math.random() * 18
-    const baseY = groundY - h2
+  },
+  (push, groundY) => {
+    const h1 = 30 + Math.random() * 12, h2 = 44 + Math.random() * 18; const baseY = groundY - h2
     push({ x: CANVAS_W + 10, y: groundY - h1, w: 20, h: h1, shape: 'wrench' })
     push({ x: CANVAS_W + 72, y: baseY, w: 22, h: h2, shape: 'spring', moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 34 })
-  } else {
-    // 複合：大フライホイール＋ハンマー
+  },
+  (push, groundY) => {
     const s = 56 + Math.random() * 14, h2 = 72 + Math.random() * 16
     push({ x: CANVAS_W + 10, y: groundY - s, w: s, h: s, shape: 'flywheel' })
     push({ x: CANVAS_W + s + 22, y: groundY - h2, w: 48, h: h2, shape: 'hammer' })
   }
-}
+]
+const dept1Bag = new ShuffleBag(dept1Spawners)
 
-// 電気電子工学科: 8種をサイズ帯・動きで個性化（低=resistor/coil, 中=circuit/transistor/capacitor,
-// 中・上下=electron, 大・回転=arc_ring, 高壁=tesla）。複合パターンあり。
-function spawnDept2(push: (o: ObstacleInit) => void, groundY: number) {
-  const r = Math.random()
-  if (r < 0.13) {
-    // 抵抗器：低くて幅広。距離を稼ぐジャンプ
+const dept2Spawners: SpawnFn[] = [
+  (push, groundY) => {
     const w = 84 + Math.random() * 40, h = 22 + Math.random() * 10
     push({ x: CANVAS_W + 10, y: groundY - h, w, h, shape: 'resistor' })
-  } else if (r < 0.26) {
-    // コイル：低〜中の細い縦。地面スレスレの素早いジャンプ
+  },
+  (push, groundY) => {
     const h = 40 + Math.random() * 22
     push({ x: CANVAS_W + 10, y: groundY - h, w: 18 + Math.random() * 6, h, shape: 'coil' })
-  } else if (r < 0.39) {
-    // 回路基板：中サイズの壁
+  },
+  (push, groundY) => {
     const h = 40 + Math.random() * 22
     push({ x: CANVAS_W + 10, y: groundY - h, w: 30 + Math.random() * 14, h, shape: 'circuit' })
-  } else if (r < 0.52) {
-    // トランジスタ：中サイズの半円ボディ
+  },
+  (push, groundY) => {
     const h = 46 + Math.random() * 20
     push({ x: CANVAS_W + 10, y: groundY - h, w: 34 + Math.random() * 12, h, shape: 'transistor' })
-  } else if (r < 0.64) {
-    // コンデンサ：やや高め
+  },
+  (push, groundY) => {
     const h = 46 + Math.random() * 24
     push({ x: CANVAS_W + 10, y: groundY - h, w: 24 + Math.random() * 8, h, shape: 'capacitor' })
-  } else if (r < 0.77) {
-    // 電子：中サイズの球が上下に浮遊するタイミング障害
-    const s = 30 + Math.random() * 10
-    const baseY = groundY - s - 6
+  },
+  (push, groundY) => {
+    const s = 30 + Math.random() * 10; const baseY = groundY - s - 6
     push({ x: CANVAS_W + 10, y: baseY, w: s, h: s, shape: 'electron', moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 46 })
-  } else if (r < 0.88) {
-    // 放電リング：大きく回転する円。広い当たり判定で大ジャンプ
+  },
+  (push, groundY) => {
     const s = 54 + Math.random() * 16
     push({ x: CANVAS_W + 10, y: groundY - s, w: s, h: s, shape: 'arc_ring' })
-  } else if (r < 0.92) {
-    // テスラコイル：最も高い壁。フルジャンプ必須
+  },
+  (push, groundY) => {
     const h = 72 + Math.random() * 20
     push({ x: CANVAS_W + 10, y: groundY - h, w: 40 + Math.random() * 12, h, shape: 'tesla' })
-  } else if (r < 0.95) {
-    // 高圧鉄塔（パイロン）：ダブルジャンプ必須の高壁（158〜182px）
+  },
+  (push, groundY) => {
     const h = 158 + Math.random() * 24
     push({ x: CANVAS_W + 10, y: groundY - h, w: 50 + Math.random() * 16, h, shape: 'pylon' })
-  } else if (r < 0.975) {
-    // 複合：抵抗器（低）＋電子（中・上下）
-    const h1 = 22 + Math.random() * 8
-    const s = 30 + Math.random() * 8, baseY = groundY - s - 6
+  },
+  (push, groundY) => {
+    const h1 = 22 + Math.random() * 8; const s = 30 + Math.random() * 8, baseY = groundY - s - 6
     push({ x: CANVAS_W + 10, y: groundY - h1, w: 80, h: h1, shape: 'resistor' })
     push({ x: CANVAS_W + 98, y: baseY, w: s, h: s, shape: 'electron', moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 42 })
-  } else {
-    // 複合：放電リング（大）＋テスラ（高壁）
+  },
+  (push, groundY) => {
     const s = 52 + Math.random() * 12, h2 = 70 + Math.random() * 14
     push({ x: CANVAS_W + 10, y: groundY - s, w: s, h: s, shape: 'arc_ring' })
     push({ x: CANVAS_W + s + 24, y: groundY - h2, w: 38, h: h2, shape: 'tesla' })
   }
+]
+const dept2Bag = new ShuffleBag(dept2Spawners)
+
+const dept3RedSpawners: SpawnFn[] = [
+  (push, groundY) => {
+    const s = 40 + Math.random() * 12; const baseY = groundY - 54 - Math.random() * 20
+    push({ x: CANVAS_W + 10, y: baseY, w: s, h: s, shape: 'syntax_error', moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 22 })
+  },
+  (push, groundY) => {
+    const h = 52 + Math.random() * 16
+    push({ x: CANVAS_W + 10, y: groundY - h, w: 34 + Math.random() * 10, h, shape: 'malloc_free', phase: Math.floor(Math.random() * 100) })
+  },
+  (push, groundY) => {
+    const w = 38 + Math.random() * 10, h = 56 + Math.random() * 16
+    push({ x: CANVAS_W + 10, y: groundY - h, w, h, shape: 'null_pointer' })
+  },
+  (push, groundY) => {
+    const w = 70 + Math.random() * 30, h = 40 + Math.random() * 14
+    push({ x: CANVAS_W + 10, y: groundY - h, w, h, shape: 'merge_conflict' })
+  },
+  (push, groundY) => {
+    const w = 48 + Math.random() * 16, h = 46 + Math.random() * 16
+    push({ x: CANVAS_W + 10, y: groundY - h, w, h, shape: 'segfault' })
+  },
+  (push, groundY) => {
+    const h = 74 + Math.random() * 22
+    push({ x: CANVAS_W + 10, y: groundY - h, w: 40 + Math.random() * 12, h, shape: 'stack_overflow' })
+  },
+  (push, groundY) => {
+    const h = 158 + Math.random() * 24
+    push({ x: CANVAS_W + 10, y: groundY - h, w: 30 + Math.random() * 12, h, shape: 'firewall' })
+  },
+  (push, groundY) => {
+    const h = 158 + Math.random() * 24
+    push({ x: CANVAS_W + 10, y: groundY - h, w: 38 + Math.random() * 10, h, shape: 'blockchain' })
+  },
+  (push, groundY) => {
+    const h = 56
+    push({ x: CANVAS_W + 10, y: groundY - h, w: 36, h, shape: 'malloc_free', phase: Math.floor(Math.random() * 100) })
+    const s = 46, baseY = groundY - 52
+    push({ x: CANVAS_W + 96, y: baseY, w: s, h: s, shape: 'bug', stompable: true, moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 16 })
+  }
+]
+const dept3RedBag = new ShuffleBag(dept3RedSpawners)
+
+const dept4Spawners: SpawnFn[] = [
+  (push, groundY) => {
+    const n = Math.random() < 0.5 ? 2 : 3
+    for (let i = 0; i < n; i++) {
+      const h = 35 + Math.random() * 20
+      push({ x: CANVAS_W + 10 + i * 44, y: groundY - h, w: 24 + Math.random() * 12, h, shape: 'bacteria' })
+    }
+  },
+  (push, groundY) => {
+    const h = 46 + Math.random() * 26
+    push({ x: CANVAS_W + 10, y: groundY - h, w: 52 + Math.random() * 18, h, shape: 'bacteria' })
+  },
+  (push, groundY) => {
+    const h = 58 + Math.random() * 22
+    push({ x: CANVAS_W + 10, y: groundY - h, w: 30 + Math.random() * 10, h, shape: 'flask' })
+  },
+  (push, groundY) => {
+    const h = 44 + Math.random() * 20
+    push({ x: CANVAS_W + 10, y: groundY - h, w: 44 + Math.random() * 16, h, shape: 'mushroom' })
+  },
+  (push, groundY) => {
+    const h1 = 55 + Math.random() * 18, h2 = 38 + Math.random() * 16
+    push({ x: CANVAS_W + 10, y: groundY - h1, w: 28, h: h1, shape: 'flask' })
+    push({ x: CANVAS_W + 74, y: groundY - h2, w: 38, h: h2, shape: 'bacteria' })
+  }
+]
+const dept4Bag = new ShuffleBag(dept4Spawners)
+
+const dept5Spawners: SpawnFn[] = [
+  (push, groundY) => {
+    const h = 52 + Math.random() * 36
+    push({ x: CANVAS_W + 10, y: groundY - h, w: 26 + Math.random() * 12, h, shape: 'crystal' })
+  },
+  (push, groundY) => {
+    const h1 = 48 + Math.random() * 26, h2 = 42 + Math.random() * 26
+    push({ x: CANVAS_W + 10, y: groundY - h1, w: 24, h: h1, shape: 'crystal' })
+    push({ x: CANVAS_W + 58, y: groundY - h2, w: 22, h: h2, shape: 'crystal' })
+  },
+  (push, groundY) => {
+    const h = 22 + Math.random() * 14
+    push({ x: CANVAS_W + 10, y: groundY - h, w: 46 + Math.random() * 24, h, shape: 'ingot' })
+  },
+  (push, groundY) => {
+    const h = 40 + Math.random() * 24
+    push({ x: CANVAS_W + 10, y: groundY - h, w: 40 + Math.random() * 18, h, shape: 'lattice' })
+  },
+  (push, groundY) => {
+    for (let i = 0; i < 3; i++) {
+      const h = 38 + Math.random() * 34 * (i + 1) / 3
+      push({ x: CANVAS_W + 10 + i * 36, y: groundY - h, w: 20, h, shape: 'crystal' })
+    }
+  },
+  (push, groundY) => {
+    const h1 = 22 + Math.random() * 12, h2 = 52 + Math.random() * 24
+    push({ x: CANVAS_W + 10, y: groundY - h1, w: 46, h: h1, shape: 'ingot' })
+    push({ x: CANVAS_W + 88, y: groundY - h2, w: 22, h: h2, shape: 'crystal' })
+  }
+]
+const dept5Bag = new ShuffleBag(dept5Spawners)
+
+export function resetSpawnerBags() {
+  dept1Bag.reset()
+  dept2Bag.reset()
+  dept3RedBag.reset()
+  dept4Bag.reset()
+  dept5Bag.reset()
 }
 
-// 電子情報工学科（デバッグ踏みつけ型）: 踏めるのは緑色の「バグ」1種のみ（一目で踏めると分かる）。
-// 踏めない「コードの障害」（syntax_error/malloc_free/null_pointer/merge_conflict/segfault/stack_overflow/
-// firewall/blockchain）はすべて赤系の危険色。踏む＝デバッグ／越える・通り抜けるを色で明確に使い分けさせる。
+function spawnDept1(push: (o: ObstacleInit) => void, groundY: number) {
+  dept1Bag.next()(push, groundY)
+}
+
+function spawnDept2(push: (o: ObstacleInit) => void, groundY: number) {
+  dept2Bag.next()(push, groundY)
+}
+
 function spawnDept3(push: (o: ObstacleInit) => void, groundY: number) {
   const r = Math.random()
-  // ── 踏める敵（緑のバグ＝デバッグ対象。1種のみ）──
   if (r < 0.18) {
-    // バグ（地上・踏める）：大きめで踏みやすい
     const s = 46 + Math.random() * 12
     push({ x: CANVAS_W + 10, y: groundY - s, w: s, h: s, shape: 'bug', stompable: true })
   } else if (r < 0.34) {
-    // バグ（空中で上下・踏める）：タイミングよく踏む
     const s = 42 + Math.random() * 10
     const baseY = groundY - 50 - Math.random() * 22
     push({ x: CANVAS_W + 10, y: baseY, w: s, h: s, shape: 'bug', stompable: true, moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 26 })
   } else if (r < 0.46) {
-    // バグ（地上・大きめ）：のっそりした大物バグ
     const s = 54 + Math.random() * 14
     push({ x: CANVAS_W + 10, y: groundY - s, w: s, h: s, shape: 'bug', stompable: true })
-  }
-  // ── 踏めない障壁（すべて赤系。越える or 消えた瞬間に通る）──
-  else if (r < 0.53) {
-    // 構文エラー（空中で上下）：閉じ忘れの } が浮遊。タイミングで越える
-    const s = 40 + Math.random() * 12
-    const baseY = groundY - 54 - Math.random() * 20
-    push({ x: CANVAS_W + 10, y: baseY, w: s, h: s, shape: 'syntax_error', moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 22 })
-  } else if (r < 0.62) {
-    // malloc/free 点滅ゲート：実体(malloc)の時だけ壁。消えた(free)瞬間に走り抜ける（ジャンプでも可）
-    const h = 52 + Math.random() * 16
-    push({ x: CANVAS_W + 10, y: groundY - h, w: 34 + Math.random() * 10, h, shape: 'malloc_free', phase: Math.floor(Math.random() * 100) })
-  } else if (r < 0.69) {
-    // ヌルポインタ：空中にぶら下がる縦長の障害
-    const w = 38 + Math.random() * 10, h = 56 + Math.random() * 16
-    push({ x: CANVAS_W + 10, y: groundY - h, w, h, shape: 'null_pointer' })
-  } else if (r < 0.76) {
-    // マージコンフリクト：幅広・低中。距離を稼ぐジャンプ
-    const w = 70 + Math.random() * 30, h = 40 + Math.random() * 14
-    push({ x: CANVAS_W + 10, y: groundY - h, w, h, shape: 'merge_conflict' })
-  } else if (r < 0.83) {
-    // セグフォ：中サイズの崩れるブロック
-    const w = 48 + Math.random() * 16, h = 46 + Math.random() * 16
-    push({ x: CANVAS_W + 10, y: groundY - h, w, h, shape: 'segfault' })
-  } else if (r < 0.88) {
-    // スタックオーバーフロー：高い壁。フルジャンプで越える
-    const h = 74 + Math.random() * 22
-    push({ x: CANVAS_W + 10, y: groundY - h, w: 40 + Math.random() * 12, h, shape: 'stack_overflow' })
-  } else if (r < 0.92) {
-    // ファイアウォール：炎の高壁。シングルでは届かずダブルジャンプ必須（158〜182px）
-    const h = 158 + Math.random() * 24
-    push({ x: CANVAS_W + 10, y: groundY - h, w: 30 + Math.random() * 12, h, shape: 'firewall' })
-  } else if (r < 0.96) {
-    // ブロックチェーンの塔：改ざん不可の高壁。ダブルジャンプ必須（158〜182px）
-    const h = 158 + Math.random() * 24
-    push({ x: CANVAS_W + 10, y: groundY - h, w: 38 + Math.random() * 10, h, shape: 'blockchain' })
-  }
-  // ── 複合パターン ──
-  else if (r < 0.98) {
-    // 複合：バグの連続（コンボチェイン）。空中に2〜3体並べる
+  } else if (r < 0.50) {
     const n = Math.random() < 0.5 ? 2 : 3
     for (let i = 0; i < n; i++) {
       const s = 40
@@ -204,63 +292,14 @@ function spawnDept3(push: (o: ObstacleInit) => void, groundY: number) {
       push({ x: CANVAS_W + 10 + i * 64, y: baseY, w: s, h: s, shape: 'bug', stompable: true, moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 18 })
     }
   } else {
-    // 複合：malloc/freeゲート＋その先に踏めるバグ（ゲートを抜けてから踏む）
-    const h = 56
-    push({ x: CANVAS_W + 10, y: groundY - h, w: 36, h, shape: 'malloc_free', phase: Math.floor(Math.random() * 100) })
-    const s = 46, baseY = groundY - 52
-    push({ x: CANVAS_W + 96, y: baseY, w: s, h: s, shape: 'bug', stompable: true, moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 16 })
+    dept3RedBag.next()(push, groundY)
   }
 }
 
-// 生物応用化学科: bacteria / flask / mushroom
 function spawnDept4(push: (o: ObstacleInit) => void, groundY: number) {
-  const r = Math.random()
-  if (r < 0.26) {
-    const n = Math.random() < 0.5 ? 2 : 3
-    for (let i = 0; i < n; i++) {
-      const h = 35 + Math.random() * 20
-      push({ x: CANVAS_W + 10 + i * 44, y: groundY - h, w: 24 + Math.random() * 12, h, shape: 'bacteria' })
-    }
-  } else if (r < 0.48) {
-    const h = 46 + Math.random() * 26
-    push({ x: CANVAS_W + 10, y: groundY - h, w: 52 + Math.random() * 18, h, shape: 'bacteria' })
-  } else if (r < 0.66) {
-    const h = 58 + Math.random() * 22
-    push({ x: CANVAS_W + 10, y: groundY - h, w: 30 + Math.random() * 10, h, shape: 'flask' })
-  } else if (r < 0.84) {
-    const h = 44 + Math.random() * 20
-    push({ x: CANVAS_W + 10, y: groundY - h, w: 44 + Math.random() * 16, h, shape: 'mushroom' })
-  } else {
-    const h1 = 55 + Math.random() * 18, h2 = 38 + Math.random() * 16
-    push({ x: CANVAS_W + 10, y: groundY - h1, w: 28, h: h1, shape: 'flask' })
-    push({ x: CANVAS_W + 74, y: groundY - h2, w: 38, h: h2, shape: 'bacteria' })
-  }
+  dept4Bag.next()(push, groundY)
 }
 
-// 材料工学科: crystal / ingot / lattice
 function spawnDept5(push: (o: ObstacleInit) => void, groundY: number) {
-  const r = Math.random()
-  if (r < 0.22) {
-    const h = 52 + Math.random() * 36
-    push({ x: CANVAS_W + 10, y: groundY - h, w: 26 + Math.random() * 12, h, shape: 'crystal' })
-  } else if (r < 0.38) {
-    const h1 = 48 + Math.random() * 26, h2 = 42 + Math.random() * 26
-    push({ x: CANVAS_W + 10, y: groundY - h1, w: 24, h: h1, shape: 'crystal' })
-    push({ x: CANVAS_W + 58, y: groundY - h2, w: 22, h: h2, shape: 'crystal' })
-  } else if (r < 0.54) {
-    const h = 22 + Math.random() * 14
-    push({ x: CANVAS_W + 10, y: groundY - h, w: 46 + Math.random() * 24, h, shape: 'ingot' })
-  } else if (r < 0.70) {
-    const h = 40 + Math.random() * 24
-    push({ x: CANVAS_W + 10, y: groundY - h, w: 40 + Math.random() * 18, h, shape: 'lattice' })
-  } else if (r < 0.84) {
-    for (let i = 0; i < 3; i++) {
-      const h = 38 + Math.random() * 34 * (i + 1) / 3
-      push({ x: CANVAS_W + 10 + i * 36, y: groundY - h, w: 20, h, shape: 'crystal' })
-    }
-  } else {
-    const h1 = 22 + Math.random() * 12, h2 = 52 + Math.random() * 24
-    push({ x: CANVAS_W + 10, y: groundY - h1, w: 46, h: h1, shape: 'ingot' })
-    push({ x: CANVAS_W + 88, y: groundY - h2, w: 22, h: h2, shape: 'crystal' })
-  }
+  dept5Bag.next()(push, groundY)
 }
