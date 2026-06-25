@@ -327,13 +327,10 @@ push({ x: CANVAS_W + 72,  y: groundY - h2, w: 22, h: h2, shape: 'spring' })
 ### ステージ長・速度
 
 ```typescript
-export const STAGE_LENGTH = 70000   // ゴールまでの距離（約2分20秒でクリア）
-export const SPEED_START   = 4      // 序盤の速度（px/frame）
+export const STAGE_LENGTH = 70000   // ゴールまでの距離（約1分半でクリア）
+export const SPEED_START   = 8      // 序盤の速度（px/frame）
 export const SPEED_END     = 15     // 終盤の速度（px/frame）
 ```
-
-> **注意**: `STAGE_LENGTH` は現在 `15000`（約30秒・テスト用）。本番リリース前に `70000` に戻すこと。
-> `6000` 以下にすると 10 秒程度でクリアになり、ゲームとして成立しない。
 
 ### ノックバック量
 
@@ -356,7 +353,7 @@ export const REVIVAL_FRAMES      = 75  // 復活スロー時間（1.25秒）
 
 ```typescript
 export const CHARGE_MAX      = 100   // 充電ゲージ最大値
-export const CHARGE_DRAIN    = 0.18  // /frame。常時減少（満タン→空 ≈ 9秒）
+export const CHARGE_DRAIN    = 0.16  // /frame。常時減少（満タン→空 ≈ 10.4秒）
 export const CHARGE_HIT_COST = 30    // 障害物被弾時のチャージ減（ノックバックと二重ペナルティ）
 export const CHARGE_REVIVE   = 50    // チャージ0でのミス復活後の残量
 export const BATTERY_REFILL  = 35    // 🔋電池1個の回復量
