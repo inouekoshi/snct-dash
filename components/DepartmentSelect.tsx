@@ -40,7 +40,7 @@ export default function DepartmentSelect({ onSelect, onBack }: Props) {
         onClick={onBack}
         className="text-gray-500 hover:text-gray-300 text-sm transition-colors"
       >
-        ← 戻る
+        ← タイトルに戻る
       </button>
     </main>
   )
