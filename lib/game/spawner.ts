@@ -301,29 +301,6 @@ function spawnDept2(push: (o: ObstacleInit) => void, groundY: number) {
   dept2Bag.next()(push, groundY)
 }
 
-function spawnDept3(push: (o: ObstacleInit) => void, groundY: number) {
-  const r = Math.random()
-  if (r < 0.18) {
-    const s = 46 + Math.random() * 12
-    push({ x: CANVAS_W + 10, y: groundY - s, w: s, h: s, shape: 'bug', stompable: true })
-  } else if (r < 0.34) {
-    const s = 42 + Math.random() * 10
-    const baseY = groundY - 50 - Math.random() * 22
-    push({ x: CANVAS_W + 10, y: baseY, w: s, h: s, shape: 'bug', stompable: true, moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 26 })
-  } else if (r < 0.46) {
-    const s = 54 + Math.random() * 14
-    push({ x: CANVAS_W + 10, y: groundY - s, w: s, h: s, shape: 'bug', stompable: true })
-  } else if (r < 0.50) {
-    const n = Math.random() < 0.5 ? 2 : 3
-    for (let i = 0; i < n; i++) {
-      const s = 40
-      const baseY = groundY - 50 - (i % 2) * 16
-      push({ x: CANVAS_W + 10 + i * 64, y: baseY, w: s, h: s, shape: 'bug', stompable: true, moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 18 })
-    }
-  } else {
-    dept3RedBag.next()(push, groundY)
-  }
-}
 
 function spawnDept4(push: (o: ObstacleInit) => void, groundY: number) {
   dept4Bag.next()(push, groundY)
