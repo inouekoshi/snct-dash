@@ -256,8 +256,8 @@ export class GameEngine {
       if (this.hasGroundAt(nextStageX) && this.hasGroundAt(nextStageX + 65)) {
         spawnBug(nextStageX, this.obstacles, this.getGroundHeightAt(nextStageX))
       }
-      const [mn, r] = SPAWN_GAPS[this.departmentId] ?? SPAWN_GAPS[1]
-      this.nextBug = mn + Math.random() * r
+      this.nextBug = 60 + Math.random() * 48 // 以前の約半分の出現頻度
+      this.nextObs = Math.max(this.nextObs, 25) // 重ならないように障害物をずらす
     }
 
     // 障害物スポーン
@@ -271,6 +271,7 @@ export class GameEngine {
       const [mn, r] = SPAWN_GAPS[this.departmentId] ?? SPAWN_GAPS[1]
       this.nextObs = mn + Math.random() * r
       this.nextCeilingObs = Math.max(this.nextCeilingObs, CEIL_GROUND_GAP)
+      if (this.isCode) this.nextBug = Math.max(this.nextBug, 25) // 重ならないようにバグをずらす
     }
     if (this.departmentId >= 2 && --this.nextCeilingObs <= 0) {
       const nextStageX = this.stageProgress + CANVAS_W
