@@ -177,10 +177,14 @@ function spawnDept3(push: (o: ObstacleInit) => void, groundY: number) {
     // セグフォ：中サイズの崩れるブロック
     const w = 48 + Math.random() * 16, h = 46 + Math.random() * 16
     push({ x: CANVAS_W + 10, y: groundY - h, w, h, shape: 'segfault' })
-  } else if (r < 0.95) {
-    // スタックオーバーフロー：最も高い壁。フルジャンプ必須
+  } else if (r < 0.90) {
+    // スタックオーバーフロー：高い壁。フルジャンプで越える
     const h = 74 + Math.random() * 22
     push({ x: CANVAS_W + 10, y: groundY - h, w: 40 + Math.random() * 12, h, shape: 'stack_overflow' })
+  } else if (r < 0.95) {
+    // ファイアウォール：最も高い炎の壁。シングルでは届かずダブルジャンプ必須（158〜182px）
+    const h = 158 + Math.random() * 24
+    push({ x: CANVAS_W + 10, y: groundY - h, w: 30 + Math.random() * 12, h, shape: 'firewall' })
   }
   // ── 複合パターン ──
   else if (r < 0.98) {

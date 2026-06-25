@@ -767,6 +767,49 @@ function dSegfault(ctx: CanvasRenderingContext2D, o: Obstacle, _theme: Theme, fr
   }
 }
 
+// ファイアウォール：電子情報で最も高い「炎の壁」。ダブルジャンプ必須。
+// レンガ調の暗赤の壁＋上端から立ち上る炎。赤系の危険色で「踏めない」を明示。
+function dFirewallTall(ctx: CanvasRenderingContext2D, o: Obstacle, _theme: Theme, frame: number) {
+  // 壁本体（暗赤レンガ）
+  ctx.fillStyle = '#3a1414'; ctx.strokeStyle = '#ff5522'; ctx.lineWidth = 2.5
+  ctx.shadowColor = '#ff4400'; ctx.shadowBlur = 8
+  rrect(ctx, o.x, o.y, o.w, o.h, 3); ctx.fill(); ctx.stroke()
+  ctx.shadowBlur = 0
+  // レンガの目地（横線＋互い違いの縦線）
+  ctx.strokeStyle = 'rgba(255,90,40,0.30)'; ctx.lineWidth = 1
+  const brickH = 13
+  let row = 0
+  for (let by = o.y + brickH; by < o.y + o.h - 2; by += brickH) {
+    ctx.beginPath(); ctx.moveTo(o.x + 1, by); ctx.lineTo(o.x + o.w - 1, by); ctx.stroke()
+    const offset = row % 2 === 0 ? o.w / 2 : o.w / 4
+    ctx.beginPath(); ctx.moveTo(o.x + offset, by); ctx.lineTo(o.x + offset, by + brickH); ctx.stroke()
+    row++
+  }
+  // 上端から立ち上る炎（揺らめき）
+  const flames = Math.max(2, Math.round(o.w / 12))
+  for (let i = 0; i < flames; i++) {
+    const fx = o.x + (i + 0.5) * (o.w / flames)
+    const fh = 12 + Math.abs(Math.sin(frame * 0.3 + i * 1.3)) * 16
+    const grad = ctx.createLinearGradient(fx, o.y - fh, fx, o.y)
+    grad.addColorStop(0, 'rgba(255,230,80,0)')
+    grad.addColorStop(0.4, '#ffcc33')
+    grad.addColorStop(1, '#ff4400')
+    ctx.fillStyle = grad
+    ctx.beginPath()
+    ctx.moveTo(fx - 5, o.y)
+    ctx.quadraticCurveTo(fx - 2, o.y - fh * 0.6, fx, o.y - fh)
+    ctx.quadraticCurveTo(fx + 2, o.y - fh * 0.6, fx + 5, o.y)
+    ctx.closePath(); ctx.fill()
+  }
+  // FIREWALL（縦書きラベル）
+  ctx.fillStyle = '#ffcc66'; ctx.font = `bold ${Math.min(11, Math.floor(o.w * 0.42))}px monospace`
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+  const word = 'FIREWALL'
+  const cx = o.x + o.w / 2
+  const startY = o.y + o.h / 2 - (word.length - 1) * 6
+  for (let i = 0; i < word.length; i++) ctx.fillText(word[i], cx, startY + i * 12)
+}
+
 export const OBSTACLE_DRAWERS: Record<Obstacle['shape'], ObstacleDrawFn> = {
   gear: dGear,
   bolt: dBolt,
@@ -797,7 +840,7 @@ export const OBSTACLE_DRAWERS: Record<Obstacle['shape'], ObstacleDrawFn> = {
   arc_ring: dArcRing,
   virus: dVirus,
   glitch: dGlitch,
-  firewall: dFirewall,
+  firewall: dFirewallTall,
   data_block: dDataBlock,
   syntax_error: dSyntaxError,
   infinite_loop: dInfiniteLoop,
