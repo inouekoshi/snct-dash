@@ -1,17 +1,12 @@
-export interface GameResult {
-  score: number
-  distance: number
-  maxArea: number
-  lap: number
+export interface GameClearResult {
+  timeMs: number
+  departmentId: number
 }
 
-export interface ScoreEntry {
+export interface StageClearEntry {
   id: string
   nickname: string
-  score: number
-  distance: number
-  max_area: number
-  created_at: string
+  department: number
+  clear_time_ms: number
+  played_at: string
 }
-
-export type LeaderboardFilter = 'all' | 'today'

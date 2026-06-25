@@ -44,11 +44,13 @@ snct-dash/
         ├── terrain.ts               # 地形セグメント生成・管理（段差・穴）
         ├── areas.ts                 # 5学科のテーマ定義（色・名前・絵文字）
         ├── helpers.ts               # overlaps / hitCircle / playerHitbox / rrect
-        ├── spawner.ts               # spawnObstacle / spawnItem
+        ├── spawner.ts               # spawnObstacle(stageX, obstacles, groundY) / spawnCeilingObstacle
         ├── obstacle-drawers.ts      # drawObstacle（Record<Shape, DrawFn> によるデータ駆動描画）
         ├── background-renderers.ts  # drawBg / drawGround（地形対応版）
         ├── player-renderer.ts       # drawPlayer
-        ├── hud-renderer.ts          # drawHUD（タイム表示・進捗バー等）/ drawTransition
+        ├── goal-renderer.ts         # drawGoal（ゴールフラッグポール・旗波打ちアニメ）
+        ├── item-renderer.ts         # drawBattery（電気電子=充電サバイバルの🔋電池）
+        ├── hud-renderer.ts          # drawHUD（充電ゲージ含む）/ renderMissOverlay / renderRevivalHint / renderPauseOverlay
         └── sound.ts                 # Web Audio API によるプロシージャル効果音
 ```
 
@@ -61,7 +63,7 @@ snct-dash/
     ↓ jump() / togglePause() 呼び出し
     ↓ departmentId を GameEngine に渡す
 [GameEngine (engine.ts)]
-    ↓ onClear コールバック（timeMs: number）
+    ↓ onClear コールバック（GameClearResult: { timeMs, departmentId }）
 [ResultModal.tsx]
     ↓ POST /api/stage-clears（nickname, department, clear_time_ms）
 [stage_clears テーブル]
@@ -84,8 +86,8 @@ snct-dash/
 | 変数名 | 必須 | 説明 |
 |--------|------|------|
 | `NEXT_PUBLIC_SUPABASE_URL` | ✅ | Supabase API URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅ | 匿名キー（公開可・クライアント/サーバー両用） |
-| `SUPABASE_SERVICE_ROLE_KEY` | ❌ | 現在不使用（RLS ポリシーで anon キーからの INSERT を許可済み） |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅ | 匿名キー（公開可・クライアントの読み取り用） |
+| `SUPABASE_SERVICE_ROLE_KEY` | ✅ | サービスロールキー（APIルート専用・秘密）。`stage_clears` には INSERT 用 RLS ポリシーが無く、`lib/supabase-server.ts` がこのキーで RLS をバイパスして書き込む |
 
 ### Vercel 設定の注意点
 

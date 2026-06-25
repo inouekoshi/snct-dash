@@ -18,15 +18,29 @@
 - **`dev`**: Phase 2以降の新仕様（タイムアタック制）を実装するブランチ。開発はここで行う。
 - 機能が完成したら `dev → main` にマージ。
 
+## 開発状況（2026-06 時点）
+
+- **Phase 2**（エンジン刷新・タイムアタック制）✅ 完了
+- **Phase 3**（学科別ステージ作り込み）🔄 進行中
+  - 機械（dept 1）：山登り階段＋障害物7種 ✅ 実装済み
+  - 電気電子（dept 2）：充電サバイバル型（バッテリー制・二段ジャンプ必須の鉄塔）✅ 実装・バランス調整済み
+  - 電子情報（dept 3）：デバッグ踏みつけ型（バグ踏みコンボでデバッグモード・独立タイマーによる出現・二段ジャンプ必須の高壁）✅ 実装・バランス調整済み
+  - 生物応用化学（dept 4）・材料（dept 5）：現在未実装・UIでロック状態（開発予定）🔲
+
+- **UIフロー更新**：名前入力は初回のみ（localStorage保存）になり、タイトル画面から直接ゲーム・ステージ選択へ遷移するようになりました。ステージ選択画面からタイトルに戻ることも可能です。
+
+詳細は [doc/roadmap.md](doc/roadmap.md) を参照。
+
 ## ドキュメント
 
 | ファイル | 内容 |
 |---------|------|
-| [doc/game_spec.md](doc/game_spec.md) | ゲーム仕様（タイムアタック制・地形・ノックバック） |
+| [doc/game_spec.md](doc/game_spec.md) | ゲーム仕様（タイムアタック制・地形・ノックバック・学科別ギミック） |
 | [doc/architecture.md](doc/architecture.md) | アーキテクチャと技術スタック |
-| [doc/database.md](doc/database.md) | DBスキーマ（stage_clearsテーブル） |
-| [doc/development.md](doc/development.md) | 開発ガイド（エンジン構造・障害物追加方法など） |
+| [doc/database.md](doc/database.md) | DBスキーマ（stage_clearsテーブル・RLS） |
+| [doc/development.md](doc/development.md) | 開発ガイド（エンジン構造・地形/アイテム/障害物の追加方法・バランス調整） |
 | [doc/roadmap.md](doc/roadmap.md) | ロードマップ（Phase 2〜6） |
+| [doc/design_phase2.md](doc/design_phase2.md) | Phase 2 実装設計書（旧仕様→タイムアタック制への移行・履歴） |
 
 ---
 

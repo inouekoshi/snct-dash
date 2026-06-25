@@ -28,34 +28,19 @@ export function playJump() {
   setTimeout(() => playTone(440, 0.08, 'sine'), 60)
 }
 
-// combo: 0=normal, 1=slightly higher, 2+=max pitch
-export function playCoin(combo = 0) {
-  const scale = 1 + Math.min(combo, 4) * 0.12
-  const base = Math.round(660 * scale)
-  const high = Math.round(880 * scale)
-  playTone(base, 0.06, 'sine', 0.1)
-  setTimeout(() => playTone(high, 0.08, 'sine', 0.1), 50)
-}
-
-export function playGameOver() {
-  playTone(330, 0.15, 'square', 0.2)
-  setTimeout(() => playTone(220, 0.15, 'square', 0.2), 150)
-  setTimeout(() => playTone(110, 0.3, 'square', 0.2), 300)
-}
-
-export function playAreaChange() {
-  playTone(440, 0.05, 'sine', 0.1)
-  setTimeout(() => playTone(550, 0.05, 'sine', 0.1), 80)
-  setTimeout(() => playTone(660, 0.1, 'sine', 0.1), 160)
-}
-
 export function playHurt() {
   playTone(200, 0.08, 'square', 0.25)
   setTimeout(() => playTone(150, 0.12, 'square', 0.2), 80)
 }
 
-export function playShieldGet() {
-  playTone(550, 0.06, 'sine', 0.12)
-  setTimeout(() => playTone(700, 0.06, 'sine', 0.12), 70)
-  setTimeout(() => playTone(880, 0.1, 'sine', 0.12), 140)
+export function playKnockback() {
+  playTone(180, 0.1, 'square', 0.2)
+  setTimeout(() => playTone(120, 0.15, 'square', 0.18), 100)
+}
+
+export function playClear() {
+  playTone(440, 0.08, 'sine', 0.15)
+  setTimeout(() => playTone(550, 0.08, 'sine', 0.15), 100)
+  setTimeout(() => playTone(660, 0.08, 'sine', 0.15), 200)
+  setTimeout(() => playTone(880, 0.2, 'sine', 0.18), 300)
 }

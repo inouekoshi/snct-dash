@@ -286,11 +286,14 @@ if (this.py >= this.currentGroundY) {
 
 ```typescript
 // targetGroundY === Infinity の場合、着地なし
-// py > CANVAS_H + 30 で落下確定
-if (this.targetGroundY === Infinity && this.py > CANVAS_H + 30) {
+// py > DEFAULT_GROUND_Y + 15 で落下確定
+// ※ CANVAS_H + 30 では高速時に穴を渡り切ってしまうため修正済み
+if (this.targetGroundY === Infinity && this.py > DEFAULT_GROUND_Y + 15) {
   this.knockback(HOLE_KNOCKBACK)
   this.py = this.currentGroundY  // 着地位置に戻す
-  this.pvy = 0
+  this.pvy = -4  // 弾む演出
+  this.pState = 'jumping'
+  this.jumpCount = 1
 }
 ```
 

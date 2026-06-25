@@ -1,5 +1,5 @@
 import type { PlayerState } from './engine-types'
-import { GROUND_Y, PLAYER_X } from './constants'
+import { DEFAULT_GROUND_Y as GROUND_Y, PLAYER_X } from './constants'
 import { rrect } from './helpers'
 
 export interface PlayerRenderState {
@@ -20,7 +20,7 @@ export function drawPlayer(ctx: CanvasRenderingContext2D, accent: string, p: Pla
   if (blink) ctx.globalAlpha = 0.35
 
   ctx.save()
-  if (p.pState === 'dead' && p.deathTimer > 0) {
+  if (p.pState === 'falling' && p.deathTimer > 0) {
     ctx.translate(x, y - 23); ctx.rotate(Math.min(p.deathTimer * 0.08, Math.PI * 0.55)); ctx.translate(-x, -(y - 23))
   }
 

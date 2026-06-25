@@ -1,69 +1,82 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import type { ScoreEntry, LeaderboardFilter } from '@/lib/types'
+import { useSearchParams } from 'next/navigation'
+import type { StageClearEntry } from '@/lib/types'
+import { AREAS } from '@/lib/game/areas'
+import type { AreaId } from '@/lib/game/areas'
 
-const AREA_EMOJIS = ['', '⚙', '⚡', '💻', '🧬', '💎']
-
-async function fetchScores(filter: LeaderboardFilter): Promise<ScoreEntry[]> {
-  const res = await fetch(`/api/leaderboard?filter=${filter}`, { cache: 'no-store' })
-  if (!res.ok) return []
-  const { scores } = await res.json()
-  return scores
+function formatTime(ms: number): string {
+  const m = Math.floor(ms / 60000)
+  const s = Math.floor((ms % 60000) / 1000)
+  const cs = Math.floor((ms % 1000) / 10)
+  return `${m}:${String(s).padStart(2, '0')}.${String(cs).padStart(2, '0')}`
 }
 
+async function fetchEntries(department: number): Promise<StageClearEntry[]> {
+  const res = await fetch(`/api/leaderboard?department=${department}`, { cache: 'no-store' })
+  if (!res.ok) return []
+  const { entries } = await res.json()
+  return entries
+}
+
+const DEPARTMENTS = [1, 2, 3, 4, 5] as const
+
 export default function Leaderboard() {
-  const [filter, setFilter] = useState<LeaderboardFilter>('all')
-  const [scores, setScores] = useState<ScoreEntry[]>([])
+  const searchParams = useSearchParams()
+  const initialDept = parseInt(searchParams.get('department') ?? '1', 10)
+  const [department, setDepartment] = useState<number>(
+    initialDept >= 1 && initialDept <= 5 ? initialDept : 1,
+  )
+  const [entries, setEntries] = useState<StageClearEntry[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     let ignore = false
-    fetchScores(filter).then((data) => {
-      if (!ignore) {
-        setScores(data)
-        setLoading(false)
-      }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLoading(true)
+    fetchEntries(department).then((data) => {
+      if (!ignore) { setEntries(data); setLoading(false) }
     })
     return () => { ignore = true }
-  }, [filter])
-
-  const handleFilterChange = (f: LeaderboardFilter) => {
-    if (f !== filter) {
-      setLoading(true)
-      setFilter(f)
-    }
-  }
+  }, [department])
 
   return (
     <div className="w-full max-w-md space-y-4 pb-24">
-      <div className="flex gap-2">
-        {(['all', 'today'] as const).map((f) => (
-          <button
-            key={f}
-            onClick={() => handleFilterChange(f)}
-            className={`flex-1 py-2 rounded-xl font-bold text-sm transition-colors ${
-              filter === f
-                ? 'bg-yellow-400 text-gray-950'
-                : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-            }`}
-          >
-            {f === 'all' ? '全期間 TOP20' : '本日 TOP10'}
-          </button>
-        ))}
+      {/* 学科タブ */}
+      <div className="grid grid-cols-5 gap-1">
+        {DEPARTMENTS.map((id) => {
+          const theme = AREAS[id as AreaId]
+          return (
+            <button
+              key={id}
+              onClick={() => setDepartment(id)}
+              className={`flex flex-col items-center gap-1 py-2 px-1 rounded-xl text-xs font-bold transition-colors ${
+                department === id
+                  ? 'bg-yellow-400 text-gray-950'
+                  : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+              }`}
+            >
+              <span className="text-lg">{theme.emoji}</span>
+              <span className="leading-tight text-center" style={{ fontSize: '10px' }}>
+                {theme.name.replace('工学科', '')}
+              </span>
+            </button>
+          )
+        })}
       </div>
 
       {loading ? (
         <div className="text-center text-gray-500 py-12">読み込み中...</div>
-      ) : scores.length === 0 ? (
+      ) : entries.length === 0 ? (
         <div className="text-center text-gray-500 py-12">
           <p className="text-4xl mb-2">🎮</p>
-          <p>まだスコアがありません</p>
-          <p className="text-sm mt-1">最初のプレイヤーになろう！</p>
+          <p>まだクリアデータがありません</p>
+          <p className="text-sm mt-1">最初のクリアを目指そう！</p>
         </div>
       ) : (
         <div className="space-y-2">
-          {scores.map((entry, i) => (
+          {entries.map((entry, i) => (
             <div
               key={entry.id}
               className={`flex items-center gap-3 p-3 rounded-xl ${
@@ -78,12 +91,9 @@ export default function Leaderboard() {
               </span>
               <div className="flex-1 min-w-0">
                 <p className="font-bold truncate">{entry.nickname}</p>
-                <p className="text-xs text-gray-400">
-                  {AREA_EMOJIS[entry.max_area]} エリア{entry.max_area} · {entry.distance.toLocaleString()}m
-                </p>
               </div>
-              <span className="font-black text-yellow-400 text-lg">
-                {entry.score.toLocaleString()}
+              <span className="font-black text-yellow-400 text-lg tabular-nums">
+                {formatTime(entry.clear_time_ms)}
               </span>
             </div>
           ))}

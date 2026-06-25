@@ -1,28 +1,52 @@
-export const GROUND_Y = 220
 export const CANVAS_W = 800
 export const CANVAS_H = 280
 export const PLAYER_X = 110
 export const GRAVITY = 0.65
 export const JUMP_VY = -13.5
-export const AREA_DURATION = 40 * 60 // 40 seconds × 60 fps
 
-// Speed per area (increases significantly each stage)
-export const AREA_SPEEDS: Record<number, number> = { 1: 5, 2: 7.5, 3: 10.5, 4: 13.5, 5: 17 }
+export const DEFAULT_GROUND_Y = 220
 
-// [minFrames, randFrames] between obstacle spawns
+export const STAGE_LENGTH = 70000 // 本番想定の長さ
+export const SPEED_START   = 8
+export const SPEED_END     = 15
+
+export const KNOCKBACK_AMOUNT     = 120
+export const HOLE_KNOCKBACK       = 200
+export const KNOCKBACK_INVINCIBLE = 90
+
+// [最小frames, ランダム幅frames]。インデックス0は未使用、1〜5がdepartmentId対応
 export const SPAWN_GAPS: [number, number][] = [
-  [0, 0], [110, 60], [85, 50], [65, 40], [50, 32], [36, 26],
+  [0, 0], [44, 28], [85, 50], [38, 30], [50, 32], [36, 26],
 ]
 
-// Lap (loop) difficulty scaling
-export const LAP_SPEED_SCALE = 0.15   // +15% speed per lap
-export const LAP_SPAWN_SCALE = 0.07   // -7% spawn interval per lap
-export const MIN_SPAWN_SCALE = 0.5    // spawn interval floor
-export const MAX_SPEED_SCALE = 3.0    // speed multiplier ceiling
+export const COYOTE_FRAMES      = 5
+export const JUMP_BUFFER_FRAMES = 8
+export const HIT_STOP_FRAMES    = 6
+export const MISS_OVERLAY_FRAMES = 90
+export const REVIVAL_FRAMES      = 75
 
-// A2: Coyote time + jump buffer
-export const COYOTE_FRAMES = 5       // frames after leaving ground where first jump is still available
-export const JUMP_BUFFER_FRAMES = 8  // frames a premature jump input is remembered
+export const STEP_FOLLOW_SPEED = 8
 
-// A3: Hit stop
-export const HIT_STOP_FRAMES = 6     // ~0.1s freeze on shield hit
+// 電気電子工学科（充電サバイバル型）専用
+export const CHARGE_MAX      = 100   // 充電ゲージ最大値
+export const CHARGE_DRAIN    = 0.16  // /frame。常時減少（満タン→空 ≈ 10.4秒）
+export const CHARGE_HIT_COST = 30    // 障害物被弾時のチャージ減
+export const CHARGE_REVIVE   = 50    // チャージ0でのミス復活後の残量（= MAX*0.5）
+export const BATTERY_REFILL  = 35    // 🔋電池1個の回復量
+// [最小frames, ランダム幅frames]。電池スポーン間隔
+export const BATTERY_GAP: [number, number] = [110, 80]
+
+// 電子情報工学科（デバッグ踏みつけ型）専用
+export const COMBO_NEEDED     = 3    // バグを踏んだ累積数でデバッグモード発動（時間でリセットしない）
+export const DEBUG_FRAMES     = 180  // デバッグモード持続（3秒）
+export const DEBUG_SPEED_MULT = 1.7  // デバッグモード中のスクロール加速倍率
+export const STOMP_BOUNCE     = -10  // 踏んだ後のバウンド初速（px/frame）
+export const STOMP_MARGIN     = 26   // 上面接触判定の許容px（広めにして踏みやすく）
+
+// malloc/free 点滅ゲート（タイミング突破型）専用
+export const MALLOC_PERIOD    = 100  // 点滅の周期（frames）
+export const MALLOC_SOLID     = 55   // うち malloc=実体（当たり判定あり）な期間。残りは free=すり抜け
+// engine（衝突判定）と drawer（見た目）で共有する solid 判定。phase は障害物ごとの整数オフセット。
+export function mallocSolid(phase: number, frame: number): boolean {
+  return ((frame + phase) % MALLOC_PERIOD) < MALLOC_SOLID
+}

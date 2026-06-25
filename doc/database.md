@@ -21,10 +21,10 @@ CREATE TABLE stage_clears (
 -- 学科別ランキング取得を高速化
 CREATE INDEX idx_stage_clears_dept_time ON stage_clears(department, clear_time_ms ASC);
 
--- RLS: 誰でも読み書き可（バリデーションはAPIルート側で実施）
+-- RLS: 読み取りのみ anon に許可。書き込みは service_role（RLS バイパス）でのみ行う
 ALTER TABLE stage_clears ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Anyone can read stage_clears" ON stage_clears FOR SELECT USING (true);
-CREATE POLICY "API can insert stage_clears" ON stage_clears FOR INSERT WITH CHECK (true);
+-- INSERT 用の anon ポリシーは作らない（クライアントから直接書き込めないようにするため）
 ```
 
 `supabase-schema.sql` に同じ内容があります。Supabase の SQL エディタで実行して適用してください。
@@ -34,10 +34,11 @@ CREATE POLICY "API can insert stage_clears" ON stage_clears FOR INSERT WITH CHEC
 | ファイル | キー | 用途 |
 |---------|------|------|
 | `lib/supabase.ts` | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | クライアントサイド（読み取り専用） |
-| `lib/supabase-server.ts` | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | APIルート（INSERT/SELECT） |
+| `lib/supabase-server.ts` | `SUPABASE_SERVICE_ROLE_KEY` | APIルート専用。RLS をバイパスして INSERT する |
 
-INSERT ポリシーで anon キーからの書き込みを許可しているため、SERVICE_ROLE_KEY は不要。
-データの整合性は `app/api/stage-clears/route.ts` のバリデーションで担保する。
+`stage_clears` には INSERT 用の RLS ポリシーが無いため、anon キーでは書き込めない。
+クリアタイムの登録は `app/api/stage-clears/route.ts` がサーバーサイドで `createServerClient()`
+（service_role キー）を使って書き込む。データの整合性は同ルートのバリデーションで担保する。
 
 ## バリデーション
 

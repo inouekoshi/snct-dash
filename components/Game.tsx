@@ -2,14 +2,17 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { GameEngine } from '@/lib/game/engine'
-import type { GameResult } from '@/lib/types'
+import { AREAS, type AreaId } from '@/lib/game/areas'
+import { STAGE_INFO } from '@/lib/game/stage-info'
+import type { GameClearResult } from '@/lib/types'
 
 interface GameProps {
   nickname: string
-  onGameOver: (result: GameResult) => void
+  departmentId: number
+  onClear: (result: GameClearResult) => void
 }
 
-export default function Game({ nickname, onGameOver }: GameProps) {
+export default function Game({ nickname, departmentId, onClear }: GameProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const engineRef = useRef<GameEngine | null>(null)
   const [started, setStarted] = useState(false)
@@ -27,7 +30,6 @@ export default function Game({ nickname, onGameOver }: GameProps) {
     setPaused(p => !p)
   }, [])
 
-  // 縦向き検出（ゲーム開始後のみ表示）
   useEffect(() => {
     if (!started) return
     const mql = window.matchMedia('(orientation: portrait)')
@@ -37,7 +39,6 @@ export default function Game({ nickname, onGameOver }: GameProps) {
     return () => mql.removeEventListener('change', update)
   }, [started])
 
-  // 横向き固定（Android Chrome 対応、iOS は警告オーバーレイで対応）
   useEffect(() => {
     if (!started) return
     type ExtOrientation = ScreenOrientation & { lock?: (o: string) => Promise<void> }
@@ -46,30 +47,24 @@ export default function Game({ nickname, onGameOver }: GameProps) {
     return () => { if (ori?.unlock) ori.unlock() }
   }, [started])
 
-  // ゲームループ・入力
   useEffect(() => {
     if (!started || !canvasRef.current) return
 
     const canvas = canvasRef.current
-    const engine = new GameEngine(canvas, onGameOver)
+    const engine = new GameEngine(canvas, departmentId, onClear)
     engineRef.current = engine
     engine.start()
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'Space' || e.code === 'ArrowUp') {
-        e.preventDefault()
-        handleJump()
+        e.preventDefault(); handleJump()
       }
       if (e.code === 'Escape' || e.code === 'KeyP') {
-        e.preventDefault()
-        handlePause()
+        e.preventDefault(); handlePause()
       }
     }
-
-    // touchstart で発火（touchend より ~100ms 早く、二段ジャンプの反応性が向上する）
     const onTouchStart = (e: TouchEvent) => {
-      e.preventDefault()
-      handleJump()
+      e.preventDefault(); handleJump()
     }
 
     window.addEventListener('keydown', onKeyDown)
@@ -80,29 +75,78 @@ export default function Game({ nickname, onGameOver }: GameProps) {
       window.removeEventListener('keydown', onKeyDown)
       canvas.removeEventListener('touchstart', onTouchStart)
     }
-  }, [started, onGameOver, handleJump, handlePause])
+  }, [started, departmentId, onClear, handleJump, handlePause])
 
   if (!started) {
+    const theme = AREAS[departmentId as AreaId] ?? AREAS[1]
+    const info = STAGE_INFO[departmentId] ?? STAGE_INFO[1]
+    const accent = theme.groundLineColor
+
     return (
-      <main className="flex flex-col items-center justify-center min-h-screen gap-6 px-4 text-center">
-        <div>
-          <p className="text-gray-400 text-sm mb-1">プレイヤー</p>
-          <p className="text-2xl font-black">{nickname}</p>
+      <main className="flex flex-col items-center justify-center min-h-screen gap-4 px-4 py-8 text-center overflow-y-auto">
+        {/* 学科ヘッダー */}
+        <div className="flex flex-col items-center gap-1">
+          <span
+            className="text-6xl leading-none"
+            style={{ filter: `drop-shadow(0 0 12px ${accent}99)` }}
+          >
+            {theme.emoji}
+          </span>
+          <h2 className="text-3xl font-black tracking-wide" style={{ color: accent }}>
+            {theme.name}
+          </h2>
+          <p
+            className="text-base font-black px-3 py-0.5 rounded-full"
+            style={{ color: accent, backgroundColor: `${accent}1f` }}
+          >
+            {info.catch}
+          </p>
         </div>
-        <div className="text-gray-400 text-sm space-y-1">
-          <p>⌨ スペース / ↑ ：ジャンプ（二段ジャンプあり）</p>
-          <p>📱 タップ：ジャンプ</p>
+
+        <p className="text-gray-500 text-xs">
+          プレイヤー：<span className="text-white font-bold">{nickname}</span>
+        </p>
+
+        <div className="w-full max-w-sm space-y-3">
+          {/* この学科は？ */}
+          <div
+            className="rounded-2xl px-4 py-3 text-left"
+            style={{ backgroundColor: `${accent}14`, border: `1px solid ${accent}40` }}
+          >
+            <p className="text-xs font-black mb-1" style={{ color: accent }}>📖 この学科は？</p>
+            <p className="text-sm text-gray-100 leading-relaxed">{info.about}</p>
+          </div>
+
+          {/* ステージの特徴 */}
+          <div
+            className="rounded-2xl px-4 py-3 text-left"
+            style={{ backgroundColor: `${accent}14`, border: `1px solid ${accent}40` }}
+          >
+            <p className="text-xs font-black mb-1.5" style={{ color: accent }}>🎮 ステージの特徴</p>
+            <ul className="space-y-1.5">
+              {info.features.map((f, i) => (
+                <li key={i} className="text-sm text-gray-100 flex gap-2 leading-snug">
+                  <span className="font-black shrink-0" style={{ color: accent }}>▸</span>
+                  <span>{f}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* 操作方法 */}
+          <div className="rounded-2xl px-4 py-3 text-left bg-gray-800/70 border border-gray-700">
+            <p className="text-xs font-black mb-1 text-gray-300">🕹 操作方法</p>
+            <p className="text-sm text-gray-100">⌨ スペース / ↑ ・ 📱 タップ：ジャンプ（二段ジャンプあり）</p>
+            <p className="text-xs text-gray-400 mt-1">⚠ 障害物や穴はノックバック（後退）だけ。ゲームオーバーなし！</p>
+          </div>
         </div>
-        <div className="bg-gray-800 rounded-xl px-4 py-3 text-sm space-y-1 w-full max-w-xs border border-gray-700">
-          <p className="text-cyan-400 font-bold">🛡 シールドシステム</p>
-          <p className="text-gray-300">1回まで障害物に当たっても大丈夫！</p>
-          <p className="text-gray-400">💎 シールドアイテムで回復できます</p>
-        </div>
+
         <button
           onClick={() => setStarted(true)}
-          className="px-10 py-5 bg-yellow-400 hover:bg-yellow-300 text-gray-950 font-black text-2xl rounded-2xl transition-colors active:scale-95"
+          className="px-12 py-4 text-gray-950 font-black text-2xl rounded-2xl transition-transform active:scale-95 hover:brightness-110 shadow-lg"
+          style={{ backgroundColor: accent, boxShadow: `0 8px 24px ${accent}55` }}
         >
-          スタート！
+          ▶ スタート！
         </button>
       </main>
     )
@@ -110,13 +154,9 @@ export default function Game({ nickname, onGameOver }: GameProps) {
 
   return (
     <main className="flex flex-col items-center justify-center min-h-screen bg-gray-950 select-none overflow-hidden">
-      {/* 縦向き警告オーバーレイ（iOS など orientation.lock 非対応デバイス向け） */}
       {isPortrait && (
         <div className="fixed inset-0 z-50 bg-gray-950 flex flex-col items-center justify-center gap-6">
-          <div
-            className="text-6xl"
-            style={{ display: 'inline-block', transform: 'rotate(90deg)' }}
-          >
+          <div className="text-6xl" style={{ display: 'inline-block', transform: 'rotate(90deg)' }}>
             📱
           </div>
           <p className="text-white text-2xl font-black">横向きにしてください</p>
