@@ -22,6 +22,7 @@ export default function GamePage() {
     if (!saved) {
       router.push('/')
     } else {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setNickname(saved)
       setIsMounted(true)
     }

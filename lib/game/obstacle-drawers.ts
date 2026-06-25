@@ -58,7 +58,7 @@ function dCircuit(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme) {
   ctx.globalAlpha = 1
 }
 
-function dCoil(ctx: CanvasRenderingContext2D, o: Obstacle, _theme: Theme) {
+function dCoil(ctx: CanvasRenderingContext2D, o: Obstacle) {
   const cx = o.x + o.w / 2
   const segments = 5, segH = o.h / (segments + 1)
   ctx.lineWidth = 3; ctx.lineCap = 'round'
@@ -654,28 +654,6 @@ function dGlitch(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme, frame
   }
 }
 
-// ファイアウォール：踏めない壁。赤いレンガ＋揺らめく炎。ジャンプで越える。
-function dFirewall(ctx: CanvasRenderingContext2D, o: Obstacle, _theme: Theme, frame: number) {
-  // レンガ壁
-  ctx.fillStyle = '#aa2200'; ctx.strokeStyle = '#ff5522'; ctx.lineWidth = 2
-  rrect(ctx, o.x, o.y, o.w, o.h, 2); ctx.fill(); ctx.stroke()
-  ctx.strokeStyle = '#ff552288'; ctx.lineWidth = 1
-  const brickH = 9
-  for (let i = 0, by = o.y + brickH; by < o.y + o.h; by += brickH, i++) {
-    ctx.beginPath(); ctx.moveTo(o.x, by); ctx.lineTo(o.x + o.w, by); ctx.stroke()
-    const offset = i % 2 === 0 ? o.w / 2 : o.w / 4
-    ctx.beginPath(); ctx.moveTo(o.x + offset, by - brickH); ctx.lineTo(o.x + offset, by); ctx.stroke()
-  }
-  // 上端の炎
-  ctx.fillStyle = '#ff7722'
-  const flames = Math.max(2, Math.round(o.w / 12))
-  for (let i = 0; i < flames; i++) {
-    const fx = o.x + (i + 0.5) * (o.w / flames)
-    const fh = 8 + Math.abs(Math.sin(frame * 0.3 + i)) * 8
-    ctx.beginPath()
-    ctx.moveTo(fx - 4, o.y); ctx.quadraticCurveTo(fx, o.y - fh, fx + 4, o.y); ctx.closePath(); ctx.fill()
-  }
-}
 
 // データブロック：踏めない壁。0/1が縦に流れるソリッドなブロック。
 function dDataBlock(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme, frame: number) {
@@ -760,7 +738,7 @@ function dMallocFree(ctx: CanvasRenderingContext2D, o: Obstacle, _theme: Theme, 
 }
 
 // ブロックチェーンの塔：ダブルジャンプ必須の高壁。ブロックが縦に連なりハッシュ＋チェーンで繋がる。赤系。
-function dBlockchain(ctx: CanvasRenderingContext2D, o: Obstacle, _theme: Theme, _frame: number) {
+function dBlockchain(ctx: CanvasRenderingContext2D, o: Obstacle) {
   const n = Math.max(3, Math.floor(o.h / 28))
   const bh = o.h / n
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle'

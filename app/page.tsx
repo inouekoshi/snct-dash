@@ -19,6 +19,7 @@ export default function Home() {
   useEffect(() => {
     const saved = localStorage.getItem('snct_nickname')
     if (saved) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setNickname(saved)
     }
     setIsMounted(true)

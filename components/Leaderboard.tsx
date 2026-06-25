@@ -33,6 +33,7 @@ export default function Leaderboard() {
 
   useEffect(() => {
     let ignore = false
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true)
     fetchEntries(department).then((data) => {
       if (!ignore) { setEntries(data); setLoading(false) }
