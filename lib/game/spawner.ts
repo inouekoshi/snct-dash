@@ -24,6 +24,35 @@ export function spawnObstacle(departmentId: number, stageX: number, obstacles: O
   else                          spawnDept5(push, groundY)
 }
 
+export function spawnBug(stageX: number, obstacles: Obstacle[], groundY = DEFAULT_GROUND_Y) {
+  const push = (o: ObstacleInit) => obstacles.push(makeObstacle(stageX + (o.x - (CANVAS_W + 10)), o))
+  const r = Math.random()
+  if (r < 0.3) {
+    const s = 46 + Math.random() * 12
+    push({ x: CANVAS_W + 10, y: groundY - s, w: s, h: s, shape: 'bug', stompable: true })
+  } else if (r < 0.6) {
+    const s = 42 + Math.random() * 10
+    const baseY = groundY - 50 - Math.random() * 22
+    push({ x: CANVAS_W + 10, y: baseY, w: s, h: s, shape: 'bug', stompable: true, moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 26 })
+  } else if (r < 0.8) {
+    const s = 54 + Math.random() * 14
+    push({ x: CANVAS_W + 10, y: groundY - s, w: s, h: s, shape: 'bug', stompable: true })
+    const s2 = 46 + Math.random() * 10
+    push({ x: CANVAS_W + s + 24, y: groundY - s2, w: s2, h: s2, shape: 'bug', stompable: true })
+  } else {
+    const n = Math.random() < 0.5 ? 2 : 3
+    for (let i = 0; i < n; i++) {
+      const s = 40
+      const baseY = groundY - 50 - (i % 2) * 16
+      push({ x: CANVAS_W + 10 + i * 64, y: baseY, w: s, h: s, shape: 'bug', stompable: true, moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 18 })
+    }
+  }
+}
+
+function spawnDept3(push: (o: ObstacleInit) => void, groundY: number) {
+  dept3RedBag.next()(push, groundY)
+}
+
 export function spawnCeilingObstacle(stageX: number, obstacles: Obstacle[]) {
   const count = Math.random() < 0.3 ? 2 : 1
   for (let i = 0; i < count; i++) {

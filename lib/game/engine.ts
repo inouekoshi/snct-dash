@@ -21,7 +21,7 @@ import { drawBg, drawGround, type BgContext } from './background-renderers'
 import { drawPlayer } from './player-renderer'
 import { drawGoal } from './goal-renderer'
 import { drawHUD, renderPauseOverlay, renderMissOverlay, renderRevivalHint } from './hud-renderer'
-import { spawnObstacle, spawnCeilingObstacle, resetSpawnerBags } from './spawner'
+import { spawnObstacle, spawnCeilingObstacle, spawnBug, resetSpawnerBags } from './spawner'
 import { buildStage } from './terrain'
 
 export class GameEngine {
@@ -71,6 +71,7 @@ export class GameEngine {
   private nextObs = 120
   private nextCeilingObs = 300
   private nextBattery = 90
+  private nextBug = 60
 
   // 充電サバイバル（電気電子工学科 = departmentId 2 のみ稼働）
   private isElec = false
@@ -248,6 +249,15 @@ export class GameEngine {
       playClear()
       setTimeout(() => this.onClear({ timeMs: Math.round(this.elapsedMs), departmentId: this.departmentId }), 800)
       return
+    }
+
+    if (this.isCode && --this.nextBug <= 0) {
+      const nextStageX = this.stageProgress + CANVAS_W
+      if (this.hasGroundAt(nextStageX) && this.hasGroundAt(nextStageX + 65)) {
+        spawnBug(nextStageX, this.obstacles, this.getGroundHeightAt(nextStageX))
+      }
+      const [mn, r] = SPAWN_GAPS[this.departmentId] ?? SPAWN_GAPS[1]
+      this.nextBug = mn + Math.random() * r
     }
 
     // 障害物スポーン
