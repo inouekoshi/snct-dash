@@ -304,8 +304,15 @@ export class GameEngine {
         // malloc/free 点滅ゲート：free（消滅）期間は当たり判定なし＝すり抜け
         if (o.shape === 'malloc_free' && !mallocSolid(o.phase, this.frame)) continue
         // 踏みつけ（電子情報）：落下中に踏める敵の上面へ着地したら成立
-        if (this.isCode && o.stompable && this.pvy > 0 && (this.py - this.pvy) <= o.y + STOMP_MARGIN) {
-          this.stomp(o)
+        if (this.isCode && o.stompable) {
+          if (this.pvy > 0 && (this.py - this.pvy) <= o.y + STOMP_MARGIN) {
+            this.stomp(o)
+          } else {
+            // 横から当たった場合はミスにならない（バグは消滅し、コンボがリセットされる）
+            this.obstacles = this.obstacles.filter(x => x !== o)
+            this.combo = 0
+            this.burst(o.x + o.w / 2, o.y + o.h / 2, '#555555', 5)
+          }
           break
         }
         // 通常被弾：チャージ大幅減（電気電子）＋ノックバック
