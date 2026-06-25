@@ -136,8 +136,8 @@ function spawnDept2(push: (o: ObstacleInit) => void, groundY: number) {
 }
 
 // 電子情報工学科（デバッグ踏みつけ型）: 踏めるのは緑色の「バグ」1種のみ（一目で踏めると分かる）。
-// 踏めない「コードの障害」（syntax_error/infinite_loop/stack_overflow/null_pointer/merge_conflict/segfault）は
-// すべて赤系の危険色。踏む＝デバッグ／越えるを色で明確に使い分けさせる。
+// 踏めない「コードの障害」（syntax_error/malloc_free/null_pointer/merge_conflict/segfault/stack_overflow/
+// firewall/blockchain）はすべて赤系の危険色。踏む＝デバッグ／越える・通り抜けるを色で明確に使い分けさせる。
 function spawnDept3(push: (o: ObstacleInit) => void, groundY: number) {
   const r = Math.random()
   // ── 踏める敵（緑のバグ＝デバッグ対象。1種のみ）──
@@ -150,41 +150,45 @@ function spawnDept3(push: (o: ObstacleInit) => void, groundY: number) {
     const s = 42 + Math.random() * 10
     const baseY = groundY - 50 - Math.random() * 22
     push({ x: CANVAS_W + 10, y: baseY, w: s, h: s, shape: 'bug', stompable: true, moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 26 })
-  } else if (r < 0.48) {
+  } else if (r < 0.46) {
     // バグ（地上・大きめ）：のっそりした大物バグ
     const s = 54 + Math.random() * 14
     push({ x: CANVAS_W + 10, y: groundY - s, w: s, h: s, shape: 'bug', stompable: true })
   }
-  // ── 踏めない障壁（越えるしかない）──
-  else if (r < 0.57) {
+  // ── 踏めない障壁（すべて赤系。越える or 消えた瞬間に通る）──
+  else if (r < 0.53) {
     // 構文エラー（空中で上下）：閉じ忘れの } が浮遊。タイミングで越える
     const s = 40 + Math.random() * 12
     const baseY = groundY - 54 - Math.random() * 20
     push({ x: CANVAS_W + 10, y: baseY, w: s, h: s, shape: 'syntax_error', moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 22 })
-  } else if (r < 0.65) {
-    // 無限ループ：回転する大きな円。広い当たり判定で大ジャンプ
-    const s = 52 + Math.random() * 16
-    push({ x: CANVAS_W + 10, y: groundY - s, w: s, h: s, shape: 'infinite_loop' })
-  } else if (r < 0.73) {
+  } else if (r < 0.62) {
+    // malloc/free 点滅ゲート：実体(malloc)の時だけ壁。消えた(free)瞬間に走り抜ける（ジャンプでも可）
+    const h = 52 + Math.random() * 16
+    push({ x: CANVAS_W + 10, y: groundY - h, w: 34 + Math.random() * 10, h, shape: 'malloc_free', phase: Math.floor(Math.random() * 100) })
+  } else if (r < 0.69) {
     // ヌルポインタ：空中にぶら下がる縦長の障害
     const w = 38 + Math.random() * 10, h = 56 + Math.random() * 16
     push({ x: CANVAS_W + 10, y: groundY - h, w, h, shape: 'null_pointer' })
-  } else if (r < 0.81) {
+  } else if (r < 0.76) {
     // マージコンフリクト：幅広・低中。距離を稼ぐジャンプ
     const w = 70 + Math.random() * 30, h = 40 + Math.random() * 14
     push({ x: CANVAS_W + 10, y: groundY - h, w, h, shape: 'merge_conflict' })
-  } else if (r < 0.88) {
+  } else if (r < 0.83) {
     // セグフォ：中サイズの崩れるブロック
     const w = 48 + Math.random() * 16, h = 46 + Math.random() * 16
     push({ x: CANVAS_W + 10, y: groundY - h, w, h, shape: 'segfault' })
-  } else if (r < 0.90) {
+  } else if (r < 0.88) {
     // スタックオーバーフロー：高い壁。フルジャンプで越える
     const h = 74 + Math.random() * 22
     push({ x: CANVAS_W + 10, y: groundY - h, w: 40 + Math.random() * 12, h, shape: 'stack_overflow' })
-  } else if (r < 0.95) {
-    // ファイアウォール：最も高い炎の壁。シングルでは届かずダブルジャンプ必須（158〜182px）
+  } else if (r < 0.92) {
+    // ファイアウォール：炎の高壁。シングルでは届かずダブルジャンプ必須（158〜182px）
     const h = 158 + Math.random() * 24
     push({ x: CANVAS_W + 10, y: groundY - h, w: 30 + Math.random() * 12, h, shape: 'firewall' })
+  } else if (r < 0.96) {
+    // ブロックチェーンの塔：改ざん不可の高壁。ダブルジャンプ必須（158〜182px）
+    const h = 158 + Math.random() * 24
+    push({ x: CANVAS_W + 10, y: groundY - h, w: 38 + Math.random() * 10, h, shape: 'blockchain' })
   }
   // ── 複合パターン ──
   else if (r < 0.98) {
@@ -196,11 +200,11 @@ function spawnDept3(push: (o: ObstacleInit) => void, groundY: number) {
       push({ x: CANVAS_W + 10 + i * 64, y: baseY, w: s, h: s, shape: 'bug', stompable: true, moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 18 })
     }
   } else {
-    // 複合：壁（無限ループ）＋その先に踏めるバグ（越えてから踏む）
-    const s1 = 50 + Math.random() * 12
-    push({ x: CANVAS_W + 10, y: groundY - s1, w: s1, h: s1, shape: 'infinite_loop' })
-    const s = 50, baseY = groundY - 56
-    push({ x: CANVAS_W + s1 + 36, y: baseY, w: s, h: s, shape: 'bug', stompable: true, moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 16 })
+    // 複合：malloc/freeゲート＋その先に踏めるバグ（ゲートを抜けてから踏む）
+    const h = 56
+    push({ x: CANVAS_W + 10, y: groundY - h, w: 36, h, shape: 'malloc_free', phase: Math.floor(Math.random() * 100) })
+    const s = 46, baseY = groundY - 52
+    push({ x: CANVAS_W + 96, y: baseY, w: s, h: s, shape: 'bug', stompable: true, moving: true, phase: Math.random() * Math.PI * 2, baseY, amplitude: 16 })
   }
 }
 

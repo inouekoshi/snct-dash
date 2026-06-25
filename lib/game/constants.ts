@@ -42,3 +42,11 @@ export const DEBUG_FRAMES     = 180  // デバッグモード持続（3秒）
 export const DEBUG_SPEED_MULT = 1.7  // デバッグモード中のスクロール加速倍率
 export const STOMP_BOUNCE     = -10  // 踏んだ後のバウンド初速（px/frame）
 export const STOMP_MARGIN     = 26   // 上面接触判定の許容px（広めにして踏みやすく）
+
+// malloc/free 点滅ゲート（タイミング突破型）専用
+export const MALLOC_PERIOD    = 100  // 点滅の周期（frames）
+export const MALLOC_SOLID     = 55   // うち malloc=実体（当たり判定あり）な期間。残りは free=すり抜け
+// engine（衝突判定）と drawer（見た目）で共有する solid 判定。phase は障害物ごとの整数オフセット。
+export function mallocSolid(phase: number, frame: number): boolean {
+  return ((frame + phase) % MALLOC_PERIOD) < MALLOC_SOLID
+}

@@ -1,7 +1,7 @@
 import type { Obstacle } from './engine-types'
 import type { AreaId } from './areas'
 import { AREAS } from './areas'
-import { DEFAULT_GROUND_Y as GROUND_Y } from './constants'
+import { DEFAULT_GROUND_Y as GROUND_Y, mallocSolid } from './constants'
 import { rrect } from './helpers'
 
 type Theme = typeof AREAS[AreaId]
@@ -667,25 +667,63 @@ function dSyntaxError(ctx: CanvasRenderingContext2D, o: Obstacle, _theme: Theme,
   }
 }
 
-// 無限ループ：回転し続ける円形矢印＋中心に∞。赤熱グロー。
-function dInfiniteLoop(ctx: CanvasRenderingContext2D, o: Obstacle, _theme: Theme, frame: number) {
+// malloc/free 点滅ゲート：malloc（実体）時は赤い確保メモリの壁、free（消滅）時は点線枠だけ＝すり抜け可。
+// solid 判定は engine の衝突判定と共有（mallocSolid）。消えた瞬間に走り抜けるタイミング突破型。
+function dMallocFree(ctx: CanvasRenderingContext2D, o: Obstacle, _theme: Theme, frame: number) {
   const cx = o.x + o.w / 2, cy = o.y + o.h / 2
-  const r = Math.min(o.w, o.h) / 2 - 4
-  const rot = frame * 0.18
-  ctx.save()
-  ctx.translate(cx, cy); ctx.rotate(rot)
-  ctx.strokeStyle = '#ff7733'; ctx.lineWidth = 4
-  ctx.shadowColor = '#ff5500'; ctx.shadowBlur = 12
-  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 1.5); ctx.stroke()
-  ctx.shadowBlur = 0; ctx.fillStyle = '#ff7733'
-  const ax = Math.cos(Math.PI * 1.5) * r, ay = Math.sin(Math.PI * 1.5) * r
-  ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(ax - 8, ay - 5); ctx.lineTo(ax - 3, ay + 8)
-  ctx.closePath(); ctx.fill()
-  ctx.rotate(-rot)
-  ctx.fillStyle = '#ffddaa'; ctx.font = `bold ${Math.floor(r * 0.95)}px monospace`
+  const solid = mallocSolid(o.phase, frame)
+  if (solid) {
+    // 実体：確保されたメモリブロック
+    ctx.fillStyle = '#3a1414'; ctx.strokeStyle = '#ff5522'; ctx.lineWidth = 2.5
+    ctx.shadowColor = '#ff4400'; ctx.shadowBlur = 8
+    rrect(ctx, o.x, o.y, o.w, o.h, 3); ctx.fill(); ctx.stroke()
+    ctx.shadowBlur = 0
+    // メモリのバイト列（確保中の表現）
+    ctx.fillStyle = 'rgba(255,90,40,0.45)'
+    const cell = 6
+    for (let yy = o.y + 6; yy < o.y + o.h - 16; yy += cell + 2) {
+      for (let xx = o.x + 5; xx < o.x + o.w - 4; xx += cell + 2) ctx.fillRect(xx, yy, cell, cell)
+    }
+    ctx.fillStyle = '#ffcc66'; ctx.font = `bold ${Math.min(11, Math.floor(o.w * 0.3))}px monospace`
+    ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'
+    ctx.fillText('malloc()', cx, o.y + o.h - 3)
+  } else {
+    // 解放済み：点線枠だけ（今は通り抜けられる合図）
+    ctx.shadowBlur = 0
+    ctx.strokeStyle = 'rgba(255,120,80,0.6)'; ctx.lineWidth = 1.5
+    ctx.setLineDash([5, 4])
+    rrect(ctx, o.x, o.y, o.w, o.h, 3); ctx.stroke()
+    ctx.setLineDash([])
+    ctx.globalAlpha = 0.7
+    ctx.fillStyle = '#ff9977'; ctx.font = `${Math.min(10, Math.floor(o.w * 0.28))}px monospace`
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+    ctx.fillText('free()', cx, cy)
+    ctx.globalAlpha = 1
+  }
+}
+
+// ブロックチェーンの塔：ダブルジャンプ必須の高壁。ブロックが縦に連なりハッシュ＋チェーンで繋がる。赤系。
+function dBlockchain(ctx: CanvasRenderingContext2D, o: Obstacle, _theme: Theme, _frame: number) {
+  const n = Math.max(3, Math.floor(o.h / 28))
+  const bh = o.h / n
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-  ctx.fillText('∞', 0, 0)
-  ctx.restore()
+  for (let i = 0; i < n; i++) {
+    const by = o.y + i * bh
+    const isGenesis = i === n - 1
+    ctx.fillStyle = isGenesis ? '#5a1a1a' : '#3a1414'
+    ctx.strokeStyle = '#ff5522'; ctx.lineWidth = 2
+    ctx.shadowColor = '#ff4400'; ctx.shadowBlur = 6
+    rrect(ctx, o.x, by + 2, o.w, bh - 4, 3); ctx.fill(); ctx.stroke()
+    ctx.shadowBlur = 0
+    ctx.fillStyle = '#ffaa66'; ctx.font = `${Math.min(9, Math.floor(o.w * 0.24))}px monospace`
+    const label = isGenesis ? 'genesis' : '#' + ((i * 2654435761) >>> 0).toString(16).slice(0, 4)
+    ctx.fillText(label, o.x + o.w / 2, by + bh / 2)
+    if (i < n - 1) {
+      // チェーンリンク
+      ctx.strokeStyle = '#ffcc66'; ctx.lineWidth = 2
+      ctx.beginPath(); ctx.arc(o.x + o.w / 2, by + bh, 3, 0, Math.PI * 2); ctx.stroke()
+    }
+  }
 }
 
 // スタックオーバーフロー：スタックフレームの箱を積み上げ、上ほど崩れそうに揺れる高壁。
@@ -843,7 +881,8 @@ export const OBSTACLE_DRAWERS: Record<Obstacle['shape'], ObstacleDrawFn> = {
   firewall: dFirewallTall,
   data_block: dDataBlock,
   syntax_error: dSyntaxError,
-  infinite_loop: dInfiniteLoop,
+  malloc_free: dMallocFree,
+  blockchain: dBlockchain,
   stack_overflow: dStackOverflow,
   null_pointer: dNullPointer,
   merge_conflict: dMergeConflict,

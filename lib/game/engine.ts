@@ -11,7 +11,7 @@ import {
   CHARGE_MAX, CHARGE_DRAIN, CHARGE_HIT_COST, CHARGE_REVIVE,
   BATTERY_REFILL, BATTERY_GAP,
   COMBO_NEEDED, DEBUG_FRAMES, DEBUG_SPEED_MULT,
-  STOMP_BOUNCE, STOMP_MARGIN,
+  STOMP_BOUNCE, STOMP_MARGIN, mallocSolid,
 } from './constants'
 import type { PlayerState, Obstacle, TerrainSegment, Item, Particle } from './engine-types'
 import { overlaps, playerHitbox } from './helpers'
@@ -300,6 +300,8 @@ export class GameEngine {
     if (this.invincible === 0 && this.debugMode === 0) {
       for (const o of this.obstacles) {
         if (!overlaps(ph, { x: o.x + 4, y: o.y + 4, w: o.w - 8, h: o.h - 8 })) continue
+        // malloc/free 点滅ゲート：free（消滅）期間は当たり判定なし＝すり抜け
+        if (o.shape === 'malloc_free' && !mallocSolid(o.phase, this.frame)) continue
         // 踏みつけ（電子情報）：落下中に踏める敵の上面へ着地したら成立
         if (this.isCode && o.stompable && this.pvy > 0 && (this.py - this.pvy) <= o.y + STOMP_MARGIN) {
           this.stomp(o)

@@ -10,8 +10,9 @@ export interface Obstacle {
        | 'hammer' | 'conveyor'
        | 'resistor' | 'transistor' | 'electron' | 'tesla' | 'arc_ring'
        | 'virus' | 'glitch' | 'firewall' | 'data_block'
-       | 'syntax_error' | 'infinite_loop' | 'stack_overflow'
+       | 'syntax_error' | 'stack_overflow'
        | 'null_pointer' | 'merge_conflict' | 'segfault'
+       | 'malloc_free' | 'blockchain'
   moving: boolean; phase: number; baseY: number; amplitude: number
   stompable?: boolean  // 電子情報工学科：上から踏んで倒せる敵か
 }
