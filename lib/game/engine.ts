@@ -308,9 +308,8 @@ export class GameEngine {
           if (this.pvy > 0 && (this.py - this.pvy) <= o.y + STOMP_MARGIN) {
             this.stomp(o)
           } else {
-            // 横から当たった場合はミスにならない（バグは消滅し、コンボがリセットされる）
+            // 横から当たった場合はミスにならない（バグは消滅するがコンボは維持）
             this.obstacles = this.obstacles.filter(x => x !== o)
-            this.combo = 0
             this.burst(o.x + o.w / 2, o.y + o.h / 2, '#555555', 5)
           }
           break
