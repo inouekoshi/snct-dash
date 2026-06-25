@@ -21,15 +21,22 @@ export default function DepartmentSelect({ onSelect, onBack }: Props) {
       <div className="flex flex-col gap-3 w-full max-w-sm">
         {DEPARTMENTS.map((id) => {
           const theme = AREAS[id as AreaId]
+          const isUnavailable = id === 4 || id === 5
           return (
             <button
               key={id}
-              onClick={() => onSelect(id)}
-              className="flex items-center gap-4 p-4 bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-gray-500 rounded-2xl transition-colors text-left active:scale-95"
+              onClick={() => !isUnavailable && onSelect(id)}
+              disabled={isUnavailable}
+              className={`flex items-center gap-4 p-4 rounded-2xl transition-colors text-left border ${
+                isUnavailable 
+                  ? 'bg-gray-900/50 border-gray-800 opacity-60 cursor-not-allowed' 
+                  : 'bg-gray-800 hover:bg-gray-700 border-gray-700 hover:border-gray-500 active:scale-95'
+              }`}
             >
-              <span className="text-4xl w-12 text-center">{theme.emoji}</span>
+              <span className={`text-4xl w-12 text-center ${isUnavailable ? 'grayscale opacity-50' : ''}`}>{theme.emoji}</span>
               <div>
                 <p className="font-black text-lg">{theme.name}</p>
+                {isUnavailable && <p className="text-xs text-red-400 font-bold mt-1">現在は利用できません</p>}
               </div>
             </button>
           )
