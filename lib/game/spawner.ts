@@ -138,7 +138,7 @@ const dept2Spawners: SpawnFn[] = [
     push({ x: CANVAS_W + 10, y: groundY - h, w: 40 + Math.random() * 12, h, shape: 'tesla' })
   },
   (push, groundY) => {
-    const h = 158 + Math.random() * 24
+    const h = 144 + Math.random() * 12
     push({ x: CANVAS_W + 10, y: groundY - h, w: 50 + Math.random() * 16, h, shape: 'pylon' })
   },
   (push, groundY) => {
@@ -180,11 +180,11 @@ const dept3RedSpawners: SpawnFn[] = [
     push({ x: CANVAS_W + 10, y: groundY - h, w: 40 + Math.random() * 12, h, shape: 'stack_overflow' })
   },
   (push, groundY) => {
-    const h = 158 + Math.random() * 24
+    const h = 144 + Math.random() * 12
     push({ x: CANVAS_W + 10, y: groundY - h, w: 30 + Math.random() * 12, h, shape: 'firewall' })
   },
   (push, groundY) => {
-    const h = 158 + Math.random() * 24
+    const h = 144 + Math.random() * 12
     push({ x: CANVAS_W + 10, y: groundY - h, w: 38 + Math.random() * 10, h, shape: 'blockchain' })
   },
   (push, groundY) => {
