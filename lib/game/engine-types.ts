@@ -8,7 +8,7 @@ export interface Obstacle {
        | 'crystal' | 'ingot' | 'lattice' | 'stalactite'
        | 'wrench' | 'spring' | 'flywheel' | 'robot_arm'
        | 'hammer' | 'conveyor'
-       | 'resistor' | 'transistor' | 'electron' | 'tesla' | 'arc_ring'
+       | 'resistor' | 'transistor' | 'electron' | 'tesla' | 'arc_ring' | 'pylon'
        | 'virus' | 'glitch' | 'firewall' | 'data_block'
        | 'syntax_error' | 'stack_overflow'
        | 'null_pointer' | 'merge_conflict' | 'segfault'

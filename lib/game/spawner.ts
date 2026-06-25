@@ -117,10 +117,14 @@ function spawnDept2(push: (o: ObstacleInit) => void, groundY: number) {
     // 放電リング：大きく回転する円。広い当たり判定で大ジャンプ
     const s = 54 + Math.random() * 16
     push({ x: CANVAS_W + 10, y: groundY - s, w: s, h: s, shape: 'arc_ring' })
-  } else if (r < 0.95) {
+  } else if (r < 0.92) {
     // テスラコイル：最も高い壁。フルジャンプ必須
     const h = 72 + Math.random() * 20
     push({ x: CANVAS_W + 10, y: groundY - h, w: 40 + Math.random() * 12, h, shape: 'tesla' })
+  } else if (r < 0.95) {
+    // 高圧鉄塔（パイロン）：ダブルジャンプ必須の高壁（158〜182px）
+    const h = 158 + Math.random() * 24
+    push({ x: CANVAS_W + 10, y: groundY - h, w: 50 + Math.random() * 16, h, shape: 'pylon' })
   } else if (r < 0.975) {
     // 複合：抵抗器（低）＋電子（中・上下）
     const h1 = 22 + Math.random() * 8

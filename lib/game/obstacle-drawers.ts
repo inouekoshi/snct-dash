@@ -542,6 +542,63 @@ function dArcRing(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme, fram
   ctx.globalAlpha = 1
 }
 
+// 高圧鉄塔（パイロン）：ダブルジャンプ必須の高壁。トラス構造の鉄塔と碍子（がいし）、赤い航空障害灯。
+function dPylon(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme, frame: number) {
+  const cx = o.x + o.w / 2
+  ctx.strokeStyle = theme.obstacleStroke; ctx.lineWidth = 2
+  
+  // 鉄塔の主柱（ハの字）
+  ctx.beginPath()
+  ctx.moveTo(cx - o.w * 0.15, o.y)
+  ctx.lineTo(cx - o.w * 0.45, o.y + o.h)
+  ctx.moveTo(cx + o.w * 0.15, o.y)
+  ctx.lineTo(cx + o.w * 0.45, o.y + o.h)
+  ctx.stroke()
+  
+  // トラス構造（バツ印と横棒）
+  const steps = Math.floor(o.h / 24)
+  for (let i = 0; i < steps; i++) {
+    const t1 = i / steps
+    const t2 = (i + 1) / steps
+    const y1 = o.y + o.h * t1
+    const y2 = o.y + o.h * t2
+    const w1 = o.w * 0.15 + o.w * 0.3 * t1
+    const w2 = o.w * 0.15 + o.w * 0.3 * t2
+    
+    // 横棒
+    ctx.beginPath(); ctx.moveTo(cx - w1, y1); ctx.lineTo(cx + w1, y1); ctx.stroke()
+    
+    // クロス（斜め）
+    if (i < steps - 1) {
+      ctx.strokeStyle = theme.obstacleStroke + 'aa'; ctx.lineWidth = 1.5
+      ctx.beginPath(); ctx.moveTo(cx - w1, y1); ctx.lineTo(cx + w2, y2); ctx.stroke()
+      ctx.beginPath(); ctx.moveTo(cx + w1, y1); ctx.lineTo(cx - w2, y2); ctx.stroke()
+      ctx.strokeStyle = theme.obstacleStroke; ctx.lineWidth = 2
+    }
+  }
+
+  // 腕金（横に突き出た部分）と碍子（がいし）
+  ctx.fillStyle = theme.obstacleColor
+  for (let i = 1; i <= 2; i++) {
+    const armY = o.y + o.h * (0.2 * i)
+    const armW = o.w * (1 - 0.1 * i)
+    ctx.fillRect(cx - armW / 2, armY - 2, armW, 5); ctx.strokeRect(cx - armW / 2, armY - 2, armW, 5)
+    
+    // 碍子（垂れ下がるパーツ）
+    ctx.fillStyle = '#ccddff'
+    ctx.beginPath(); ctx.arc(cx - armW / 2 + 4, armY + 6, 3, 0, Math.PI * 2); ctx.fill(); ctx.stroke()
+    ctx.beginPath(); ctx.arc(cx + armW / 2 - 4, armY + 6, 3, 0, Math.PI * 2); ctx.fill(); ctx.stroke()
+    ctx.fillStyle = theme.obstacleColor
+  }
+  
+  // 頂部の航空障害灯（赤く点滅）
+  const pulse = Math.sin(frame * 0.1) * 0.5 + 0.5
+  ctx.fillStyle = `rgba(255, 50, 50, ${0.5 + pulse * 0.5})`
+  ctx.shadowColor = '#ff2222'; ctx.shadowBlur = 8 * pulse
+  ctx.beginPath(); ctx.arc(cx, o.y - 4, 4, 0, Math.PI * 2); ctx.fill()
+  ctx.shadowBlur = 0
+}
+
 // ── 電子情報工学科の追加障害物 ───────────────────────────────────────────────
 
 // ウイルス：踏める敵。トゲ付きの球体＋怒り目。サイバー色。
@@ -876,6 +933,7 @@ export const OBSTACLE_DRAWERS: Record<Obstacle['shape'], ObstacleDrawFn> = {
   electron: dElectron,
   tesla: dTesla,
   arc_ring: dArcRing,
+  pylon: dPylon,
   virus: dVirus,
   glitch: dGlitch,
   firewall: dFirewallTall,
