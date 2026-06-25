@@ -29,7 +29,7 @@ export const STEP_FOLLOW_SPEED = 8
 
 // 電気電子工学科（充電サバイバル型）専用
 export const CHARGE_MAX      = 100   // 充電ゲージ最大値
-export const CHARGE_DRAIN    = 0.14  // /frame。常時減少（満タン→空 ≈ 12秒）
+export const CHARGE_DRAIN    = 0.16  // /frame。常時減少（満タン→空 ≈ 10.4秒）
 export const CHARGE_HIT_COST = 30    // 障害物被弾時のチャージ減
 export const CHARGE_REVIVE   = 50    // チャージ0でのミス復活後の残量（= MAX*0.5）
 export const BATTERY_REFILL  = 35    // 🔋電池1個の回復量
