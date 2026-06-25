@@ -7,8 +7,8 @@ export const JUMP_VY = -13.5
 export const DEFAULT_GROUND_Y = 220
 
 export const STAGE_LENGTH = 70000 // 本番想定の長さ
-export const SPEED_START   = 4
-export const SPEED_END     = 15
+export const SPEED_START   = 8
+export const SPEED_END     = 14
 
 export const KNOCKBACK_AMOUNT     = 120
 export const HOLE_KNOCKBACK       = 200
