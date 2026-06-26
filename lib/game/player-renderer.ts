@@ -11,6 +11,7 @@ export interface PlayerRenderState {
   shield: boolean
   deathTimer: number
   frame: number
+  bio?: boolean
 }
 
 export function drawPlayer(ctx: CanvasRenderingContext2D, accent: string, p: PlayerRenderState) {
@@ -25,8 +26,10 @@ export function drawPlayer(ctx: CanvasRenderingContext2D, accent: string, p: Pla
   }
 
   // Shadow
-  ctx.fillStyle = 'rgba(0,0,0,0.22)'
-  ctx.beginPath(); ctx.ellipse(x, GROUND_Y + 3, 13, 4, 0, 0, Math.PI * 2); ctx.fill()
+  if (!p.bio) {
+    ctx.fillStyle = 'rgba(0,0,0,0.22)'
+    ctx.beginPath(); ctx.ellipse(x, GROUND_Y + 3, 13, 4, 0, 0, Math.PI * 2); ctx.fill()
+  }
 
   // Legs
   const lp = p.pState === 'jumping' ? 0 : p.legPhase

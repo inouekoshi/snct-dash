@@ -6,7 +6,13 @@ export function buildStage(departmentId: number): TerrainSegment[] {
   if (departmentId === 1) return buildStageMech()
   if (departmentId === 2) return buildStageElec()
   if (departmentId === 3) return buildStageCode()
+  if (departmentId === 4) return buildStageBio()
   return buildStageDefault()
+}
+
+// 生物応用化学科（液体スイム）専用地形：地面・壁・穴すべてなし。全画面が液体。
+function buildStageBio(): TerrainSegment[] {
+  return []
 }
 
 // 電子情報工学科専用地形：踏みつけのテンポと公平性を優先し、穴も段差も無い平坦。

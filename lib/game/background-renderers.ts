@@ -1,5 +1,5 @@
 import type { AreaId } from './areas'
-import { AREAS } from './areas'
+import { AREAS, bioZone } from './areas'
 import type { TerrainSegment } from './engine-types'
 import { CANVAS_W, CANVAS_H, DEFAULT_GROUND_Y, PLAYER_X } from './constants'
 
@@ -10,6 +10,8 @@ export interface BgContext {
   bgX: number
   speed: number
   debug?: boolean  // 電子情報：デバッグモード中はコード雨を強化
+  stageProgress?: number
+  isBio?: boolean
 }
 
 export function drawBg(ctx: CanvasRenderingContext2D, area: AreaId, theme: Theme, bg: BgContext) {
@@ -123,17 +125,53 @@ function bgCode(ctx: CanvasRenderingContext2D, theme: Theme, bg: BgContext) {
 }
 
 function bgBio(ctx: CanvasRenderingContext2D, theme: Theme, bg: BgContext) {
+  const p = bg.stageProgress || 0
+  const zone = bioZone(p)
+  
+  // Background tint based on zone
+  const isChem = zone === 'chem'
+  const tintColor = isChem ? 'rgba(0, 150, 200, 0.1)' : 'rgba(200, 100, 0, 0.1)'
+  ctx.fillStyle = tintColor
+  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H)
+
+  // Floating dust/bubbles
   ctx.strokeStyle = theme.groundLineColor; ctx.lineWidth = 1.5
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 15; i++) {
     const bx = ((bg.frame * 0.4 + i * 137) % (CANVAS_W + 60)) - 30
-    const by = DEFAULT_GROUND_Y - 25 - ((bg.frame * 0.8 + i * 47) % (DEFAULT_GROUND_Y - 60))
-    const br = 8 + (i % 3) * 7
-    ctx.globalAlpha = 0.09
+    const by = CANVAS_H - ((bg.frame * (0.8 + i * 0.1) + i * 47) % (CANVAS_H + 60)) // Ascending bubbles
+    const br = 4 + (i % 3) * 4
+    ctx.globalAlpha = 0.15
     ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI * 2); ctx.stroke()
-    ctx.fillStyle = theme.groundLineColor; ctx.globalAlpha = 0.04
+    ctx.fillStyle = theme.groundLineColor; ctx.globalAlpha = 0.08
     ctx.beginPath(); ctx.arc(bx - br * 0.3, by - br * 0.3, br * 0.25, 0, Math.PI * 2); ctx.fill()
   }
+
+  // Light rays
+  ctx.globalAlpha = 0.05
+  ctx.fillStyle = '#ffffff'
+  for (let i = 0; i < 3; i++) {
+    const lx = (bg.frame * -0.5 + i * 300) % (CANVAS_W * 2) - CANVAS_W / 2
+    ctx.beginPath()
+    ctx.moveTo(lx, 0)
+    ctx.lineTo(lx + 150, 0)
+    ctx.lineTo(lx + 50, CANVAS_H)
+    ctx.lineTo(lx - 50, CANVAS_H)
+    ctx.fill()
+  }
+
+  // Top/bottom walls (Tank edges)
   ctx.globalAlpha = 1
+  ctx.strokeStyle = theme.groundLineColor; ctx.lineWidth = 4
+  ctx.shadowColor = theme.groundLineColor; ctx.shadowBlur = 8
+  ctx.setLineDash([20, 10])
+  ctx.lineDashOffset = -(bg.frame * bg.speed * 0.4) % 30
+  
+  ctx.beginPath()
+  ctx.moveTo(0, 4); ctx.lineTo(CANVAS_W, 4) // Top edge
+  ctx.moveTo(0, CANVAS_H - 4); ctx.lineTo(CANVAS_W, CANVAS_H - 4) // Bottom edge
+  ctx.stroke()
+  
+  ctx.setLineDash([]); ctx.shadowBlur = 0
 }
 
 function bgMat(ctx: CanvasRenderingContext2D, theme: Theme, bg: BgContext) {

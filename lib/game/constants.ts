@@ -16,7 +16,7 @@ export const KNOCKBACK_INVINCIBLE = 90
 
 // [最小frames, ランダム幅frames]。インデックス0は未使用、1〜5がdepartmentId対応
 export const SPAWN_GAPS: [number, number][] = [
-  [0, 0], [44, 28], [85, 50], [38, 30], [50, 32], [36, 26],
+  [0, 0], [44, 28], [85, 50], [38, 30], [78, 46], [36, 26],
 ]
 
 export const COYOTE_FRAMES      = 5
@@ -50,3 +50,13 @@ export const MALLOC_SOLID     = 55   // うち malloc=実体（当たり判定�
 export function mallocSolid(phase: number, frame: number): boolean {
   return ((frame + phase) % MALLOC_PERIOD) < MALLOC_SOLID
 }
+
+// 生物応用化学科（液体スイム）専用
+export const SWIM_THRUST     = -0.72           // 押下中の上昇加速
+export const SWIM_DRAG       = 0.90            // 速度減衰（水の抵抗）
+export const SWIM_MAX_VY     = 5.2
+export const BIO_WALL_KNOCKBACK = 90           // 壁ヒット後退（通常120より軽め）
+export const BIO_GAP         = 116             // パイプ縦隙間（プレイヤー高46+余裕）
+export const BIO_PIPE_W      = 42
+export const BIO_SPEED_START = 6
+export const BIO_SPEED_END   = 10

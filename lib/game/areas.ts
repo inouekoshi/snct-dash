@@ -58,8 +58,8 @@ export const AREAS: Record<AreaId, AreaTheme> = {
     id: 4,
     name: '生物応用化学科',
     emoji: '🧬',
-    bgTop: '#001100',
-    bgBottom: '#002200',
+    bgTop: '#021a14',
+    bgBottom: '#002b1f',
     groundColor: '#004400',
     groundLineColor: '#00cc44',
     obstacleColor: '#006622',
@@ -83,3 +83,7 @@ export const AREAS: Record<AreaId, AreaTheme> = {
 }
 
 export const AREA_DISTANCE = 2000
+
+export function bioZone(p: number): 'chem' | 'bio' {
+  return Math.floor(p / 2200) % 2 === 0 ? 'chem' : 'bio'
+}
