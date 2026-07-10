@@ -1,5 +1,5 @@
 import type { AreaId } from './areas'
-import { AREAS } from './areas'
+import { AREAS, bioZone } from './areas'
 import { playJump, playKnockback, playClear } from './sound'
 import type { GameClearResult } from '@/lib/types'
 import {
@@ -12,16 +12,18 @@ import {
   BATTERY_REFILL, BATTERY_GAP,
   COMBO_NEEDED, DEBUG_FRAMES, DEBUG_SPEED_MULT,
   STOMP_BOUNCE, STOMP_MARGIN, mallocSolid,
+  SWIM_THRUST, SWIM_DRAG, SWIM_MAX_VY, BIO_WALL_KNOCKBACK, BIO_SPEED_START, BIO_SPEED_END,
+  SHIELD_GAP, SHIELD_COLOR,
 } from './constants'
 import type { PlayerState, Obstacle, TerrainSegment, Item, Particle } from './engine-types'
 import { overlaps, playerHitbox } from './helpers'
 import { drawObstacle } from './obstacle-drawers'
-import { drawBattery } from './item-renderer'
+import { drawBattery, drawShieldItem } from './item-renderer'
 import { drawBg, drawGround, type BgContext } from './background-renderers'
 import { drawPlayer } from './player-renderer'
 import { drawGoal } from './goal-renderer'
 import { drawHUD, renderPauseOverlay, renderMissOverlay, renderRevivalHint } from './hud-renderer'
-import { spawnObstacle, spawnCeilingObstacle, spawnBug, resetSpawnerBags } from './spawner'
+import { spawnObstacle, spawnCeilingObstacle, spawnBug, spawnPipePair, resetSpawnerBags } from './spawner'
 import { buildStage } from './terrain'
 
 export class GameEngine {
@@ -82,6 +84,12 @@ export class GameEngine {
   private combo = 0
   private debugMode = 0
 
+  // 液体スイム（生物応用化学科 = departmentId 4 のみ稼働）
+  private isBio = false
+  private thrustHeld = false
+  private bioShield = false      // バリア保持中か（1回だけ被弾を無効化）
+  private nextShield = 150       // 次のバリアアイテム出現までのframe
+
   // Background scroll
   private bgX = 0
 
@@ -97,12 +105,24 @@ export class GameEngine {
     this.departmentId = departmentId
     this.isElec = departmentId === 2
     this.isCode = departmentId === 3
+    this.isBio = departmentId === 4
+    if (this.isBio) {
+      this.py = CANVAS_H / 2
+    }
     this.onClear = onClear
     resetSpawnerBags()
     this.terrain = buildStage(departmentId)
   }
 
   // ── 公開インターフェース ───────────────────────────────────────────────────
+
+  setThrust(active: boolean) {
+    // 「離す」(false)は常に反映する。ミス演出/ヒットストップ中に keyup を無視すると
+    // thrustHeld が true のまま残り、押していないのに浮上し続けるバグになる。
+    // 浮上開始(true)のみポーズ/ミス/クリア中を無視する。
+    if (active && (this.isCleared || this.isPaused || this.missOverlayTimer > 0 || this.hitStopTimer > 0)) return
+    this.thrustHeld = active
+  }
 
   jump() {
     if (this.isCleared || this.isPaused || this.missOverlayTimer > 0) return
@@ -168,45 +188,43 @@ export class GameEngine {
       this.bgX -= speed * 0.25
     }
 
-    // 地形判定
-    this.targetGroundY = this.getGroundY()
-
-    // プレイヤー物理
-    this.pvy += GRAVITY
-    this.py += this.pvy
-
-    if (this.targetGroundY !== Infinity && this.py >= this.targetGroundY) {
-      // 着地
-      this.py = this.targetGroundY
-      this.pvy = 0
-      this.jumpCount = 0
-      if (this.pState === 'jumping' || this.pState === 'falling') this.pState = 'running'
-      this.coyoteTime = COYOTE_FRAMES
-      if (this.jumpBuffer > 0) { this.jumpBuffer = 0; this.performJump() }
+    // 地形判定とプレイヤー物理
+    if (this.isBio) {
+      this.updateBio()
     } else {
-      if (this.coyoteTime > 0) this.coyoteTime--
-      if (this.jumpBuffer > 0) this.jumpBuffer--
-    }
+      this.targetGroundY = this.getGroundY()
 
-    // 穴落下判定（2段階）
-    // ①: 地面レベルを超えたらフラグセット（スクロール停止、プレイヤーのみ落下継続）
-    if (this.targetGroundY === Infinity && this.py > DEFAULT_GROUND_Y + 30 && !this.isFallingIntoHole) {
-      this.isFallingIntoHole = true
-    }
-    // ②: 画面外まで落ちたら MISS 処理
-    if (this.isFallingIntoHole && this.py > CANVAS_H + 60) {
-      this.isFallingIntoHole = false
-      this.knockback(HOLE_KNOCKBACK)
-      this.py = this.currentGroundY
-      this.pvy = -4
-      this.pState = 'jumping'
-      this.jumpCount = 1
-    }
+      this.pvy += GRAVITY
+      this.py += this.pvy
 
-    // 段差追随
-    if (this.targetGroundY !== Infinity) {
-      const diff = this.targetGroundY - this.currentGroundY
-      this.currentGroundY += Math.sign(diff) * Math.min(Math.abs(diff), STEP_FOLLOW_SPEED)
+      if (this.targetGroundY !== Infinity && this.py >= this.targetGroundY) {
+        this.py = this.targetGroundY
+        this.pvy = 0
+        this.jumpCount = 0
+        if (this.pState === 'jumping' || this.pState === 'falling') this.pState = 'running'
+        this.coyoteTime = COYOTE_FRAMES
+        if (this.jumpBuffer > 0) { this.jumpBuffer = 0; this.performJump() }
+      } else {
+        if (this.coyoteTime > 0) this.coyoteTime--
+        if (this.jumpBuffer > 0) this.jumpBuffer--
+      }
+
+      if (this.targetGroundY === Infinity && this.py > DEFAULT_GROUND_Y + 30 && !this.isFallingIntoHole) {
+        this.isFallingIntoHole = true
+      }
+      if (this.isFallingIntoHole && this.py > CANVAS_H + 60) {
+        this.isFallingIntoHole = false
+        this.knockback(HOLE_KNOCKBACK)
+        this.py = this.currentGroundY
+        this.pvy = -4
+        this.pState = 'jumping'
+        this.jumpCount = 1
+      }
+
+      if (this.targetGroundY !== Infinity) {
+        const diff = this.targetGroundY - this.currentGroundY
+        this.currentGroundY += Math.sign(diff) * Math.min(Math.abs(diff), STEP_FOLLOW_SPEED)
+      }
     }
 
     if (this.pState === 'running') this.legPhase += 0.25
@@ -264,16 +282,20 @@ export class GameEngine {
     const CEIL_GROUND_GAP = 90
     if (--this.nextObs <= 0) {
       const nextStageX = this.stageProgress + CANVAS_W
-      if (this.hasGroundAt(nextStageX) && this.hasGroundAt(nextStageX + 65) && this.hasGroundAt(nextStageX + 130)
-          && this.isFlatAt(nextStageX, 130)) {
-        spawnObstacle(this.departmentId, nextStageX, this.obstacles, this.getGroundHeightAt(nextStageX))
+      if (this.isBio) {
+        spawnPipePair(nextStageX, this.obstacles, bioZone(this.stageProgress))
+      } else {
+        if (this.hasGroundAt(nextStageX) && this.hasGroundAt(nextStageX + 65) && this.hasGroundAt(nextStageX + 130)
+            && this.isFlatAt(nextStageX, 130)) {
+          spawnObstacle(this.departmentId, nextStageX, this.obstacles, this.getGroundHeightAt(nextStageX))
+        }
       }
       const [mn, r] = SPAWN_GAPS[this.departmentId] ?? SPAWN_GAPS[1]
       this.nextObs = mn + Math.random() * r
       this.nextCeilingObs = Math.max(this.nextCeilingObs, CEIL_GROUND_GAP)
       if (this.isCode) this.nextBug = Math.max(this.nextBug, 25) // 重ならないようにバグをずらす
     }
-    if (this.departmentId >= 2 && --this.nextCeilingObs <= 0) {
+    if (!this.isBio && this.departmentId >= 2 && --this.nextCeilingObs <= 0) {
       const nextStageX = this.stageProgress + CANVAS_W
       spawnCeilingObstacle(nextStageX, this.obstacles)
       const base = Math.max(100, 260 - this.departmentId * 25)
@@ -290,6 +312,15 @@ export class GameEngine {
       this.items.push({ stageX: nextStageX, x: CANVAS_W + 10, y, effect: 'charge', wobble: Math.random() * Math.PI * 2 })
       const [mn, r] = BATTERY_GAP
       this.nextBattery = mn + Math.random() * r
+    }
+
+    // バリアアイテムスポーン（生物応用化学科）：培養液中を浮遊。取ると1回被弾を無効化。
+    if (this.isBio && --this.nextShield <= 0) {
+      const nextStageX = this.stageProgress + CANVAS_W
+      const y = 55 + Math.random() * (CANVAS_H - 110) // 上下壁を避けた高さ
+      this.items.push({ stageX: nextStageX, x: CANVAS_W + 10, y, effect: 'shield', wobble: Math.random() * Math.PI * 2 })
+      const [mn, r] = SHIELD_GAP
+      this.nextShield = mn + Math.random() * r
     }
 
     // オブジェクトのCanvas座標を更新・画面外を除去
@@ -325,6 +356,15 @@ export class GameEngine {
           }
           break
         }
+        // バリア（生物応用化学科）：保持中なら1回だけ被弾を無効化して通過。
+        // 消費して無敵フレームを付与し、当たったパイプをそのまま通り抜けられるようにする。
+        if (this.isBio && this.bioShield) {
+          this.bioShield = false
+          this.invincible = KNOCKBACK_INVINCIBLE
+          this.burst(PLAYER_X, this.py, SHIELD_COLOR, 18)
+          playJump()
+          break
+        }
         // 通常被弾：チャージ大幅減（電気電子）＋ノックバック
         if (this.isElec) this.charge = Math.max(0, this.charge - CHARGE_HIT_COST)
         this.knockback(KNOCKBACK_AMOUNT)
@@ -354,17 +394,59 @@ export class GameEngine {
         return true
       })
     }
+
+    // バリア取得判定（生物応用化学科）：拾うとバリアを保持（1回被弾を無効化）
+    if (this.isBio && this.items.length) {
+      this.items = this.items.filter(it => {
+        if (it.effect === 'shield' && overlaps(ph, { x: it.x - 14, y: it.y - 14, w: 28, h: 28 })) {
+          this.bioShield = true
+          this.burst(it.x, it.y, SHIELD_COLOR, 12)
+          playJump()
+          return false
+        }
+        return true
+      })
+    }
   }
 
   // ── 内部メソッド ──────────────────────────────────────────────────────────
 
+  private updateBio() {
+    if (this.thrustHeld) {
+      this.pvy += SWIM_THRUST
+    } else {
+      this.pvy += GRAVITY * 0.6 // 沈降
+    }
+    this.pvy *= SWIM_DRAG
+    this.pvy = Math.max(-SWIM_MAX_VY, Math.min(SWIM_MAX_VY, this.pvy))
+    this.py += this.pvy
+    this.pState = this.pvy < 0 ? 'jumping' : 'falling'
+
+    if (this.py < 15) {
+      this.py = CANVAS_H / 2
+      this.pvy = 0
+      this.knockback(BIO_WALL_KNOCKBACK)
+    } else if (this.py > CANVAS_H - 15) {
+      this.py = CANVAS_H / 2
+      this.pvy = 0
+      this.knockback(BIO_WALL_KNOCKBACK)
+    }
+    
+    if (this.thrustHeld && this.frame % 5 === 0) {
+      this.burst(PLAYER_X - 15, this.py, '#ffffff88', 1)
+    }
+  }
+
   private get currentSpeed(): number {
     const t = Math.min(this.stageProgress / STAGE_LENGTH, 1)
+    if (this.isBio) {
+      return BIO_SPEED_START + (BIO_SPEED_END - BIO_SPEED_START) * t
+    }
     return SPEED_START + (SPEED_END - SPEED_START) * t
   }
 
   private get effectiveSpeed(): number {
-    if (this.revivalTimer > 0) return SPEED_START
+    if (this.revivalTimer > 0) return this.isBio ? BIO_SPEED_START : SPEED_START
     // デバッグモード中（電子情報）はスクロール加速＝タイム短縮ボーナス
     return this.debugMode > 0 ? this.currentSpeed * DEBUG_SPEED_MULT : this.currentSpeed
   }
@@ -435,6 +517,9 @@ export class GameEngine {
     this.hitStopTimer     = HIT_STOP_FRAMES
     this.missOverlayTimer = MISS_OVERLAY_FRAMES
     this.revivalTimer     = REVIVAL_FRAMES
+    // スイム（生物応用化学）は上下の慣性をリセットして復帰を安定させる
+    // （壁ヒットは updateBio 側で既に 0 にしているが、パイプ衝突経路もここで揃える）
+    if (this.isBio) this.pvy = 0
     playKnockback()
     this.burst(PLAYER_X, this.py - 20, '#ff8800', 10)
   }
@@ -479,18 +564,21 @@ export class GameEngine {
   private render() {
     const ctx = this.ctx
     const theme = AREAS[this.departmentId as AreaId]
-    const bg: BgContext = { frame: this.frame, bgX: this.bgX, speed: this.missOverlayTimer > 0 ? 0 : this.effectiveSpeed, debug: this.debugMode > 0 }
+    const bg: BgContext = { frame: this.frame, bgX: this.bgX, speed: this.missOverlayTimer > 0 ? 0 : this.effectiveSpeed, debug: this.debugMode > 0, stageProgress: this.stageProgress, isBio: this.isBio }
 
     ctx.save()
 
     drawBg(ctx, this.departmentId as AreaId, theme, bg)
-    drawGround(ctx, theme, bg, this.terrain, this.stageProgress)
+    if (!this.isBio) {
+      drawGround(ctx, theme, bg, this.terrain, this.stageProgress)
+    }
     drawGoal(ctx, this.departmentId as AreaId, theme, this.stageProgress, this.frame)
 
     for (const o of this.obstacles) drawObstacle(ctx, o, theme, this.frame)
 
     for (const it of this.items) {
       if (it.effect === 'charge') drawBattery(ctx, it, theme, this.frame)
+      else if (it.effect === 'shield') drawShieldItem(ctx, it, this.frame)
     }
 
     for (const p of this.particles) {
@@ -503,7 +591,8 @@ export class GameEngine {
     drawPlayer(ctx, theme.coinColor, {
       py: this.py, pState: this.pState, pvy: this.pvy,
       invincible: this.invincible, legPhase: this.legPhase,
-      shield: false, deathTimer: 0, frame: this.frame,
+      shield: this.isBio ? this.bioShield : false, deathTimer: 0, frame: this.frame,
+      bio: this.isBio
     })
 
     drawHUD(ctx, theme, {

@@ -1,5 +1,5 @@
 import type { Obstacle } from './engine-types'
-import { CANVAS_W, DEFAULT_GROUND_Y } from './constants'
+import { CANVAS_W, DEFAULT_GROUND_Y, BIO_GAP, BIO_PIPE_W, CANVAS_H } from './constants'
 
 type ObstacleInit = Pick<Obstacle, 'x' | 'y' | 'w' | 'h' | 'shape'> & Partial<Pick<Obstacle, 'moving' | 'phase' | 'baseY' | 'amplitude' | 'stompable'>>
 
@@ -291,6 +291,40 @@ export function resetSpawnerBags() {
   dept3RedBag.reset()
   dept4Bag.reset()
   dept5Bag.reset()
+  pipeBag.reset()
+}
+
+const pipeSpawners: ((push: (o: ObstacleInit) => void, zone: 'chem' | 'bio') => void)[] = [
+  (push, zone) => {
+    const shape = zone === 'chem' ? 'reagent_tube' : 'cell_wall'
+    const yCenter = 70 + Math.random() * (CANVAS_H - 140)
+    push({ x: CANVAS_W + 10, y: -50, w: BIO_PIPE_W, h: yCenter - BIO_GAP / 2 + 50, shape, baseY: -50 })
+    push({ x: CANVAS_W + 10, y: yCenter + BIO_GAP / 2, w: BIO_PIPE_W, h: CANVAS_H, shape, baseY: yCenter + BIO_GAP / 2 })
+  },
+  (push, zone) => {
+    const shape = zone === 'chem' ? 'reagent_tube' : 'cell_wall'
+    const yCenter = 90 + Math.random() * (CANVAS_H - 180)
+    const amp = 20 + Math.random() * 20
+    const phase = Math.random() * Math.PI * 2
+    push({ x: CANVAS_W + 10, y: -100, w: BIO_PIPE_W, h: yCenter - BIO_GAP / 2 + 100, shape, moving: true, baseY: -100, amplitude: amp, phase })
+    push({ x: CANVAS_W + 10, y: yCenter + BIO_GAP / 2, w: BIO_PIPE_W, h: CANVAS_H, shape, moving: true, baseY: yCenter + BIO_GAP / 2, amplitude: amp, phase })
+  },
+  (push, zone) => {
+    const shape = zone === 'chem' ? 'reagent_tube' : 'cell_wall'
+    const yCenter = 70 + Math.random() * (CANVAS_H - 140)
+    push({ x: CANVAS_W + 10, y: -50, w: BIO_PIPE_W, h: yCenter - BIO_GAP / 2 + 50, shape, baseY: -50 })
+    push({ x: CANVAS_W + 10, y: yCenter + BIO_GAP / 2, w: BIO_PIPE_W, h: CANVAS_H, shape, baseY: yCenter + BIO_GAP / 2 })
+    
+    const yCenter2 = Math.max(70, Math.min(CANVAS_H - 70, yCenter + (Math.random() < 0.5 ? 40 : -40)))
+    push({ x: CANVAS_W + 10 + BIO_PIPE_W + 40, y: -50, w: BIO_PIPE_W, h: yCenter2 - BIO_GAP / 2 + 50, shape, baseY: -50 })
+    push({ x: CANVAS_W + 10 + BIO_PIPE_W + 40, y: yCenter2 + BIO_GAP / 2, w: BIO_PIPE_W, h: CANVAS_H, shape, baseY: yCenter2 + BIO_GAP / 2 })
+  }
+]
+const pipeBag = new ShuffleBag(pipeSpawners)
+
+export function spawnPipePair(stageX: number, obstacles: Obstacle[], zone: 'chem' | 'bio') {
+  const push = (o: ObstacleInit) => obstacles.push(makeObstacle(stageX + (o.x - (CANVAS_W + 10)), o))
+  pipeBag.next()(push, zone)
 }
 
 function spawnDept1(push: (o: ObstacleInit) => void, groundY: number) {

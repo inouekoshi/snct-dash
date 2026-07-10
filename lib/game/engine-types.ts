@@ -13,6 +13,7 @@ export interface Obstacle {
        | 'syntax_error' | 'stack_overflow'
        | 'null_pointer' | 'merge_conflict' | 'segfault'
        | 'malloc_free' | 'blockchain'
+       | 'reagent_tube' | 'cell_wall'
   moving: boolean; phase: number; baseY: number; amplitude: number
   stompable?: boolean  // 電子情報工学科：上から踏んで倒せる敵か
 }
@@ -24,7 +25,7 @@ export type TerrainSegment =
 export interface Item {
   stageX: number
   x: number; y: number
-  effect: 'time_stop' | 'invincible' | 'charge'
+  effect: 'time_stop' | 'invincible' | 'charge' | 'shield'
   wobble: number
 }
 

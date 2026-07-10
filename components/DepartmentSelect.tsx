@@ -21,7 +21,7 @@ export default function DepartmentSelect({ onSelect, onBack }: Props) {
       <div className="flex flex-col gap-3 w-full max-w-sm">
         {DEPARTMENTS.map((id) => {
           const theme = AREAS[id as AreaId]
-          const isUnavailable = id === 4 || id === 5
+          const isUnavailable = id === 5
           return (
             <button
               key={id}

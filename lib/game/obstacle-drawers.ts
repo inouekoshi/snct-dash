@@ -883,6 +883,44 @@ function dFirewallTall(ctx: CanvasRenderingContext2D, o: Obstacle, _theme: Theme
   for (let i = 0; i < word.length; i++) ctx.fillText(word[i], cx, startY + i * 12)
 }
 
+// ── 生物応用化学科（液体スイム）の障害物 ───────────────────────────────────────────────
+
+function dReagentTube(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme, frame: number) {
+  const { x, y, w, h } = o
+  ctx.fillStyle = 'rgba(0, 180, 220, 0.25)'
+  ctx.strokeStyle = '#00ccff'
+  ctx.lineWidth = 2
+  rrect(ctx, x, y, w, h, w / 2); ctx.fill(); ctx.stroke()
+  
+  ctx.fillStyle = 'rgba(255,255,255,0.6)'
+  ctx.save(); ctx.beginPath(); rrect(ctx, x, y, w, h, w / 2); ctx.clip()
+  for (let i = 0; i < 5; i++) {
+    const bx = x + w * 0.3 + ((i * 123) % (w * 0.4))
+    const by = y + h - ((frame * (0.6 + i * 0.1) + i * 50) % h)
+    ctx.beginPath(); ctx.arc(bx, by, 2 + (i % 3), 0, Math.PI * 2); ctx.fill()
+  }
+  ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 3
+  ctx.beginPath(); ctx.moveTo(x + 6, y + 20); ctx.lineTo(x + 6, y + h - 20); ctx.stroke()
+  ctx.restore()
+}
+
+function dCellWall(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme, frame: number) {
+  const { x, y, w, h } = o
+  ctx.fillStyle = 'rgba(180, 220, 0, 0.25)'
+  ctx.strokeStyle = '#aaff00'
+  ctx.lineWidth = 2
+  rrect(ctx, x, y, w, h, 8); ctx.fill(); ctx.stroke()
+  
+  ctx.fillStyle = '#ccff33'
+  ctx.save(); ctx.beginPath(); rrect(ctx, x, y, w, h, 8); ctx.clip()
+  const step = w * 0.8
+  for (let cy = y + step / 2; cy < y + h; cy += step) {
+    ctx.globalAlpha = 0.5 + Math.sin(frame * 0.05 + cy) * 0.3
+    ctx.beginPath(); ctx.arc(x + w / 2, cy, w * 0.2, 0, Math.PI * 2); ctx.fill()
+  }
+  ctx.restore()
+}
+
 export const OBSTACLE_DRAWERS: Record<Obstacle['shape'], ObstacleDrawFn> = {
   gear: dGear,
   bolt: dBolt,
@@ -923,6 +961,8 @@ export const OBSTACLE_DRAWERS: Record<Obstacle['shape'], ObstacleDrawFn> = {
   null_pointer: dNullPointer,
   merge_conflict: dMergeConflict,
   segfault: dSegfault,
+  reagent_tube: dReagentTube,
+  cell_wall: dCellWall,
 }
 
 export function drawObstacle(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme, frame: number) {
