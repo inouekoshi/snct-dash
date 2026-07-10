@@ -114,7 +114,10 @@ export class GameEngine {
   // ── 公開インターフェース ───────────────────────────────────────────────────
 
   setThrust(active: boolean) {
-    if (this.isCleared || this.isPaused || this.missOverlayTimer > 0 || this.hitStopTimer > 0) return
+    // 「離す」(false)は常に反映する。ミス演出/ヒットストップ中に keyup を無視すると
+    // thrustHeld が true のまま残り、押していないのに浮上し続けるバグになる。
+    // 浮上開始(true)のみポーズ/ミス/クリア中を無視する。
+    if (active && (this.isCleared || this.isPaused || this.missOverlayTimer > 0 || this.hitStopTimer > 0)) return
     this.thrustHeld = active
   }
 
@@ -409,7 +412,7 @@ export class GameEngine {
   }
 
   private get effectiveSpeed(): number {
-    if (this.revivalTimer > 0) return SPEED_START
+    if (this.revivalTimer > 0) return this.isBio ? BIO_SPEED_START : SPEED_START
     // デバッグモード中（電子情報）はスクロール加速＝タイム短縮ボーナス
     return this.debugMode > 0 ? this.currentSpeed * DEBUG_SPEED_MULT : this.currentSpeed
   }
@@ -480,6 +483,9 @@ export class GameEngine {
     this.hitStopTimer     = HIT_STOP_FRAMES
     this.missOverlayTimer = MISS_OVERLAY_FRAMES
     this.revivalTimer     = REVIVAL_FRAMES
+    // スイム（生物応用化学）は上下の慣性をリセットして復帰を安定させる
+    // （壁ヒットは updateBio 側で既に 0 にしているが、パイプ衝突経路もここで揃える）
+    if (this.isBio) this.pvy = 0
     playKnockback()
     this.burst(PLAYER_X, this.py - 20, '#ff8800', 10)
   }
