@@ -60,3 +60,7 @@ export const BIO_GAP         = 116             // パイプ縦隙間（プレイ
 export const BIO_PIPE_W      = 42
 export const BIO_SPEED_START = 6
 export const BIO_SPEED_END   = 10
+// 保護アイテム（バリア）：取ると1回だけ被弾（パイプ衝突）を無効化する。
+// [最小frames, ランダム幅frames]。約4〜9秒間隔。取り逃しても次が来るので出過ぎてOK。
+export const SHIELD_GAP: [number, number] = [240, 300]
+export const SHIELD_COLOR = '#5ffbf1'

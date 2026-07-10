@@ -13,11 +13,12 @@ import {
   COMBO_NEEDED, DEBUG_FRAMES, DEBUG_SPEED_MULT,
   STOMP_BOUNCE, STOMP_MARGIN, mallocSolid,
   SWIM_THRUST, SWIM_DRAG, SWIM_MAX_VY, BIO_WALL_KNOCKBACK, BIO_SPEED_START, BIO_SPEED_END,
+  SHIELD_GAP, SHIELD_COLOR,
 } from './constants'
 import type { PlayerState, Obstacle, TerrainSegment, Item, Particle } from './engine-types'
 import { overlaps, playerHitbox } from './helpers'
 import { drawObstacle } from './obstacle-drawers'
-import { drawBattery } from './item-renderer'
+import { drawBattery, drawShieldItem } from './item-renderer'
 import { drawBg, drawGround, type BgContext } from './background-renderers'
 import { drawPlayer } from './player-renderer'
 import { drawGoal } from './goal-renderer'
@@ -86,6 +87,8 @@ export class GameEngine {
   // 液体スイム（生物応用化学科 = departmentId 4 のみ稼働）
   private isBio = false
   private thrustHeld = false
+  private bioShield = false      // バリア保持中か（1回だけ被弾を無効化）
+  private nextShield = 150       // 次のバリアアイテム出現までのframe
 
   // Background scroll
   private bgX = 0
@@ -311,6 +314,15 @@ export class GameEngine {
       this.nextBattery = mn + Math.random() * r
     }
 
+    // バリアアイテムスポーン（生物応用化学科）：培養液中を浮遊。取ると1回被弾を無効化。
+    if (this.isBio && --this.nextShield <= 0) {
+      const nextStageX = this.stageProgress + CANVAS_W
+      const y = 55 + Math.random() * (CANVAS_H - 110) // 上下壁を避けた高さ
+      this.items.push({ stageX: nextStageX, x: CANVAS_W + 10, y, effect: 'shield', wobble: Math.random() * Math.PI * 2 })
+      const [mn, r] = SHIELD_GAP
+      this.nextShield = mn + Math.random() * r
+    }
+
     // オブジェクトのCanvas座標を更新・画面外を除去
     for (const o of this.obstacles) {
       o.x = this.toCanvasX(o.stageX)
@@ -344,6 +356,15 @@ export class GameEngine {
           }
           break
         }
+        // バリア（生物応用化学科）：保持中なら1回だけ被弾を無効化して通過。
+        // 消費して無敵フレームを付与し、当たったパイプをそのまま通り抜けられるようにする。
+        if (this.isBio && this.bioShield) {
+          this.bioShield = false
+          this.invincible = KNOCKBACK_INVINCIBLE
+          this.burst(PLAYER_X, this.py, SHIELD_COLOR, 18)
+          playJump()
+          break
+        }
         // 通常被弾：チャージ大幅減（電気電子）＋ノックバック
         if (this.isElec) this.charge = Math.max(0, this.charge - CHARGE_HIT_COST)
         this.knockback(KNOCKBACK_AMOUNT)
@@ -368,6 +389,19 @@ export class GameEngine {
         if (it.effect === 'charge' && overlaps(ph, { x: it.x - 11, y: it.y - 15, w: 22, h: 30 })) {
           this.charge = Math.min(CHARGE_MAX, this.charge + BATTERY_REFILL)
           this.burst(it.x, it.y, AREAS[2].coinColor, 8)
+          return false
+        }
+        return true
+      })
+    }
+
+    // バリア取得判定（生物応用化学科）：拾うとバリアを保持（1回被弾を無効化）
+    if (this.isBio && this.items.length) {
+      this.items = this.items.filter(it => {
+        if (it.effect === 'shield' && overlaps(ph, { x: it.x - 14, y: it.y - 14, w: 28, h: 28 })) {
+          this.bioShield = true
+          this.burst(it.x, it.y, SHIELD_COLOR, 12)
+          playJump()
           return false
         }
         return true
@@ -544,6 +578,7 @@ export class GameEngine {
 
     for (const it of this.items) {
       if (it.effect === 'charge') drawBattery(ctx, it, theme, this.frame)
+      else if (it.effect === 'shield') drawShieldItem(ctx, it, this.frame)
     }
 
     for (const p of this.particles) {
@@ -556,7 +591,7 @@ export class GameEngine {
     drawPlayer(ctx, theme.coinColor, {
       py: this.py, pState: this.pState, pvy: this.pvy,
       invincible: this.invincible, legPhase: this.legPhase,
-      shield: false, deathTimer: 0, frame: this.frame,
+      shield: this.isBio ? this.bioShield : false, deathTimer: 0, frame: this.frame,
       bio: this.isBio
     })
 

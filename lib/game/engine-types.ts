@@ -25,7 +25,7 @@ export type TerrainSegment =
 export interface Item {
   stageX: number
   x: number; y: number
-  effect: 'time_stop' | 'invincible' | 'charge'
+  effect: 'time_stop' | 'invincible' | 'charge' | 'shield'
   wobble: number
 }
 
