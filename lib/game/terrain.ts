@@ -7,7 +7,18 @@ export function buildStage(departmentId: number): TerrainSegment[] {
   if (departmentId === 2) return buildStageElec()
   if (departmentId === 3) return buildStageCode()
   if (departmentId === 4) return buildStageBio()
+  if (departmentId === 5) return buildStageMat()
   return buildStageDefault()
+}
+
+// 材料工学科専用地形：工程ごとに性質が変わる遊びに集中させるため、穴も段差も無い平坦。
+function buildStageMat(): TerrainSegment[] {
+  return [{
+    type: 'ground',
+    stageX: 0,
+    width: STAGE_LENGTH + CANVAS_W + 200,
+    groundY: DEFAULT_GROUND_Y,
+  }]
 }
 
 // 生物応用化学科（液体スイム）専用地形：地面・壁・穴すべてなし。全画面が液体。

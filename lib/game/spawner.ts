@@ -1,7 +1,10 @@
-import type { Obstacle } from './engine-types'
-import { CANVAS_W, DEFAULT_GROUND_Y, BIO_GAP, BIO_PIPE_W, CANVAS_H } from './constants'
+import type { Obstacle, Item } from './engine-types'
+import {
+  CANVAS_W, DEFAULT_GROUND_Y, BIO_GAP, BIO_PIPE_W, CANVAS_H,
+  ROLL_GAP, HEAT_GATE_OFFSET, HEAT_CHALLENGE_OFFSET, type MatPhase,
+} from './constants'
 
-type ObstacleInit = Pick<Obstacle, 'x' | 'y' | 'w' | 'h' | 'shape'> & Partial<Pick<Obstacle, 'moving' | 'phase' | 'baseY' | 'amplitude' | 'stompable'>>
+type ObstacleInit = Pick<Obstacle, 'x' | 'y' | 'w' | 'h' | 'shape'> & Partial<Pick<Obstacle, 'moving' | 'phase' | 'baseY' | 'amplitude' | 'stompable' | 'bendable' | 'breakable'>>
 
 // stageX は呼び出し側（engine.ts）が指定する
 function makeObstacle(stageX: number, o: ObstacleInit): Obstacle {
@@ -285,12 +288,72 @@ const dept5Spawners: SpawnFn[] = [
 ]
 const dept5Bag = new ShuffleBag(dept5Spawners)
 
+// 材料工学科・圧延区間：ローラー（上ロール）の下は薄板なら潜れる。跳ぶと上ロールにぶつかる。
+// 「跳ばずに潜る」と「地上のインゴットは跳ぶ」の読み分けが課題。
+function pushRoller(push: (o: ObstacleInit) => void, x: number, groundY: number) {
+  const h = 70
+  push({ x, y: groundY - ROLL_GAP - h, w: 54, h, shape: 'roller' })
+}
+const rollSpawners: SpawnFn[] = [
+  (push, groundY) => pushRoller(push, CANVAS_W + 10, groundY),
+  (push, groundY) => {
+    pushRoller(push, CANVAS_W + 10, groundY)
+    pushRoller(push, CANVAS_W + 130, groundY)
+  },
+  (push, groundY) => {
+    pushRoller(push, CANVAS_W + 10, groundY)
+    const h = 24 + Math.random() * 10
+    push({ x: CANVAS_W + 220, y: groundY - h, w: 48, h, shape: 'ingot' })
+  },
+  (push, groundY) => {
+    const h = 22 + Math.random() * 12
+    push({ x: CANVAS_W + 10, y: groundY - h, w: 46 + Math.random() * 20, h, shape: 'ingot' })
+  },
+  (push, groundY) => {
+    const h = 44 + Math.random() * 24
+    push({ x: CANVAS_W + 10, y: groundY - h, w: 24, h, shape: 'crystal' })
+  },
+]
+const rollBag = new ShuffleBag(rollSpawners)
+
+// 材料工学科：溶解・圧延区間の通常スポーン（熱処理区間は spawnHeatSet、検査区間は出さない）
+export function spawnMat(phase: MatPhase, stageX: number, obstacles: Obstacle[], groundY = DEFAULT_GROUND_Y) {
+  const push = (o: ObstacleInit) => obstacles.push(makeObstacle(stageX + (o.x - (CANVAS_W + 10)), o))
+  if (phase === 'melt') dept5Bag.next()(push, groundY)
+  else if (phase === 'roll') rollBag.next()(push, groundY)
+}
+
+// 材料工学科・熱処理区間：看板 → ゲート → 課題 を1画面内に固定配置で生成する。
+// flex: 🔥炉（空中・ジャンプで通過）→ しなる → 金色の板バネに当たってよい（曲がって戻り加速）
+// hard: 💧水槽（地上・走って通過）→ かたい → 結晶壁を砕ける
+// forced: 最初の1回だけ、炉を地上に置いて必ず通過させる（しなる体験のチュートリアル）
+export function spawnHeatSet(
+  stageX: number, kind: 'flex' | 'hard', forced: boolean,
+  obstacles: Obstacle[], items: Item[], groundY = DEFAULT_GROUND_Y,
+) {
+  const item = (dx: number, y: number, effect: Item['effect']) =>
+    items.push({ stageX: stageX + dx, x: CANVAS_W + 10, y, effect, wobble: 0 })
+  item(0, groundY - 46, kind === 'flex' ? 'sign_flex' : 'sign_hard')
+  if (kind === 'flex') {
+    item(HEAT_GATE_OFFSET, forced ? groundY - 60 : groundY - 104, 'furnace')
+    obstacles.push(makeObstacle(stageX + HEAT_CHALLENGE_OFFSET.flex, {
+      x: 0, y: groundY - 72, w: 40, h: 72, shape: 'leaf_spring', bendable: true,
+    }))
+  } else {
+    item(HEAT_GATE_OFFSET, groundY - 10, 'quench')
+    obstacles.push(makeObstacle(stageX + HEAT_CHALLENGE_OFFSET.hard, {
+      x: 0, y: groundY - 146, w: 36, h: 146, shape: 'brittle_crystal', breakable: true,
+    }))
+  }
+}
+
 export function resetSpawnerBags() {
   dept1Bag.reset()
   dept2Bag.reset()
   dept3RedBag.reset()
   dept4Bag.reset()
   dept5Bag.reset()
+  rollBag.reset()
   pipeBag.reset()
 }
 

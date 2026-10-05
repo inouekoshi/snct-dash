@@ -2,6 +2,7 @@ import type { AreaId } from './areas'
 import { AREAS, bioZone } from './areas'
 import type { TerrainSegment } from './engine-types'
 import { CANVAS_W, CANVAS_H, DEFAULT_GROUND_Y, PLAYER_X } from './constants'
+import { bgMat } from './mat-renderers'
 
 type Theme = typeof AREAS[AreaId]
 
@@ -25,7 +26,7 @@ export function drawBg(ctx: CanvasRenderingContext2D, area: AreaId, theme: Theme
     case 2: bgElec(ctx, theme, bg); break
     case 3: bgCode(ctx, theme, bg); break
     case 4: bgBio(ctx, theme, bg);  break
-    case 5: bgMat(ctx, theme, bg);  break
+    case 5: bgMat(ctx, theme, bg.bgX, bg.frame, bg.stageProgress ?? 0); break
   }
   ctx.restore()
 }
@@ -172,26 +173,6 @@ function bgBio(ctx: CanvasRenderingContext2D, theme: Theme, bg: BgContext) {
   ctx.stroke()
   
   ctx.setLineDash([]); ctx.shadowBlur = 0
-}
-
-function bgMat(ctx: CanvasRenderingContext2D, theme: Theme, bg: BgContext) {
-  ctx.strokeStyle = theme.groundLineColor; ctx.lineWidth = 1
-  const s = 40, ox = bg.bgX % (s * 2)
-  ctx.globalAlpha = 0.07
-  for (let x = ox; x < CANVAS_W + s; x += s) {
-    for (let y = 20; y < DEFAULT_GROUND_Y; y += s) {
-      ctx.beginPath()
-      ctx.moveTo(x, y)
-      ctx.lineTo(x + s, y + s * 0.5)
-      ctx.lineTo(x, y + s)
-      ctx.lineTo(x - s, y + s * 0.5)
-      ctx.closePath(); ctx.stroke()
-    }
-  }
-  const lv = ctx.createLinearGradient(0, DEFAULT_GROUND_Y - 20, 0, DEFAULT_GROUND_Y)
-  lv.addColorStop(0, 'transparent'); lv.addColorStop(1, theme.groundLineColor + '44')
-  ctx.globalAlpha = 0.6; ctx.fillStyle = lv; ctx.fillRect(0, DEFAULT_GROUND_Y - 20, CANVAS_W, 20)
-  ctx.globalAlpha = 1
 }
 
 // 地形セグメントに基づいて地面を描画する（穴の部分は描画しない）

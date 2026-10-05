@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import type { GameClearResult } from '@/lib/types'
 import { AREAS } from '@/lib/game/areas'
 import type { AreaId } from '@/lib/game/areas'
+import MatProductReveal from './MatProductReveal'
 
 function formatTime(ms: number): string {
   const m = Math.floor(ms / 60000)
@@ -83,6 +84,8 @@ export default function ResultModal({ nickname, result, onRetry, onHome, onLeade
         {submitting && <p className="text-gray-500 text-sm">登録中...</p>}
         {error && <p className="text-red-400 text-sm">{error}</p>}
       </div>
+
+      {result.departmentId === 5 && <MatProductReveal accent={theme.groundLineColor} />}
 
       <div className="flex flex-col gap-3 w-full max-w-xs">
         <button

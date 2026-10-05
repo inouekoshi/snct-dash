@@ -64,3 +64,50 @@ export const BIO_SPEED_END   = 10
 // [最小frames, ランダム幅frames]。約4〜9秒間隔。取り逃しても次が来るので出過ぎてOK。
 export const SHIELD_GAP: [number, number] = [240, 300]
 export const SHIELD_COLOR = '#5ffbf1'
+
+// 材料工学科（製品ができるまでラン）専用
+// 自分自身が材料になり「溶解 → 圧延 → 熱処理 → 検査」と加工されるたびに性質（物理）が変わる。
+// 区間境界は STAGE_LENGTH に対する比率で持つ（テスト時に STAGE_LENGTH を縮めても比率が保たれる）。
+export type MatPhase = 'melt' | 'roll' | 'heat' | 'inspect'
+export const MAT_PHASE_ORDER: MatPhase[] = ['melt', 'roll', 'heat', 'inspect']
+export const MAT_PHASE_START: Record<MatPhase, number> = {
+  melt:    0,
+  roll:    0.28,
+  heat:    0.56,
+  inspect: 0.955,
+}
+// 区間は保存せず stageProgress から毎回計算する（ノックバックで戻っても矛盾しない）
+export function matPhase(stageProgress: number): MatPhase {
+  const t = stageProgress / STAGE_LENGTH
+  if (t >= MAT_PHASE_START.inspect) return 'inspect'
+  if (t >= MAT_PHASE_START.heat) return 'heat'
+  if (t >= MAT_PHASE_START.roll) return 'roll'
+  return 'melt'
+}
+// 区間境界の stageX 一覧（工程ゲートの描画・安全区間の判定に使う）
+export function matBoundaries(): { x: number; phase: MatPhase }[] {
+  return MAT_PHASE_ORDER.slice(1).map(phase => ({ x: MAT_PHASE_START[phase] * STAGE_LENGTH, phase }))
+}
+// 区間ごとのプレイヤー当たり判定の高さ（通常は46）。液滴は丸く低め、薄板はぺたんこ。
+export const MAT_HITBOX_H: Record<MatPhase, number> = { melt: 34, roll: 22, heat: 40, inspect: 40 }
+export const MAT_SAFE_MARGIN   = 400    // 区間境界の前後この距離には障害物を出さない
+export const MELT_BOUNCE_VY    = -5.5   // 溶解（液滴）：着地のたびに小さく自動で弾む
+export const ROLL_GAP          = 26     // 圧延：ローラー下面と床のすき間（薄板22pxなら潜れる）
+// 熱処理：看板 → ゲート → 課題 のセット配置（セット先頭からの stageX オフセット）
+// 🔥炉は空中なのでジャンプで通過する。着地が板バネを飛び越えないよう、板バネは遠めに置く
+// （ジャンプの滞空は約41フレーム＝速度8〜15で330〜615px）。
+export const HEAT_GATE_OFFSET = 240
+export const HEAT_CHALLENGE_OFFSET: Record<'flex' | 'hard', number> = { flex: 820, hard: 520 }
+// セット先頭からこの距離で状態が通常に戻る（課題を越えた少し先）
+export const HEAT_STATE_SPAN: Record<'flex' | 'hard', number> = { flex: 1060, hard: 720 }
+export const HEAT_SET_GAP: [number, number] = [1250, 300]  // セット同士の間隔 [最小, ランダム幅]
+// 材料工学科の通常スポーン間隔 [最小frames, ランダム幅]。圧延はローラーの手前で必ず着地できるよう広め
+export const MAT_SPAWN_GAPS: Record<'melt' | 'roll', [number, number]> = { melt: [40, 26], roll: [58, 28] }
+export const MAT_BEND_FRAMES   = 18     // 板バネで曲がっている時間（0.3秒・この間は減速）
+export const MAT_BOOST_FRAMES  = 60     // 形が戻った反動の加速時間
+export const MAT_BOOST_MAX     = 1.4    // 加速倍率の上限（重ねがけしない）
+export const MAT_SLOW_FRAMES   = 60     // 結晶壁を砕かず迂回したときの減速（1秒）
+export const MAT_SLOW_MULT     = 0.6
+export const MAT_CUTIN_FRAMES  = 48     // 工程カットインの表示時間（0.8秒）
+export const MAT_FLEX_COLOR    = '#ff8a3d'
+export const MAT_HARD_COLOR    = '#7fd4ff'

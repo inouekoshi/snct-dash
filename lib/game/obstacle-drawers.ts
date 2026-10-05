@@ -3,6 +3,7 @@ import type { AreaId } from './areas'
 import { AREAS } from './areas'
 import { DEFAULT_GROUND_Y as GROUND_Y, mallocSolid } from './constants'
 import { rrect } from './helpers'
+import { dLeafSpring, dBrittleCrystal, dRoller } from './mat-renderers'
 
 type Theme = typeof AREAS[AreaId]
 export type ObstacleDrawFn = (ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme, frame: number) => void
@@ -963,6 +964,9 @@ export const OBSTACLE_DRAWERS: Record<Obstacle['shape'], ObstacleDrawFn> = {
   segfault: dSegfault,
   reagent_tube: dReagentTube,
   cell_wall: dCellWall,
+  leaf_spring: dLeafSpring,
+  brittle_crystal: dBrittleCrystal,
+  roller: dRoller,
 }
 
 export function drawObstacle(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme, frame: number) {

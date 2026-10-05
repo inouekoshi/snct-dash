@@ -20,6 +20,7 @@ export function hitCircle(box: Box, cx: number, cy: number, r: number): boolean 
   return (nx - cx) ** 2 + (ny - cy) ** 2 < r * r
 }
 
-export function playerHitbox(py: number): Box {
-  return { x: PLAYER_X - 12, y: py - 46, w: 24, h: 46 }
+// h は当たり判定の高さ。材料工学科だけ工程（液滴・薄板など）に応じて変える。
+export function playerHitbox(py: number, h = 46): Box {
+  return { x: PLAYER_X - 12, y: py - h, w: 24, h }
 }

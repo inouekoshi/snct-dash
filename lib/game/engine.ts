@@ -14,6 +14,10 @@ import {
   STOMP_BOUNCE, STOMP_MARGIN, mallocSolid,
   SWIM_THRUST, SWIM_DRAG, SWIM_MAX_VY, BIO_WALL_KNOCKBACK, BIO_SPEED_START, BIO_SPEED_END,
   SHIELD_GAP, SHIELD_COLOR,
+  matPhase, matBoundaries, MAT_PHASE_ORDER, MAT_PHASE_START, MAT_HITBOX_H, MAT_SAFE_MARGIN, MELT_BOUNCE_VY,
+  HEAT_GATE_OFFSET, HEAT_STATE_SPAN, HEAT_SET_GAP, MAT_SPAWN_GAPS,
+  MAT_BEND_FRAMES, MAT_BOOST_FRAMES, MAT_BOOST_MAX, MAT_SLOW_FRAMES, MAT_SLOW_MULT, MAT_CUTIN_FRAMES,
+  MAT_FLEX_COLOR, MAT_HARD_COLOR, type MatPhase,
 } from './constants'
 import type { PlayerState, Obstacle, TerrainSegment, Item, Particle } from './engine-types'
 import { overlaps, playerHitbox } from './helpers'
@@ -23,7 +27,8 @@ import { drawBg, drawGround, type BgContext } from './background-renderers'
 import { drawPlayer } from './player-renderer'
 import { drawGoal } from './goal-renderer'
 import { drawHUD, renderPauseOverlay, renderMissOverlay, renderRevivalHint } from './hud-renderer'
-import { spawnObstacle, spawnCeilingObstacle, spawnBug, spawnPipePair, resetSpawnerBags } from './spawner'
+import { spawnObstacle, spawnCeilingObstacle, spawnBug, spawnPipePair, resetSpawnerBags, spawnMat, spawnHeatSet } from './spawner'
+import { drawMatPlayer, drawMatItem, drawMatGround, drawMatHud, drawMatCutin, type MatState } from './mat-renderers'
 import { buildStage } from './terrain'
 
 export class GameEngine {
@@ -90,6 +95,22 @@ export class GameEngine {
   private bioShield = false      // バリア保持中か（1回だけ被弾を無効化）
   private nextShield = 150       // 次のバリアアイテム出現までのframe
 
+  // 製品ができるまでラン（材料工学科 = departmentId 5 のみ稼働）
+  private isMat = false
+  private matState: MatState = 'normal'
+  private matStateUntilX = 0       // この stageX を過ぎたら状態が通常に戻る
+  private nextHeatSetX = 0         // 次の熱処理セットの先頭 stageX
+  private heatSetCount = 0
+  private bendTimer = 0            // 板バネで曲がっている残りフレーム（減速）
+  private boostTimer = 0           // 形が戻った反動の加速の残りフレーム
+  private boostMult = 1
+  private matSlowTimer = 0         // 結晶壁を迂回したときの減速の残りフレーム
+  private maxMatPhaseIdx = -1      // 到達した最も先の工程（カットインは初到達時のみ）
+  private lastHeatKind: 'flex' | 'hard' | null = null
+  private heatKindStreak = 0
+  private cutinTimer = 0
+  private cutinPhase: MatPhase = 'melt'
+
   // Background scroll
   private bgX = 0
 
@@ -106,6 +127,8 @@ export class GameEngine {
     this.isElec = departmentId === 2
     this.isCode = departmentId === 3
     this.isBio = departmentId === 4
+    this.isMat = departmentId === 5
+    this.nextHeatSetX = MAT_PHASE_START.heat * STAGE_LENGTH + MAT_SAFE_MARGIN
     if (this.isBio) {
       this.py = CANVAS_H / 2
     }
@@ -204,6 +227,8 @@ export class GameEngine {
         if (this.pState === 'jumping' || this.pState === 'falling') this.pState = 'running'
         this.coyoteTime = COYOTE_FRAMES
         if (this.jumpBuffer > 0) { this.jumpBuffer = 0; this.performJump() }
+        // 溶解（材料工学科）：液滴は着地のたびに小さく自動で弾む。ジャンプ回数は消費しない
+        else if (this.isMat && matPhase(this.stageProgress) === 'melt') this.pvy = MELT_BOUNCE_VY
       } else {
         if (this.coyoteTime > 0) this.coyoteTime--
         if (this.jumpBuffer > 0) this.jumpBuffer--
@@ -252,6 +277,8 @@ export class GameEngine {
       if (this.debugMode > 0) this.debugMode--
     }
 
+    if (this.isMat) this.updateMat()
+
     // ゴール直前スパーク
     if (!this.isCleared && STAGE_LENGTH - this.stageProgress <= 60 && this.frame % 4 === 0) {
       const goalTheme = AREAS[this.departmentId as AreaId]
@@ -284,18 +311,25 @@ export class GameEngine {
       const nextStageX = this.stageProgress + CANVAS_W
       if (this.isBio) {
         spawnPipePair(nextStageX, this.obstacles, bioZone(this.stageProgress))
+      } else if (this.isMat) {
+        const ph = matPhase(nextStageX)
+        if ((ph === 'melt' || ph === 'roll') && this.isMatSafeToSpawn(nextStageX, 260)) {
+          spawnMat(ph, nextStageX, this.obstacles, this.getGroundHeightAt(nextStageX))
+        }
       } else {
         if (this.hasGroundAt(nextStageX) && this.hasGroundAt(nextStageX + 65) && this.hasGroundAt(nextStageX + 130)
             && this.isFlatAt(nextStageX, 130)) {
           spawnObstacle(this.departmentId, nextStageX, this.obstacles, this.getGroundHeightAt(nextStageX))
         }
       }
-      const [mn, r] = SPAWN_GAPS[this.departmentId] ?? SPAWN_GAPS[1]
+      const [mn, r] = this.isMat
+        ? MAT_SPAWN_GAPS[matPhase(this.stageProgress) === 'roll' ? 'roll' : 'melt']
+        : SPAWN_GAPS[this.departmentId] ?? SPAWN_GAPS[1]
       this.nextObs = mn + Math.random() * r
       this.nextCeilingObs = Math.max(this.nextCeilingObs, CEIL_GROUND_GAP)
       if (this.isCode) this.nextBug = Math.max(this.nextBug, 25) // 重ならないようにバグをずらす
     }
-    if (!this.isBio && this.departmentId >= 2 && --this.nextCeilingObs <= 0) {
+    if (!this.isBio && !this.isMat && this.departmentId >= 2 && --this.nextCeilingObs <= 0) {
       const nextStageX = this.stageProgress + CANVAS_W
       spawnCeilingObstacle(nextStageX, this.obstacles)
       const base = Math.max(100, 260 - this.departmentId * 25)
@@ -339,9 +373,10 @@ export class GameEngine {
     })
 
     // 衝突判定
-    const ph = playerHitbox(this.py)
+    const ph = this.isMat ? playerHitbox(this.py, MAT_HITBOX_H[matPhase(this.stageProgress)]) : playerHitbox(this.py)
     if (this.invincible === 0 && this.debugMode === 0) {
       for (const o of this.obstacles) {
+        if (o.spent) continue
         if (!overlaps(ph, { x: o.x + 4, y: o.y + 4, w: o.w - 8, h: o.h - 8 })) continue
         // malloc/free 点滅ゲート：free（消滅）期間は当たり判定なし＝すり抜け
         if (o.shape === 'malloc_free' && !mallocSolid(o.phase, this.frame)) continue
@@ -355,6 +390,19 @@ export class GameEngine {
             this.burst(o.x + o.w / 2, o.y + o.h / 2, '#555555', 5)
           }
           break
+        }
+        // しなる（材料工学科）：板バネに当たると曲がって、形が戻る反動で前へ加速する
+        if (this.isMat && o.bendable && this.matState === 'flex') {
+          this.bendSpring(o)
+          continue
+        }
+        // かたい（材料工学科）：もろい結晶壁を砕いて通過する（加速はしない）
+        if (this.isMat && o.breakable && this.matState === 'hard') {
+          this.obstacles = this.obstacles.filter(x => x !== o)
+          this.burst(o.x + o.w / 2, o.y + o.h / 2, '#ff7aff', 16)
+          this.burst(o.x + o.w / 2, o.y + o.h * 0.2, MAT_HARD_COLOR, 8)
+          playKnockback()
+          continue
         }
         // バリア（生物応用化学科）：保持中なら1回だけ被弾を無効化して通過。
         // 消費して無敵フレームを付与し、当たったパイプをそのまま通り抜けられるようにする。
@@ -392,6 +440,22 @@ export class GameEngine {
           return false
         }
         return true
+      })
+    }
+
+    // 熱処理ゲート（材料工学科）：🔥炉で「しなる」、💧水槽で「かたい」になる
+    if (this.isMat && this.items.length) {
+      this.items = this.items.filter(it => {
+        const box = it.effect === 'furnace' ? { x: it.x - 22, y: it.y - 28, w: 44, h: 56 }
+          : it.effect === 'quench' ? { x: it.x - 42, y: it.y - 14, w: 84, h: 26 }
+          : null
+        if (!box || !overlaps(ph, box)) return true
+        const kind = it.effect === 'furnace' ? 'flex' : 'hard'
+        this.matState = kind
+        this.matStateUntilX = it.stageX - HEAT_GATE_OFFSET + HEAT_STATE_SPAN[kind]
+        this.burst(it.x, it.y, it.effect === 'furnace' ? MAT_FLEX_COLOR : MAT_HARD_COLOR, 16)
+        playJump()
+        return false
       })
     }
 
@@ -447,8 +511,79 @@ export class GameEngine {
 
   private get effectiveSpeed(): number {
     if (this.revivalTimer > 0) return this.isBio ? BIO_SPEED_START : SPEED_START
+    // 材料工学科：板バネで曲がっている間は減速 → 形が戻ると加速。結晶壁の迂回は減速。
+    if (this.isMat) {
+      let s = this.currentSpeed
+      if (this.bendTimer > 0) s *= 0.6
+      else if (this.boostTimer > 0) s *= this.boostMult
+      if (this.matSlowTimer > 0) s *= MAT_SLOW_MULT
+      return s
+    }
     // デバッグモード中（電子情報）はスクロール加速＝タイム短縮ボーナス
     return this.debugMode > 0 ? this.currentSpeed * DEBUG_SPEED_MULT : this.currentSpeed
+  }
+
+  // 材料工学科：毎フレームの工程・状態・タイマー処理と、熱処理セットのスポーン
+  private updateMat() {
+    const phase = matPhase(this.stageProgress)
+    const idx = MAT_PHASE_ORDER.indexOf(phase)
+    // 工程カットイン：初めてその工程に入ったときだけ（ノックバックで戻って再突入しても出さない）
+    if (idx > this.maxMatPhaseIdx) {
+      this.maxMatPhaseIdx = idx
+      this.cutinPhase = phase
+      this.cutinTimer = MAT_CUTIN_FRAMES
+      if (idx > 0) this.burst(PLAYER_X, this.py - 20, AREAS[5].groundLineColor, 14)
+    }
+    if (this.cutinTimer > 0) this.cutinTimer--
+
+    // 熱処理の状態はセットを抜けたら通常に戻る（stageX 基準なので速度が変わってもずれない）
+    if (this.matState !== 'normal' && this.stageProgress > this.matStateUntilX) this.matState = 'normal'
+
+    if (this.bendTimer > 0 && --this.bendTimer === 0) this.boostTimer = MAT_BOOST_FRAMES
+    else if (this.boostTimer > 0) this.boostTimer--
+    if (this.matSlowTimer > 0) this.matSlowTimer--
+
+    for (const o of this.obstacles) {
+      if (o.bend) o.bend = Math.max(0, o.bend - 1 / MAT_BEND_FRAMES)
+      // 結晶壁を砕かずに越えた（迂回した）→ 着地先の減速
+      if (o.breakable && !o.spent && o.x + o.w < PLAYER_X - 12) {
+        o.spent = true
+        this.matSlowTimer = MAT_SLOW_FRAMES
+      }
+    }
+
+    // 熱処理セット：看板 → ゲート → 課題。最初の1回は炉を地上に置いて「しなる」を必ず体験させる
+    const heatEnd = MAT_PHASE_START.inspect * STAGE_LENGTH - MAT_SAFE_MARGIN
+    if (this.stageProgress + CANVAS_W >= this.nextHeatSetX && this.nextHeatSetX + HEAT_STATE_SPAN.flex < heatEnd) {
+      const forced = this.heatSetCount === 0
+      let kind: 'flex' | 'hard' = forced ? 'flex' : Math.random() < 0.5 ? 'flex' : 'hard'
+      if (!forced && kind === this.lastHeatKind && this.heatKindStreak >= 2) kind = kind === 'flex' ? 'hard' : 'flex'
+      this.heatKindStreak = kind === this.lastHeatKind ? this.heatKindStreak + 1 : 1
+      this.lastHeatKind = kind
+      spawnHeatSet(this.nextHeatSetX, kind, forced, this.obstacles, this.items, this.getGroundHeightAt(this.nextHeatSetX))
+      this.heatSetCount++
+      const [mn, r] = HEAT_SET_GAP
+      this.nextHeatSetX += mn + Math.random() * r
+    }
+  }
+
+  // 材料工学科：区間境界の前後（安全区間）にかからないか
+  private isMatSafeToSpawn(stageX: number, width: number): boolean {
+    for (const b of matBoundaries()) {
+      if (stageX + width > b.x - MAT_SAFE_MARGIN && stageX < b.x + MAT_SAFE_MARGIN) return false
+    }
+    return true
+  }
+
+  // しなる（材料工学科）：板バネを曲げる。上から勢いよく当たるほど、形が戻ったときの加速が大きい
+  private bendSpring(o: Obstacle) {
+    o.spent = true
+    o.bend = 1
+    this.bendTimer = MAT_BEND_FRAMES
+    this.boostTimer = 0
+    this.boostMult = Math.min(MAT_BOOST_MAX, 1.15 + Math.abs(this.pvy) * 0.02)
+    this.burst(o.x + o.w / 2, o.y + 10, '#ffd34d', 12)
+    playJump()
   }
 
   // stageProgress基準のCanvas X座標変換
@@ -520,6 +655,8 @@ export class GameEngine {
     // スイム（生物応用化学）は上下の慣性をリセットして復帰を安定させる
     // （壁ヒットは updateBio 側で既に 0 にしているが、パイプ衝突経路もここで揃える）
     if (this.isBio) this.pvy = 0
+    // 材料工学科：曲げ・加速・減速の途中状態は持ち越さない
+    this.bendTimer = 0; this.boostTimer = 0; this.matSlowTimer = 0
     playKnockback()
     this.burst(PLAYER_X, this.py - 20, '#ff8800', 10)
   }
@@ -569,7 +706,9 @@ export class GameEngine {
     ctx.save()
 
     drawBg(ctx, this.departmentId as AreaId, theme, bg)
-    if (!this.isBio) {
+    if (this.isMat) {
+      drawMatGround(ctx, theme, this.stageProgress)
+    } else if (!this.isBio) {
       drawGround(ctx, theme, bg, this.terrain, this.stageProgress)
     }
     drawGoal(ctx, this.departmentId as AreaId, theme, this.stageProgress, this.frame)
@@ -579,6 +718,7 @@ export class GameEngine {
     for (const it of this.items) {
       if (it.effect === 'charge') drawBattery(ctx, it, theme, this.frame)
       else if (it.effect === 'shield') drawShieldItem(ctx, it, this.frame)
+      else drawMatItem(ctx, it, this.frame)
     }
 
     for (const p of this.particles) {
@@ -588,12 +728,19 @@ export class GameEngine {
     }
     ctx.globalAlpha = 1
 
-    drawPlayer(ctx, theme.coinColor, {
-      py: this.py, pState: this.pState, pvy: this.pvy,
-      invincible: this.invincible, legPhase: this.legPhase,
-      shield: this.isBio ? this.bioShield : false, deathTimer: 0, frame: this.frame,
-      bio: this.isBio
-    })
+    if (this.isMat) {
+      drawMatPlayer(ctx, {
+        py: this.py, pvy: this.pvy, phase: matPhase(this.stageProgress), state: this.matState,
+        invincible: this.invincible, bendTimer: this.bendTimer, frame: this.frame,
+      })
+    } else {
+      drawPlayer(ctx, theme.coinColor, {
+        py: this.py, pState: this.pState, pvy: this.pvy,
+        invincible: this.invincible, legPhase: this.legPhase,
+        shield: this.isBio ? this.bioShield : false, deathTimer: 0, frame: this.frame,
+        bio: this.isBio
+      })
+    }
 
     drawHUD(ctx, theme, {
       elapsedMs: this.elapsedMs,
@@ -606,6 +753,11 @@ export class GameEngine {
       comboNeeded: this.isCode ? COMBO_NEEDED : undefined,
       debugMode: this.isCode ? this.debugMode : undefined,
     })
+
+    if (this.isMat) {
+      drawMatHud(ctx, theme, matPhase(this.stageProgress), this.matSlowTimer > 0)
+      if (this.cutinTimer > 0) drawMatCutin(ctx, theme, this.cutinPhase, this.cutinTimer, MAT_CUTIN_FRAMES)
+    }
 
     if (this.missOverlayTimer > 0) {
       renderMissOverlay(ctx, theme, this.missProgressLost, this.missOverlayTimer, MISS_OVERLAY_FRAMES)
