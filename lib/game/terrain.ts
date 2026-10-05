@@ -2,83 +2,23 @@ import type { TerrainSegment } from './engine-types'
 import { STAGE_LENGTH, CANVAS_W, DEFAULT_GROUND_Y } from './constants'
 
 // ステージ開始時に全地形を一括生成する。
+// 段差（山登り階段）があるのは機械工学科だけ。生物応化は地面なし、それ以外は平坦。
+// 穴（type: 'hole'）は engine 側に落下フローとして残しているが、現在どの学科も使っていない。
 export function buildStage(departmentId: number): TerrainSegment[] {
   if (departmentId === 1) return buildStageMech()
-  if (departmentId === 2) return buildStageElec()
-  if (departmentId === 3) return buildStageCode()
-  if (departmentId === 4) return buildStageBio()
-  if (departmentId === 5) return buildStageMat()
-  return buildStageDefault()
+  if (departmentId === 4) return []  // 生物応用化学科（液体スイム）：地面・壁・穴すべてなし
+  return buildStageFlat()
 }
 
-// 材料工学科専用地形：工程ごとに性質が変わる遊びに集中させるため、穴も段差も無い平坦。
-function buildStageMat(): TerrainSegment[] {
+// 電気電子（充電維持）・電子情報（踏みつけ）・材料（工程ごとの性質変化）は、
+// それぞれの固有ギミックに集中させるため穴も段差も無い完全な平坦にする。
+function buildStageFlat(): TerrainSegment[] {
   return [{
     type: 'ground',
     stageX: 0,
     width: STAGE_LENGTH + CANVAS_W + 200,
     groundY: DEFAULT_GROUND_Y,
   }]
-}
-
-// 生物応用化学科（液体スイム）専用地形：地面・壁・穴すべてなし。全画面が液体。
-function buildStageBio(): TerrainSegment[] {
-  return []
-}
-
-// 電子情報工学科専用地形：踏みつけのテンポと公平性を優先し、穴も段差も無い平坦。
-// 踏み損ね＋穴落下の二重ミスを避け、「踏む／壁を越える」に集中させる。
-function buildStageCode(): TerrainSegment[] {
-  return [{
-    type: 'ground',
-    stageX: 0,
-    width: STAGE_LENGTH + CANVAS_W + 200,
-    groundY: DEFAULT_GROUND_Y,
-  }]
-}
-
-// 電気電子工学科専用地形：穴も段差も無い完全な平坦。
-// プレイヤーは「充電維持＋障害物回避」に集中する。機械工学科の山登り階段とも差別化。
-function buildStageElec(): TerrainSegment[] {
-  return [{
-    type: 'ground',
-    stageX: 0,
-    width: STAGE_LENGTH + CANVAS_W + 200,
-    groundY: DEFAULT_GROUND_Y,
-  }]
-}
-
-function buildStageDefault(): TerrainSegment[] {
-  const segments: TerrainSegment[] = []
-  let cursor = 0
-
-  segments.push({ type: 'ground', stageX: 0, width: 500, groundY: DEFAULT_GROUND_Y })
-  cursor = 500
-
-  const SAFE_ZONE_END = STAGE_LENGTH - 600
-
-  while (cursor < SAFE_ZONE_END) {
-    const groundWidth = 200 + Math.random() * 250
-    segments.push({ type: 'ground', stageX: cursor, width: groundWidth, groundY: DEFAULT_GROUND_Y })
-    cursor += groundWidth
-
-    if (cursor >= SAFE_ZONE_END) break
-
-    if (Math.random() < 0.4) {
-      const holeWidth = 100 + Math.random() * 80
-      segments.push({ type: 'hole', stageX: cursor, width: holeWidth })
-      cursor += holeWidth
-    }
-  }
-
-  segments.push({
-    type: 'ground',
-    stageX: cursor,
-    width: STAGE_LENGTH + CANVAS_W - cursor + 200,
-    groundY: DEFAULT_GROUND_Y,
-  })
-
-  return segments
 }
 
 // 機械工学科専用地形：穴は無し。段差を積み上げた「山登り」階段で差別化

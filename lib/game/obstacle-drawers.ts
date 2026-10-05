@@ -8,42 +8,6 @@ import { dLeafSpring, dBrittleCrystal, dRoller } from './mat-renderers'
 type Theme = typeof AREAS[AreaId]
 export type ObstacleDrawFn = (ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme, frame: number) => void
 
-function dGear(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme) {
-  rrect(ctx, o.x, o.y, o.w, o.h, 3); ctx.fill()
-  rrect(ctx, o.x, o.y, o.w, o.h, 3); ctx.stroke()
-  for (let tx = o.x + 3; tx < o.x + o.w - 3; tx += 10) { ctx.fillRect(tx, o.y - 6, 5, 6) }
-  ctx.beginPath(); ctx.arc(o.x + o.w / 2, o.y + o.h / 2, o.w / 4, 0, Math.PI * 2); ctx.strokeStyle = theme.obstacleStroke; ctx.stroke()
-}
-
-function dBolt(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme) {
-  const cx = o.x + o.w / 2
-  const hh = Math.min(o.h * 0.3, 14)
-  ctx.beginPath()
-  ctx.moveTo(o.x + 3, o.y); ctx.lineTo(o.x + o.w - 3, o.y)
-  ctx.lineTo(o.x + o.w, o.y + hh * 0.5); ctx.lineTo(o.x + o.w - 3, o.y + hh)
-  ctx.lineTo(o.x + 3, o.y + hh); ctx.lineTo(o.x, o.y + hh * 0.5)
-  ctx.closePath(); ctx.fill(); ctx.stroke()
-  const sw = o.w * 0.42
-  ctx.fillRect(cx - sw / 2, o.y + hh, sw, o.h - hh)
-  ctx.strokeRect(cx - sw / 2, o.y + hh, sw, o.h - hh)
-  ctx.strokeStyle = theme.obstacleStroke + '66'; ctx.lineWidth = 1
-  for (let sy = o.y + hh + 4; sy < o.y + o.h - 3; sy += 5) {
-    ctx.beginPath(); ctx.moveTo(cx - sw / 2, sy); ctx.lineTo(cx + sw / 2, sy); ctx.stroke()
-  }
-}
-
-function dPiston(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme) {
-  const cx = o.x + o.w / 2
-  const headH = o.h * 0.28, rodH = o.h * 0.22
-  const cylY = o.y + headH + rodH
-  ctx.fillRect(o.x - 3, o.y, o.w + 6, headH); ctx.strokeRect(o.x - 3, o.y, o.w + 6, headH)
-  ctx.fillRect(cx - 4, o.y + headH, 8, rodH); ctx.strokeRect(cx - 4, o.y + headH, 8, rodH)
-  ctx.fillRect(o.x + 2, cylY, o.w - 4, o.y + o.h - cylY)
-  ctx.strokeRect(o.x + 2, cylY, o.w - 4, o.y + o.h - cylY)
-  ctx.fillStyle = theme.obstacleStroke + '33'
-  ctx.fillRect(o.x + 5, cylY + 3, 4, o.y + o.h - cylY - 6)
-}
-
 function dCircuit(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme) {
   rrect(ctx, o.x, o.y, o.w, o.h, 3); ctx.fill()
   rrect(ctx, o.x, o.y, o.w, o.h, 3); ctx.stroke()
@@ -133,89 +97,6 @@ function dBug(ctx: CanvasRenderingContext2D, o: Obstacle, _theme: Theme, frame: 
   ctx.shadowColor = '#3dff7e'; ctx.shadowBlur = 6
   ctx.beginPath(); ctx.moveTo(cx - 6, ay); ctx.lineTo(cx + 6, ay); ctx.lineTo(cx, ay + 8); ctx.closePath(); ctx.fill()
   ctx.shadowBlur = 0; ctx.globalAlpha = 1
-}
-
-function dMonitor(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme, frame: number) {
-  const cx = o.x + o.w / 2
-  const screenH = o.h * 0.72
-  rrect(ctx, o.x, o.y, o.w, screenH, 3); ctx.fill(); ctx.stroke()
-  ctx.fillStyle = '#001122'
-  rrect(ctx, o.x + 3, o.y + 3, o.w - 6, screenH - 6, 2); ctx.fill()
-  ctx.fillStyle = '#00ff44'
-  ctx.font = `bold ${Math.max(8, Math.floor(o.w * 0.18))}px monospace`
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-  ctx.globalAlpha = 0.6 + Math.sin(frame * 0.14) * 0.4
-  ctx.fillText('ERROR', cx, o.y + screenH * 0.5)
-  ctx.globalAlpha = 1
-  ctx.fillStyle = theme.obstacleColor
-  ctx.fillRect(cx - o.w * 0.12, o.y + screenH, o.w * 0.24, o.h - screenH)
-  ctx.strokeRect(cx - o.w * 0.12, o.y + screenH, o.w * 0.24, o.h - screenH)
-}
-
-function dChip(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme) {
-  const pw = 5, pinH = 6, pinGap = 10
-  const pins = Math.max(2, Math.floor((o.h - 10) / pinGap))
-  const bodyX = o.x + pw + 3, bodyW = o.w - (pw + 3) * 2
-  for (let i = 0; i < pins; i++) {
-    const py = o.y + 5 + i * pinGap
-    ctx.fillRect(o.x, py, pw, pinH); ctx.strokeRect(o.x, py, pw, pinH)
-    ctx.fillRect(o.x + o.w - pw, py, pw, pinH); ctx.strokeRect(o.x + o.w - pw, py, pw, pinH)
-  }
-  rrect(ctx, bodyX, o.y, bodyW, o.h, 2); ctx.fill(); ctx.stroke()
-  ctx.fillStyle = '#001133'
-  ctx.beginPath(); ctx.arc(bodyX + 8, o.y + 8, 4, 0, Math.PI * 2); ctx.fill()
-  ctx.strokeStyle = theme.obstacleStroke + '44'; ctx.lineWidth = 1
-  ctx.beginPath(); ctx.moveTo(bodyX + 4, o.y + o.h * 0.44); ctx.lineTo(bodyX + bodyW - 4, o.y + o.h * 0.44); ctx.stroke()
-  ctx.beginPath(); ctx.moveTo(bodyX + 4, o.y + o.h * 0.66); ctx.lineTo(bodyX + bodyW - 4, o.y + o.h * 0.66); ctx.stroke()
-}
-
-function dBacteria(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme, frame: number) {
-  const cx = o.x + o.w / 2, cy = o.y + o.h / 2, rx = o.w / 2, ry = o.h / 2
-  const wb = Math.sin(frame * 0.08) * 2.5
-  ctx.beginPath(); ctx.ellipse(cx, cy, rx + wb * 0.5, ry - wb * 0.5, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke()
-  ctx.strokeStyle = theme.obstacleStroke + '88'; ctx.lineWidth = 1.5
-  for (let i = 0; i < 4; i++) {
-    const a = i / 4 * Math.PI * 2 + frame * 0.03
-    ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * rx, cy + Math.sin(a) * ry); ctx.lineTo(cx + Math.cos(a) * (rx + 10), cy + Math.sin(a) * (ry + 10)); ctx.stroke()
-  }
-}
-
-function dFlask(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme) {
-  const cx = o.x + o.w / 2
-  const neckH = o.h * 0.32, nw = o.w * 0.32
-  ctx.beginPath()
-  ctx.moveTo(cx - nw / 2, o.y); ctx.lineTo(cx + nw / 2, o.y)
-  ctx.lineTo(cx + nw / 2, o.y + neckH); ctx.lineTo(o.x + o.w, o.y + o.h)
-  ctx.lineTo(o.x, o.y + o.h); ctx.lineTo(cx - nw / 2, o.y + neckH)
-  ctx.closePath(); ctx.fill(); ctx.stroke()
-  const liqRatio = 0.42
-  const liqTop = o.y + neckH + (o.h - neckH) * liqRatio
-  const liqW = liqRatio * o.w
-  ctx.fillStyle = theme.groundLineColor + '50'
-  ctx.beginPath()
-  ctx.moveTo(cx - liqW / 2, liqTop); ctx.lineTo(cx + liqW / 2, liqTop)
-  ctx.lineTo(o.x + o.w, o.y + o.h); ctx.lineTo(o.x, o.y + o.h)
-  ctx.closePath(); ctx.fill()
-  ctx.fillStyle = theme.obstacleStroke
-  ctx.fillRect(cx - nw / 2 - 2, o.y - 5, nw + 4, 6); ctx.strokeRect(cx - nw / 2 - 2, o.y - 5, nw + 4, 6)
-}
-
-function dMushroom(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme) {
-  const cx = o.x + o.w / 2
-  const stemH = o.h * 0.4, stemW = o.w * 0.36
-  const capY = o.y + o.h - stemH - 6
-  ctx.fillRect(cx - stemW / 2, o.y + o.h - stemH, stemW, stemH)
-  ctx.strokeRect(cx - stemW / 2, o.y + o.h - stemH, stemW, stemH)
-  ctx.beginPath()
-  ctx.arc(cx, capY, o.w / 2, Math.PI, 0)
-  ctx.lineTo(o.x + o.w, capY + 10)
-  ctx.quadraticCurveTo(cx + o.w * 0.14, capY + 18, cx, capY + 13)
-  ctx.quadraticCurveTo(cx - o.w * 0.14, capY + 18, o.x, capY + 10)
-  ctx.closePath(); ctx.fill(); ctx.stroke()
-  ctx.fillStyle = theme.obstacleStroke + '55'
-  ctx.beginPath(); ctx.arc(cx - o.w * 0.2, capY - o.h * 0.1, o.w * 0.1, 0, Math.PI * 2); ctx.fill()
-  ctx.beginPath(); ctx.arc(cx + o.w * 0.2, capY - o.h * 0.08, o.w * 0.08, 0, Math.PI * 2); ctx.fill()
-  ctx.beginPath(); ctx.arc(cx, capY - o.h * 0.22, o.w * 0.09, 0, Math.PI * 2); ctx.fill()
 }
 
 function dCrystal(ctx: CanvasRenderingContext2D, o: Obstacle) {
@@ -602,80 +483,6 @@ function dPylon(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme, frame:
 
 // ── 電子情報工学科の追加障害物 ───────────────────────────────────────────────
 
-// ウイルス：踏める敵。トゲ付きの球体＋怒り目。サイバー色。
-function dVirus(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme, frame: number) {
-  const cx = o.x + o.w / 2, cy = o.y + o.h / 2
-  const r = Math.min(o.w, o.h) / 2 - 4
-  // トゲ
-  ctx.strokeStyle = theme.obstacleStroke; ctx.lineWidth = 2
-  const spikes = 8
-  for (let i = 0; i < spikes; i++) {
-    const a = (i / spikes) * Math.PI * 2 + frame * 0.02
-    ctx.beginPath()
-    ctx.moveTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r)
-    ctx.lineTo(cx + Math.cos(a) * (r + 5), cy + Math.sin(a) * (r + 5))
-    ctx.stroke()
-  }
-  // 本体
-  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke()
-  // 目（×まなこ）
-  ctx.strokeStyle = '#ff4466'; ctx.lineWidth = 2
-  const es = r * 0.22
-  for (const ox of [-r * 0.34, r * 0.34]) {
-    const ex = cx + ox, ey = cy - r * 0.1
-    ctx.beginPath(); ctx.moveTo(ex - es, ey - es); ctx.lineTo(ex + es, ey + es)
-    ctx.moveTo(ex + es, ey - es); ctx.lineTo(ex - es, ey + es); ctx.stroke()
-  }
-  // 口
-  ctx.beginPath(); ctx.arc(cx, cy + r * 0.35, r * 0.3, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke()
-}
-
-// グリッチ：踏める敵。RGBずれと走査線で点滅する四角。
-function dGlitch(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme, frame: number) {
-  const shift = Math.sin(frame * 0.5) * 3
-  // RGBずれ（赤シアンのゴースト）
-  ctx.globalAlpha = 0.5
-  ctx.fillStyle = '#ff2266'
-  ctx.fillRect(o.x - shift, o.y, o.w, o.h)
-  ctx.fillStyle = '#22ffee'
-  ctx.fillRect(o.x + shift, o.y, o.w, o.h)
-  ctx.globalAlpha = 1
-  // 本体
-  ctx.fillStyle = theme.obstacleColor
-  rrect(ctx, o.x, o.y, o.w, o.h, 2); ctx.fill(); ctx.stroke()
-  // 走査線
-  ctx.strokeStyle = theme.obstacleStroke + '88'; ctx.lineWidth = 1
-  for (let sy = o.y + 3; sy < o.y + o.h - 2; sy += 5) {
-    ctx.beginPath(); ctx.moveTo(o.x + 2, sy); ctx.lineTo(o.x + o.w - 2, sy); ctx.stroke()
-  }
-  // ランダムにずれるブロック
-  if (Math.floor(frame * 0.2) % 3 === 0) {
-    ctx.fillStyle = theme.obstacleStroke
-    ctx.fillRect(o.x + 4, o.y + o.h * 0.4, o.w * 0.5, 4)
-  }
-}
-
-
-// データブロック：踏めない壁。0/1が縦に流れるソリッドなブロック。
-function dDataBlock(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme, frame: number) {
-  rrect(ctx, o.x, o.y, o.w, o.h, 3); ctx.fill(); ctx.stroke()
-  ctx.save()
-  ctx.beginPath(); ctx.rect(o.x + 2, o.y + 2, o.w - 4, o.h - 4); ctx.clip()
-  ctx.fillStyle = theme.groundLineColor
-  ctx.font = '10px monospace'; ctx.textAlign = 'center'
-  const cols = Math.max(1, Math.floor(o.w / 12))
-  for (let c = 0; c < cols; c++) {
-    const colX = o.x + (c + 0.5) * (o.w / cols)
-    for (let r = 0; r < Math.ceil(o.h / 12) + 1; r++) {
-      const drop = (frame * 0.8 + c * 17 + r * 12) % (o.h + 12)
-      ctx.globalAlpha = 0.35 + ((c + r) % 2) * 0.25
-      const bit = (Math.floor(frame * 0.1 + c * 3 + r * 7) % 2) === 0 ? '0' : '1'
-      ctx.fillText(bit, colX, o.y + drop)
-    }
-  }
-  ctx.globalAlpha = 1
-  ctx.restore()
-}
 
 // ── 電子情報工学科：踏めない障壁（コードを止めるエラー・概念）────────────────
 
@@ -923,18 +730,10 @@ function dCellWall(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme, fra
 }
 
 export const OBSTACLE_DRAWERS: Record<Obstacle['shape'], ObstacleDrawFn> = {
-  gear: dGear,
-  bolt: dBolt,
-  piston: dPiston,
   circuit: dCircuit,
   coil: dCoil,
   capacitor: dCapacitor,
   bug: dBug,
-  monitor: dMonitor,
-  chip: dChip,
-  bacteria: dBacteria,
-  flask: dFlask,
-  mushroom: dMushroom,
   crystal: (ctx, o) => dCrystal(ctx, o),
   ingot: dIngot,
   lattice: dLattice,
@@ -951,10 +750,7 @@ export const OBSTACLE_DRAWERS: Record<Obstacle['shape'], ObstacleDrawFn> = {
   tesla: dTesla,
   arc_ring: dArcRing,
   pylon: dPylon,
-  virus: dVirus,
-  glitch: dGlitch,
   firewall: dFirewallTall,
-  data_block: dDataBlock,
   syntax_error: dSyntaxError,
   malloc_free: dMallocFree,
   blockchain: dBlockchain,

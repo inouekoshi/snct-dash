@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: '高専ダッシュ！',
     short_name: '高専ダッシュ',
-    description: '鈴鹿高専の5学科を走り抜けろ！高専祭限定エンドレスランナーゲーム',
+    description: '鈴鹿高専の5学科をテーマにしたタイムアタックゲーム。学科を選んでクリアタイムを競おう！',
     start_url: '/game',
     display: 'fullscreen',
     orientation: 'landscape',

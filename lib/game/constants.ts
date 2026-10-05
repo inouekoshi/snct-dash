@@ -14,9 +14,10 @@ export const KNOCKBACK_AMOUNT     = 120
 export const HOLE_KNOCKBACK       = 200
 export const KNOCKBACK_INVINCIBLE = 90
 
-// [最小frames, ランダム幅frames]。インデックス0は未使用、1〜5がdepartmentId対応
+// [最小frames, ランダム幅frames]。インデックス0は未使用、1〜4がdepartmentId対応
+// （4=生物応化はパイプの間隔。材料工学科は工程別の MAT_SPAWN_GAPS を使う）
 export const SPAWN_GAPS: [number, number][] = [
-  [0, 0], [44, 28], [85, 50], [38, 30], [78, 46], [36, 26],
+  [0, 0], [44, 28], [85, 50], [38, 30], [78, 46],
 ]
 
 export const COYOTE_FRAMES      = 5

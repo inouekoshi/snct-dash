@@ -11,7 +11,6 @@ export interface AreaTheme {
   obstacleColor: string
   obstacleStroke: string
   coinColor: string
-  decorations: string[]
 }
 
 export const AREAS: Record<AreaId, AreaTheme> = {
@@ -26,7 +25,6 @@ export const AREAS: Record<AreaId, AreaTheme> = {
     obstacleColor: '#cc6600',
     obstacleStroke: '#ff9933',
     coinColor: '#ff8c00',
-    decorations: ['gear', 'bolt'],
   },
   2: {
     id: 2,
@@ -39,7 +37,6 @@ export const AREAS: Record<AreaId, AreaTheme> = {
     obstacleColor: '#cccc00',
     obstacleStroke: '#ffff44',
     coinColor: '#ffff00',
-    decorations: ['spark', 'wire'],
   },
   3: {
     id: 3,
@@ -52,7 +49,6 @@ export const AREAS: Record<AreaId, AreaTheme> = {
     obstacleColor: '#005599',
     obstacleStroke: '#33aaff',
     coinColor: '#00aaff',
-    decorations: ['bug', 'bit'],
   },
   4: {
     id: 4,
@@ -65,7 +61,6 @@ export const AREAS: Record<AreaId, AreaTheme> = {
     obstacleColor: '#006622',
     obstacleStroke: '#00ee55',
     coinColor: '#00dd44',
-    decorations: ['dna', 'bubble'],
   },
   5: {
     id: 5,
@@ -78,11 +73,9 @@ export const AREAS: Record<AreaId, AreaTheme> = {
     obstacleColor: '#660099',
     obstacleStroke: '#cc44ff',
     coinColor: '#aa44ff',
-    decorations: ['crystal', 'atom'],
   },
 }
 
-export const AREA_DISTANCE = 2000
 
 export function bioZone(p: number): 'chem' | 'bio' {
   return Math.floor(p / 2200) % 2 === 0 ? 'chem' : 'bio'

@@ -3,18 +3,20 @@ export type PlayerState = 'running' | 'jumping' | 'falling'
 export interface Obstacle {
   stageX: number
   x: number; y: number; w: number; h: number
-  shape: 'gear' | 'bolt' | 'piston' | 'circuit' | 'coil' | 'capacitor'
-       | 'bug' | 'monitor' | 'chip' | 'bacteria' | 'flask' | 'mushroom'
-       | 'crystal' | 'ingot' | 'lattice' | 'stalactite'
-       | 'wrench' | 'spring' | 'flywheel' | 'robot_arm'
-       | 'hammer' | 'conveyor'
-       | 'resistor' | 'transistor' | 'electron' | 'tesla' | 'arc_ring' | 'pylon'
-       | 'virus' | 'glitch' | 'firewall' | 'data_block'
-       | 'syntax_error' | 'stack_overflow'
-       | 'null_pointer' | 'merge_conflict' | 'segfault'
-       | 'malloc_free' | 'blockchain'
+  shape:
+       // 機械工学科
+       | 'wrench' | 'spring' | 'flywheel' | 'robot_arm' | 'hammer' | 'conveyor'
+       // 電気電子工学科
+       | 'circuit' | 'coil' | 'capacitor' | 'resistor' | 'transistor' | 'electron' | 'tesla' | 'arc_ring' | 'pylon'
+       // 電子情報工学科（bug のみ踏める）
+       | 'bug' | 'syntax_error' | 'stack_overflow' | 'null_pointer' | 'merge_conflict' | 'segfault'
+       | 'malloc_free' | 'blockchain' | 'firewall'
+       // 天井障害（電気電子・電子情報）
+       | 'stalactite'
+       // 生物応用化学科（液体スイム）
        | 'reagent_tube' | 'cell_wall'
-       | 'leaf_spring' | 'brittle_crystal' | 'roller'
+       // 材料工学科
+       | 'crystal' | 'ingot' | 'lattice' | 'roller' | 'leaf_spring' | 'brittle_crystal'
   moving: boolean; phase: number; baseY: number; amplitude: number
   stompable?: boolean  // 電子情報工学科：上から踏んで倒せる敵か
   bendable?: boolean   // 材料工学科：「しなる」状態なら当たってよい板バネ（曲がって戻り加速）
@@ -30,8 +32,10 @@ export type TerrainSegment =
 export interface Item {
   stageX: number
   x: number; y: number
-  effect: 'time_stop' | 'invincible' | 'charge' | 'shield'
-        | 'furnace' | 'quench' | 'sign_flex' | 'sign_hard'  // 材料工学科：熱処理のゲートと看板
+  effect: 'charge'                    // 電気電子工学科：🔋電池
+        | 'shield'                    // 生物応用化学科：バリア
+        | 'furnace' | 'quench'        // 材料工学科：熱処理ゲート（🔥炉／💧水槽）
+        | 'sign_flex' | 'sign_hard'   // 材料工学科：熱処理の看板（判定なし）
   wobble: number
 }
 

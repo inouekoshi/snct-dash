@@ -15,16 +15,14 @@ function makeObstacle(stageX: number, o: ObstacleInit): Obstacle {
   }
 }
 
-// 複合障害物のcanvasXオフセットをstageXに変換する
-// o.x は CANVAS_W+10 を基準にした canvas X 座標として設計されているため
-// stageX オフセット = o.x - (CANVAS_W + 10)
-export function spawnObstacle(departmentId: number, stageX: number, obstacles: Obstacle[], groundY = DEFAULT_GROUND_Y) {
+// 地上走行型（機械・電気電子・電子情報）の通常スポーン。
+// 生物応化は spawnPipePair、材料は spawnMat / spawnHeatSet を使う。
+// 複合障害物の o.x は CANVAS_W+10 を基準にした canvas X 座標として設計されているため、
+// stageX オフセット = o.x - (CANVAS_W + 10) に変換する。
+export function spawnObstacle(departmentId: 1 | 2 | 3, stageX: number, obstacles: Obstacle[], groundY = DEFAULT_GROUND_Y) {
   const push = (o: ObstacleInit) => obstacles.push(makeObstacle(stageX + (o.x - (CANVAS_W + 10)), o))
-  if      (departmentId === 1) spawnDept1(push, groundY)
-  else if (departmentId === 2) spawnDept2(push, groundY)
-  else if (departmentId === 3) spawnDept3(push, groundY)
-  else if (departmentId === 4) spawnDept4(push, groundY)
-  else                          spawnDept5(push, groundY)
+  const bag = departmentId === 1 ? dept1Bag : departmentId === 2 ? dept2Bag : dept3RedBag
+  bag.next()(push, groundY)
 }
 
 export function spawnBug(stageX: number, obstacles: Obstacle[], groundY = DEFAULT_GROUND_Y) {
@@ -52,9 +50,6 @@ export function spawnBug(stageX: number, obstacles: Obstacle[], groundY = DEFAUL
   }
 }
 
-function spawnDept3(push: (o: ObstacleInit) => void, groundY: number) {
-  dept3RedBag.next()(push, groundY)
-}
 
 export function spawnCeilingObstacle(stageX: number, obstacles: Obstacle[]) {
   const count = Math.random() < 0.3 ? 2 : 1
@@ -228,35 +223,8 @@ const dept3RedSpawners: SpawnFn[] = [
 ]
 const dept3RedBag = new ShuffleBag(dept3RedSpawners)
 
-const dept4Spawners: SpawnFn[] = [
-  (push, groundY) => {
-    const n = Math.random() < 0.5 ? 2 : 3
-    for (let i = 0; i < n; i++) {
-      const h = 35 + Math.random() * 20
-      push({ x: CANVAS_W + 10 + i * 44, y: groundY - h, w: 24 + Math.random() * 12, h, shape: 'bacteria' })
-    }
-  },
-  (push, groundY) => {
-    const h = 46 + Math.random() * 26
-    push({ x: CANVAS_W + 10, y: groundY - h, w: 52 + Math.random() * 18, h, shape: 'bacteria' })
-  },
-  (push, groundY) => {
-    const h = 58 + Math.random() * 22
-    push({ x: CANVAS_W + 10, y: groundY - h, w: 30 + Math.random() * 10, h, shape: 'flask' })
-  },
-  (push, groundY) => {
-    const h = 44 + Math.random() * 20
-    push({ x: CANVAS_W + 10, y: groundY - h, w: 44 + Math.random() * 16, h, shape: 'mushroom' })
-  },
-  (push, groundY) => {
-    const h1 = 55 + Math.random() * 18, h2 = 38 + Math.random() * 16
-    push({ x: CANVAS_W + 10, y: groundY - h1, w: 28, h: h1, shape: 'flask' })
-    push({ x: CANVAS_W + 74, y: groundY - h2, w: 38, h: h2, shape: 'bacteria' })
-  }
-]
-const dept4Bag = new ShuffleBag(dept4Spawners)
-
-const dept5Spawners: SpawnFn[] = [
+// 材料工学科・溶解区間の地上障害（結晶・インゴット・格子）
+const meltSpawners: SpawnFn[] = [
   (push, groundY) => {
     const h = 52 + Math.random() * 36
     push({ x: CANVAS_W + 10, y: groundY - h, w: 26 + Math.random() * 12, h, shape: 'crystal' })
@@ -286,7 +254,7 @@ const dept5Spawners: SpawnFn[] = [
     push({ x: CANVAS_W + 88, y: groundY - h2, w: 22, h: h2, shape: 'crystal' })
   }
 ]
-const dept5Bag = new ShuffleBag(dept5Spawners)
+const meltBag = new ShuffleBag(meltSpawners)
 
 // 材料工学科・圧延区間：ローラー（上ロール）の下は薄板なら潜れる。跳ぶと上ロールにぶつかる。
 // 「跳ばずに潜る」と「地上のインゴットは跳ぶ」の読み分けが課題。
@@ -319,7 +287,7 @@ const rollBag = new ShuffleBag(rollSpawners)
 // 材料工学科：溶解・圧延区間の通常スポーン（熱処理区間は spawnHeatSet、検査区間は出さない）
 export function spawnMat(phase: MatPhase, stageX: number, obstacles: Obstacle[], groundY = DEFAULT_GROUND_Y) {
   const push = (o: ObstacleInit) => obstacles.push(makeObstacle(stageX + (o.x - (CANVAS_W + 10)), o))
-  if (phase === 'melt') dept5Bag.next()(push, groundY)
+  if (phase === 'melt') meltBag.next()(push, groundY)
   else if (phase === 'roll') rollBag.next()(push, groundY)
 }
 
@@ -351,8 +319,7 @@ export function resetSpawnerBags() {
   dept1Bag.reset()
   dept2Bag.reset()
   dept3RedBag.reset()
-  dept4Bag.reset()
-  dept5Bag.reset()
+  meltBag.reset()
   rollBag.reset()
   pipeBag.reset()
 }
@@ -390,19 +357,7 @@ export function spawnPipePair(stageX: number, obstacles: Obstacle[], zone: 'chem
   pipeBag.next()(push, zone)
 }
 
-function spawnDept1(push: (o: ObstacleInit) => void, groundY: number) {
-  dept1Bag.next()(push, groundY)
-}
-
-function spawnDept2(push: (o: ObstacleInit) => void, groundY: number) {
-  dept2Bag.next()(push, groundY)
-}
 
 
-function spawnDept4(push: (o: ObstacleInit) => void, groundY: number) {
-  dept4Bag.next()(push, groundY)
-}
 
-function spawnDept5(push: (o: ObstacleInit) => void, groundY: number) {
-  dept5Bag.next()(push, groundY)
-}
+

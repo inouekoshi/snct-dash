@@ -20,7 +20,7 @@ import {
   MAT_FLEX_COLOR, MAT_HARD_COLOR, type MatPhase,
 } from './constants'
 import type { PlayerState, Obstacle, TerrainSegment, Item, Particle } from './engine-types'
-import { overlaps, playerHitbox } from './helpers'
+import { overlaps, playerHitbox, itemHitbox, type Box } from './helpers'
 import { drawObstacle } from './obstacle-drawers'
 import { drawBattery, drawShieldItem } from './item-renderer'
 import { drawBg, drawGround, type BgContext } from './background-renderers'
@@ -69,10 +69,6 @@ export class GameEngine {
   private obstacles: Obstacle[] = []
   private items: Item[] = []
   private particles: Particle[] = []
-
-  // Item effects
-  private itemEffect: 'time_stop' | 'invincible' | null = null
-  private itemEffectTimer = 0
 
   // Spawn timers
   private nextObs = 120
@@ -197,10 +193,8 @@ export class GameEngine {
     // MISS オーバーレイ中は物理を止める（frame は進みアニメ継続）
     if (this.missOverlayTimer > 0) { this.missOverlayTimer--; return }
 
-    // タイマー加算（time_stopアイテム中は止まる）
-    if (this.itemEffect !== 'time_stop') {
-      this.elapsedMs += 1000 / 60
-    }
+    // タイマー加算
+    this.elapsedMs += 1000 / 60
 
     // 復活スロー：revivalTimer 中は最低速度に固定
     if (this.revivalTimer > 0) this.revivalTimer--
@@ -254,12 +248,6 @@ export class GameEngine {
 
     if (this.pState === 'running') this.legPhase += 0.25
     if (this.invincible > 0) this.invincible--
-
-    // アイテム効果タイマー
-    if (this.itemEffectTimer > 0) {
-      this.itemEffectTimer--
-      if (this.itemEffectTimer === 0) this.itemEffect = null
-    }
 
     // 充電ドレイン（電気電子工学科）：常に減少し、0でミス
     if (this.isElec) {
@@ -319,7 +307,8 @@ export class GameEngine {
       } else {
         if (this.hasGroundAt(nextStageX) && this.hasGroundAt(nextStageX + 65) && this.hasGroundAt(nextStageX + 130)
             && this.isFlatAt(nextStageX, 130)) {
-          spawnObstacle(this.departmentId, nextStageX, this.obstacles, this.getGroundHeightAt(nextStageX))
+          // ここに来るのは地上走行型の機械・電気電子・電子情報（1〜3）のみ
+          spawnObstacle(this.departmentId as 1 | 2 | 3, nextStageX, this.obstacles, this.getGroundHeightAt(nextStageX))
         }
       }
       const [mn, r] = this.isMat
@@ -329,7 +318,8 @@ export class GameEngine {
       this.nextCeilingObs = Math.max(this.nextCeilingObs, CEIL_GROUND_GAP)
       if (this.isCode) this.nextBug = Math.max(this.nextBug, 25) // 重ならないようにバグをずらす
     }
-    if (!this.isBio && !this.isMat && this.departmentId >= 2 && --this.nextCeilingObs <= 0) {
+    // 天井障害（電気電子・電子情報）
+    if ((this.isElec || this.isCode) && --this.nextCeilingObs <= 0) {
       const nextStageX = this.stageProgress + CANVAS_W
       spawnCeilingObstacle(nextStageX, this.obstacles)
       const base = Math.max(100, 260 - this.departmentId * 25)
@@ -431,49 +421,46 @@ export class GameEngine {
       })
     }
 
-    // 電池取得判定（電気電子工学科）
-    if (this.isElec && this.items.length) {
-      this.items = this.items.filter(it => {
-        if (it.effect === 'charge' && overlaps(ph, { x: it.x - 11, y: it.y - 15, w: 22, h: 30 })) {
-          this.charge = Math.min(CHARGE_MAX, this.charge + BATTERY_REFILL)
-          this.burst(it.x, it.y, AREAS[2].coinColor, 8)
-          return false
-        }
-        return true
-      })
-    }
-
-    // 熱処理ゲート（材料工学科）：🔥炉で「しなる」、💧水槽で「かたい」になる
-    if (this.isMat && this.items.length) {
-      this.items = this.items.filter(it => {
-        const box = it.effect === 'furnace' ? { x: it.x - 22, y: it.y - 28, w: 44, h: 56 }
-          : it.effect === 'quench' ? { x: it.x - 42, y: it.y - 14, w: 84, h: 26 }
-          : null
-        if (!box || !overlaps(ph, box)) return true
-        const kind = it.effect === 'furnace' ? 'flex' : 'hard'
-        this.matState = kind
-        this.matStateUntilX = it.stageX - HEAT_GATE_OFFSET + HEAT_STATE_SPAN[kind]
-        this.burst(it.x, it.y, it.effect === 'furnace' ? MAT_FLEX_COLOR : MAT_HARD_COLOR, 16)
-        playJump()
-        return false
-      })
-    }
-
-    // バリア取得判定（生物応用化学科）：拾うとバリアを保持（1回被弾を無効化）
-    if (this.isBio && this.items.length) {
-      this.items = this.items.filter(it => {
-        if (it.effect === 'shield' && overlaps(ph, { x: it.x - 14, y: it.y - 14, w: 28, h: 28 })) {
-          this.bioShield = true
-          this.burst(it.x, it.y, SHIELD_COLOR, 12)
-          playJump()
-          return false
-        }
-        return true
-      })
-    }
+    this.collectItems(ph)
   }
 
   // ── 内部メソッド ──────────────────────────────────────────────────────────
+
+  // アイテム取得判定：🔋電池（電気電子）／🛡バリア（生物応化）／🔥炉・💧水槽（材料）。看板は判定なし。
+  private collectItems(ph: Box) {
+    if (!this.items.length) return
+    this.items = this.items.filter(it => {
+      const box = itemHitbox(it)
+      if (!box || !overlaps(ph, box)) return true
+      this.applyItem(it)
+      return false
+    })
+  }
+
+  private applyItem(it: Item) {
+    switch (it.effect) {
+      case 'charge':
+        this.charge = Math.min(CHARGE_MAX, this.charge + BATTERY_REFILL)
+        this.burst(it.x, it.y, AREAS[2].coinColor, 8)
+        break
+      case 'shield':
+        // 拾うとバリアを保持（1回被弾を無効化）
+        this.bioShield = true
+        this.burst(it.x, it.y, SHIELD_COLOR, 12)
+        playJump()
+        break
+      case 'furnace':
+      case 'quench': {
+        // 熱処理ゲート：🔥炉で「しなる」、💧水槽で「かたい」になる
+        const kind = it.effect === 'furnace' ? 'flex' : 'hard'
+        this.matState = kind
+        this.matStateUntilX = it.stageX - HEAT_GATE_OFFSET + HEAT_STATE_SPAN[kind]
+        this.burst(it.x, it.y, kind === 'flex' ? MAT_FLEX_COLOR : MAT_HARD_COLOR, 16)
+        playJump()
+        break
+      }
+    }
+  }
 
   private updateBio() {
     if (this.thrustHeld) {
@@ -737,7 +724,7 @@ export class GameEngine {
       drawPlayer(ctx, theme.coinColor, {
         py: this.py, pState: this.pState, pvy: this.pvy,
         invincible: this.invincible, legPhase: this.legPhase,
-        shield: this.isBio ? this.bioShield : false, deathTimer: 0, frame: this.frame,
+        shield: this.isBio ? this.bioShield : false, frame: this.frame,
         bio: this.isBio
       })
     }

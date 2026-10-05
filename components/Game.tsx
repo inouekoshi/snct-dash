@@ -18,6 +18,8 @@ export default function Game({ nickname, departmentId, onClear }: GameProps) {
   const [started, setStarted] = useState(false)
   const [isPortrait, setIsPortrait] = useState(false)
   const [paused, setPaused] = useState(false)
+  // 生物応用化学科（液体スイム）だけは長押しで浮上する操作。他学科はタップでジャンプ。
+  const isSwim = departmentId === 4
 
   const handleJump = useCallback(() => {
     engineRef.current?.jump()
@@ -58,7 +60,7 @@ export default function Game({ nickname, departmentId, onClear }: GameProps) {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'Space' || e.code === 'ArrowUp') {
         e.preventDefault()
-        if (departmentId === 4) engine.setThrust(true)
+        if (isSwim) engine.setThrust(true)
         else handleJump()
       }
       if (e.code === 'Escape' || e.code === 'KeyP') {
@@ -66,17 +68,17 @@ export default function Game({ nickname, departmentId, onClear }: GameProps) {
       }
     }
     const onKeyUp = (e: KeyboardEvent) => {
-      if (departmentId === 4 && (e.code === 'Space' || e.code === 'ArrowUp')) engine.setThrust(false)
+      if (isSwim && (e.code === 'Space' || e.code === 'ArrowUp')) engine.setThrust(false)
     }
     const onTouchStart = (e: TouchEvent) => {
       e.preventDefault()
-      if (departmentId === 4) engine.setThrust(true)
+      if (isSwim) engine.setThrust(true)
       else handleJump()
     }
-    const onTouchEnd = () => { if (departmentId === 4) engine.setThrust(false) }
-    const onPointerDown = () => { if (departmentId === 4) engine.setThrust(true) }
-    const onPointerUp = () => { if (departmentId === 4) engine.setThrust(false) }
-    const onBlur = () => { if (departmentId === 4) engine.setThrust(false) }
+    const onTouchEnd = () => { if (isSwim) engine.setThrust(false) }
+    const onPointerDown = () => { if (isSwim) engine.setThrust(true) }
+    const onPointerUp = () => { if (isSwim) engine.setThrust(false) }
+    const onBlur = () => { if (isSwim) engine.setThrust(false) }
 
     window.addEventListener('keydown', onKeyDown)
     window.addEventListener('keyup', onKeyUp)
@@ -100,7 +102,7 @@ export default function Game({ nickname, departmentId, onClear }: GameProps) {
       canvas.removeEventListener('pointerup', onPointerUp)
       canvas.removeEventListener('pointerleave', onPointerUp)
     }
-  }, [started, departmentId, onClear, handleJump, handlePause])
+  }, [started, departmentId, isSwim, onClear, handleJump, handlePause])
 
   if (!started) {
     const theme = AREAS[departmentId as AreaId] ?? AREAS[1]
@@ -162,7 +164,7 @@ export default function Game({ nickname, departmentId, onClear }: GameProps) {
           <div className="rounded-2xl px-4 py-3 text-left bg-gray-800/70 border border-gray-700">
             <p className="text-xs font-black mb-1 text-gray-300">🕹 操作方法</p>
             <p className="text-sm text-gray-100">
-              {departmentId === 4
+              {isSwim
                 ? '⌨ スペース / ↑ 長押し ・ 📱 画面タップ長押し：浮上（離すと沈む）'
                 : '⌨ スペース / ↑ ・ 📱 タップ：ジャンプ（二段ジャンプあり）'}
             </p>
@@ -197,7 +199,7 @@ export default function Game({ nickname, departmentId, onClear }: GameProps) {
           ref={canvasRef}
           className="w-full rounded-xl border border-gray-800 touch-none"
           style={{ imageRendering: 'pixelated' }}
-          onClick={departmentId === 4 ? undefined : handleJump}
+          onClick={isSwim ? undefined : handleJump}
         />
         <button
           onClick={handlePause}
@@ -207,10 +209,10 @@ export default function Game({ nickname, departmentId, onClear }: GameProps) {
         </button>
       </div>
       <p className="text-gray-600 text-xs mt-4 sm:hidden">
-        {departmentId === 4 ? 'タップ長押し：浮上（離すと沈む）｜⏸ボタンで一時停止' : 'タップでジャンプ（二段ジャンプあり）｜⏸ボタンで一時停止'}
+        {isSwim ? 'タップ長押し：浮上（離すと沈む）｜⏸ボタンで一時停止' : 'タップでジャンプ（二段ジャンプあり）｜⏸ボタンで一時停止'}
       </p>
       <p className="text-gray-600 text-xs mt-4 hidden sm:block">
-        {departmentId === 4 ? 'スペース / 上キー長押し: 浮上（離すと沈む）｜P / Esc: 一時停止' : 'スペース / クリック: ジャンプ（二段ジャンプあり）｜P / Esc: 一時停止'}
+        {isSwim ? 'スペース / 上キー長押し: 浮上（離すと沈む）｜P / Esc: 一時停止' : 'スペース / クリック: ジャンプ（二段ジャンプあり）｜P / Esc: 一時停止'}
       </p>
     </main>
   )

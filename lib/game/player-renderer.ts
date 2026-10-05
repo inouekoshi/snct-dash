@@ -9,7 +9,6 @@ export interface PlayerRenderState {
   invincible: number
   legPhase: number
   shield: boolean
-  deathTimer: number
   frame: number
   bio?: boolean
 }
@@ -21,9 +20,6 @@ export function drawPlayer(ctx: CanvasRenderingContext2D, accent: string, p: Pla
   if (blink) ctx.globalAlpha = 0.35
 
   ctx.save()
-  if (p.pState === 'falling' && p.deathTimer > 0) {
-    ctx.translate(x, y - 23); ctx.rotate(Math.min(p.deathTimer * 0.08, Math.PI * 0.55)); ctx.translate(-x, -(y - 23))
-  }
 
   // Shadow
   if (!p.bio) {
