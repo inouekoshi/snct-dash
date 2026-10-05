@@ -86,8 +86,7 @@ snct-dash/
 | 変数名 | 必須 | 説明 |
 |--------|------|------|
 | `NEXT_PUBLIC_SUPABASE_URL` | ✅ | Supabase API URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅ | 匿名キー（公開可・クライアントの読み取り用） |
-| `SUPABASE_SERVICE_ROLE_KEY` | ✅ | サービスロールキー（APIルート専用・秘密）。`stage_clears` には INSERT 用 RLS ポリシーが無く、`lib/supabase-server.ts` がこのキーで RLS をバイパスして書き込む |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅ | 匿名キー（公開可）。APIルート（`lib/supabase-server.ts`）もこのキーで RLS ポリシーに従って読み書きする |
 
 ### Vercel 設定の注意点
 

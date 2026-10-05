@@ -50,8 +50,7 @@
 | 変数名 | 必須 | 説明 |
 |--------|------|------|
 | `NEXT_PUBLIC_SUPABASE_URL` | ✅ | Supabase プロジェクトの API URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅ | Supabase の匿名キー（公開可） |
-| `SUPABASE_SERVICE_ROLE_KEY` | ✅ | Supabase のサービスロールキー（APIルート専用・秘密） |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅ | Supabase の匿名キー（公開可）。APIルートもこのキーを使う |
 
 Supabase ダッシュボード → プロジェクト → **Settings > API** で確認できます。
 
