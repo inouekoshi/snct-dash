@@ -1,8 +1,10 @@
 @import "tailwindcss";
 
+/* ゲームは常にダーク配色。端末のライトモードで白背景にならないよう固定する
+   （body の背景は Tailwind の bg-gray-950 より、このレイヤー外の指定が優先されるため） */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #030712;
+  --foreground: #ffffff;
 }
 
 @theme inline {
@@ -12,12 +14,6 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
 
 body {
   background: var(--background);
