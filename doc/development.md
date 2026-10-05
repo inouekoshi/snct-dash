@@ -8,7 +8,7 @@
 - [地形システム](#地形システム)
 - [ノックバック・MISSシステム](#ノックバックmissシステム)
 - [ゴールレンダラー](#ゴールレンダラー)
-- [新しいアイテムを追加する](#新しいアイテムを追加する)
+- [アイテムシステム](#アイテムシステム)
 - [障害物の種類を追加する](#障害物の種類を追加する)
 - [ゲームバランスの調整](#ゲームバランスの調整)
 - [よくあるトラブル](#よくあるトラブル)
@@ -69,8 +69,8 @@ y (280)
 overlaps(ph, { x: o.x + 4, y: o.y + 4, w: o.w - 8, h: o.h - 8 })
 ```
 
-アイテム（電気電子の🔋電池）との衝突も AABB（`overlaps()`）で判定します。
-円形判定の `hitCircle()` も `helpers.ts` に用意されています（現在は未使用）。
+プレイヤーの判定ボックスは `playerHitbox(py, h = 46)` です。材料工学科だけ、工程に応じて高さ `h` を変えます（液滴34／薄板22／金属片40、`MAT_HITBOX_H`）。
+アイテムとの判定も AABB で、ボックスは `itemHitbox(item)`（`helpers.ts`）が種類ごとに返します。
 
 ---
 
@@ -115,14 +115,14 @@ Canvas上のX座標 = PLAYER_X + (stageX - stageProgress)
 ```typescript
 export function buildStage(departmentId: number): TerrainSegment[] {
   if (departmentId === 1) return buildStageMech()  // 機械：穴なし・山登り階段
-  if (departmentId === 2) return buildStageElec()  // 電気電子：完全な平坦（充電サバイバル）
-  return buildStageDefault()                       // その他：標準の穴配置
+  if (departmentId === 4) return []                // 生物応化：地面なし（液体スイム）
+  return buildStageFlat()                          // 電気電子・電子情報・材料：完全な平坦
 }
 ```
 
 - `buildStageMech()`：落とし穴を使わず、2〜4段の「山型階段」を積み上げる（`STEP_H = 40`）
-- `buildStageElec()`：穴も段差も無い1本の平坦地面。プレイヤーは充電維持＋障害物回避に集中する
-- `buildStageDefault()`：平坦な地面と穴（幅110px以上）を交互に配置
+- `buildStageFlat()`：穴も段差も無い1本の平坦地面。各学科の固有ギミックに集中させる
+- 穴（`type: 'hole'`）の落下フローは engine に残しているが、現在どの学科も使っていない
 
 ---
 
@@ -214,67 +214,31 @@ drawGoal(ctx, areaId, theme, stageProgress, frame)
 
 ---
 
-## アイテムシステム（電気電子=充電サバイバルの実装）
+## アイテムシステム
 
-アイテムは `Item` 型（`engine-types.ts`）で定義され、`engine.ts` の `items: Item[]` で管理されます。
-電気電子工学科の🔋電池（`effect: 'charge'`）が実装の参照例です。新しいアイテムも同じ流れで追加します。
+アイテムは `Item` 型（`engine-types.ts`）で定義し、`engine.ts` の `items: Item[]` で管理します。
 
-### 1. `Item.effect` に種別を追加（`engine-types.ts`）
+| effect | 学科 | 内容 |
+|--------|------|------|
+| `charge` | 電気電子 | 🔋電池。充電ゲージを回復 |
+| `shield` | 生物応化 | バリア。1回だけ被弾を無効化 |
+| `furnace` / `quench` | 材料 | 熱処理ゲート。🔥炉で「しなる」、💧水槽で「かたい」 |
+| `sign_flex` / `sign_hard` | 材料 | 熱処理の看板（取得判定なし・表示のみ） |
 
-```typescript
-export interface Item {
-  stageX: number
-  x: number; y: number
-  effect: 'time_stop' | 'invincible' | 'charge'  // ← ここに追加
-  wobble: number
-}
-```
+新しいアイテムは次の4か所に追加します。
 
-### 2. スポーンする（`engine.ts` の `update()`）
-
-スポーンタイマーをカウントダウンし、`stageX`（画面右端＝`stageProgress + CANVAS_W`）に push します。
-電池は学科限定（`departmentId === 2`）でスポーンします。
-
-```typescript
-if (this.isElec && --this.nextBattery <= 0) {
-  const nextStageX = this.stageProgress + CANVAS_W
-  // 必ずジャンプしないと届かない高さ（74〜120px）に置く。走行中の判定上端は groundY-46 付近
-  const y = this.getGroundHeightAt(nextStageX) - (74 + Math.random() * 46)
-  this.items.push({ stageX: nextStageX, x: CANVAS_W + 10, y, effect: 'charge', wobble: Math.random() * Math.PI * 2 })
-  const [mn, r] = BATTERY_GAP
-  this.nextBattery = mn + Math.random() * r
-}
-```
-
-### 3. 取得判定と効果（`engine.ts` の衝突判定ブロック）
-
-毎フレーム `playerHitbox` と AABB（`overlaps()`）で重なりを判定し、効果を適用して配列から除去します。
-
-```typescript
-this.items = this.items.filter(it => {
-  if (it.effect === 'charge' && overlaps(ph, { x: it.x - 11, y: it.y - 15, w: 22, h: 30 })) {
-    this.charge = Math.min(CHARGE_MAX, this.charge + BATTERY_REFILL)
-    this.burst(it.x, it.y, AREAS[2].coinColor, 8)  // 取得エフェクト
-    return false
-  }
-  return true
-})
-```
-
-`time_stop` / `invincible` のような時間効果型は `itemEffect` / `itemEffectTimer` を使う
-（`time_stop` 中は `elapsedMs` を加算しない仕組みが既にある）。
-
-### 4. 描画する（`item-renderer.ts` + `engine.ts` の `render()`）
-
-`item-renderer.ts` に描画関数を追加し、`render()` の `items` ループから呼びます。
-
-```typescript
-for (const it of this.items) {
-  if (it.effect === 'charge') drawBattery(ctx, it, theme, this.frame)
-}
-```
-
-`it.x` / `it.y` は毎フレーム `toCanvasX()` で Canvas 座標に更新済み。`wobble` で上下のふわふわ揺れを付けます。
+1. **種類を追加する**：`Item.effect` に追加する（`engine-types.ts`）
+2. **スポーンする**：`engine.ts` の `update()` でタイマーをカウントダウンし、画面右端（`stageProgress + CANVAS_W`）の `stageX` で `items` に push する。学科限定のものはフラグ（`isElec` など）で囲む
+   ```typescript
+   if (this.isElec && --this.nextBattery <= 0) {
+     const nextStageX = this.stageProgress + CANVAS_W
+     const y = this.getGroundHeightAt(nextStageX) - (74 + Math.random() * 46)
+     this.items.push({ stageX: nextStageX, x: CANVAS_W + 10, y, effect: 'charge', wobble: Math.random() * Math.PI * 2 })
+     ...
+   }
+   ```
+3. **取得判定と効果**：判定ボックスを `helpers.ts` の `itemHitbox()` に、効果を `engine.ts` の `applyItem()` に追加する。毎フレーム `collectItems()` が判定し、取得したものを配列から除く
+4. **描画する**：描画関数（`item-renderer.ts` など）を作り、`render()` の `items` ループから呼ぶ。`it.x` / `it.y` は毎フレーム Canvas 座標に更新済み。`wobble` で上下のふわふわ揺れを付けられる
 
 ---
 
@@ -284,30 +248,37 @@ for (const it of this.items) {
 
 ```typescript
 interface Obstacle {
-  shape: 'gear' | 'bolt' | /* ... */ | 'new_shape'
+  shape:
+       // 機械工学科
+       | 'wrench' | 'spring' | /* ... */ | 'new_shape'
 }
 ```
 
 ### 2. `drawObstacle()` に描画処理を追加（`obstacle-drawers.ts`）
 
 ```typescript
-const drawFns: Record<Shape, DrawFn> = {
+export const OBSTACLE_DRAWERS: Record<Obstacle['shape'], ObstacleDrawFn> = {
   // ...既存...
-  new_shape: (ctx, o, theme) => {
-    // Canvas API で描画
-  },
+  new_shape: dNewShape,  // (ctx, o, theme, frame) => void
 }
 ```
 
+`Record` なので、`shape` に追加して描画関数を登録し忘れると型エラーになります。
+
 ### 3. スポーン関数で使用（`spawner.ts`）
+
+学科ごとのパターンは `SpawnFn` の配列にまとめ、`ShuffleBag` で偏りなく順番に出します（機械＝`dept1Spawners`、電気電子＝`dept2Spawners`、電子情報＝`dept3RedSpawners`、材料＝`meltSpawners` / `rollSpawners`）。
 
 ```typescript
 // push(o) は o.x の Canvas オフセット（CANVAS_W+10 基準）を stageX に変換して登録する
 // groundY は地形の高さ（段差上なら DEFAULT_GROUND_Y より小さい値が渡る）
-function spawnDept1(push: (o: ObstacleInit) => void, groundY: number) {
-  const h = 50
-  push({ x: CANVAS_W + 10, y: groundY - h, w: 35, h, shape: 'new_shape' })
-}
+const dept1Spawners: SpawnFn[] = [
+  // ...既存...
+  (push, groundY) => {
+    const h = 50
+    push({ x: CANVAS_W + 10, y: groundY - h, w: 35, h, shape: 'new_shape' })
+  },
+]
 ```
 
 複合障害物の場合は `x` に異なる offset を渡すことで正しい間隔に配置される：
@@ -363,6 +334,16 @@ export const BATTERY_GAP: [number, number] = [110, 80]  // 電池スポーン間
 > **バランス調整の指針**: 「電池をほぼ全部拾えばギリギリ完走できる」密度を狙う。
 > `STAGE_LENGTH` を本番（70000）に戻した際は `BATTERY_GAP` / `CHARGE_DRAIN` の再調整が必要。
 
+### 電子情報・生物応化・材料
+
+- 電子情報（dept 3）：`COMBO_NEEDED` / `DEBUG_FRAMES` / `DEBUG_SPEED_MULT` / `STOMP_*` / `MALLOC_*`
+- 生物応化（dept 4）：`SWIM_*` / `BIO_GAP` / `BIO_SPEED_*` / `SHIELD_GAP`（[doc/design_bio.md](design_bio.md)）
+- 材料（dept 5）：`MAT_*` / `HEAT_*` / `MELT_BOUNCE_VY` / `ROLL_GAP`（調整のポイントは [doc/design_mat.md](design_mat.md)）
+
+### テスト用に STAGE_LENGTH を縮める
+
+動作確認では `STAGE_LENGTH` を一時的に `15000`（約30秒）にしてよい。**`6000` は12秒でクリアになるので使わない。** コミット・マージ前に必ず `70000` に戻す。材料工学科の工程の区間は比率で決まるので、縮めても4工程すべて確認できる。
+
 ### 穴落下・段差の閾値（`engine.ts` 内）
 
 ```typescript
@@ -394,12 +375,15 @@ CANVAS_H + 60          // = 340px
 ### クリアタイムが登録されない
 
 1. ブラウザの DevTools → **Network タブ**で `POST /api/stage-clears` のレスポンスを確認
-2. **HTTP 500 "missing Supabase env vars"** の場合:
+2. **HTTP 500 "Missing Supabase server env vars"** の場合:
    - Vercel ダッシュボード → Settings → Environment Variables を開く
    - `NEXT_PUBLIC_SUPABASE_URL` と `NEXT_PUBLIC_SUPABASE_ANON_KEY` が **All Environments** になっているか確認
    - Production のみだと Preview（dev ブランチ）では動かない
    - 変更後は必ず**再デプロイ**が必要（`NEXT_PUBLIC_*` はビルド時に埋め込まれるため）
-3. **HTTP 500 その他** の場合: Supabase ダッシュボードの **Logs** でエラーを確認
+3. **HTTP 500 その他** の場合:
+   - まず Supabase プロジェクトが一時停止（INACTIVE）していないか確認する。Free プランは約7日アクセスがないと止まる（Cron ウォームアップで防いでいるが、止まったらダッシュボードの Restore で復旧）
+   - Vercel のランタイムログに `Invalid API key` が出ていたら、その環境の `NEXT_PUBLIC_SUPABASE_ANON_KEY` が正しいか確認する
+   - それ以外は Supabase ダッシュボードの **Logs** でエラーを確認
 4. RLS ポリシーの確認:
    ```sql
    SELECT policyname, cmd FROM pg_policies WHERE tablename = 'stage_clears';
