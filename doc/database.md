@@ -34,11 +34,12 @@ CREATE POLICY "Anyone can read stage_clears" ON stage_clears FOR SELECT USING (t
 | ファイル | キー | 用途 |
 |---------|------|------|
 | `lib/supabase.ts` | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | クライアントサイド（読み取り専用） |
-| `lib/supabase-server.ts` | `SUPABASE_SERVICE_ROLE_KEY` | APIルート専用。RLS をバイパスして INSERT する |
+| `lib/supabase-server.ts` | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | APIルート専用。RLS ポリシーに従って SELECT / INSERT する |
 
-`stage_clears` には INSERT 用の RLS ポリシーが無いため、anon キーでは書き込めない。
+`stage_clears` には SELECT / INSERT を public に許可する RLS ポリシーがあり、anon キーで読み書きできる。
 クリアタイムの登録は `app/api/stage-clears/route.ts` がサーバーサイドで `createServerClient()`
-（service_role キー）を使って書き込む。データの整合性は同ルートのバリデーションで担保する。
+（anon キー）を使って書き込む。データの整合性は同ルートのバリデーションで担保する。
+service_role キーは使わない（`SUPABASE_SERVICE_ROLE_KEY` は不要）。
 
 ## バリデーション
 

@@ -1,16 +1,17 @@
 import { createClient } from '@supabase/supabase-js'
 
-// サーバー専用クライアント。service_role キーで接続し RLS をバイパスする。
-// （stage_clears テーブルには INSERT 用の RLS ポリシーが無いため、anon キーでは書き込みできない）
+// サーバー専用クライアント（APIルートで使用）。
+// anon キーで接続し、stage_clears の RLS ポリシー（SELECT / INSERT を public に許可）に従う。
+// service_role キーは使わない方針（環境変数の取り違えで本番が止まった経緯があるため）。
 export function createServerClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !serviceRoleKey) {
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!url || !anonKey) {
     throw new Error(
-      'Missing Supabase server env vars: NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY',
+      'Missing Supabase server env vars: NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY',
     )
   }
-  return createClient(url, serviceRoleKey, {
+  return createClient(url, anonKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   })
 }
