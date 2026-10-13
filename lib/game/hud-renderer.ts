@@ -186,9 +186,7 @@ export function renderPauseOverlay(ctx: CanvasRenderingContext2D) {
   ctx.fillRect(0, 0, CANVAS_W, CANVAS_H)
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
   ctx.fillStyle = '#ffffff'
-  ctx.font = 'bold 38px monospace'
-  ctx.fillText('⏸  PAUSE', CANVAS_W / 2, CANVAS_H / 2 - 18)
-  ctx.font = '16px sans-serif'
-  ctx.fillStyle = '#aaaaaa'
-  ctx.fillText('P キー / ポーズボタンで再開', CANVAS_W / 2, CANVAS_H / 2 + 24)
+  ctx.font = 'bold 34px monospace'
+  // 下半分には React 側のメニュー（再開・やり直し・学科選択）を重ねるので、文字は上に寄せる
+  ctx.fillText('⏸  PAUSE', CANVAS_W / 2, CANVAS_H * 0.18)
 }

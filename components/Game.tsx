@@ -9,28 +9,55 @@ import type { GameClearResult } from '@/lib/types'
 interface GameProps {
   nickname: string
   departmentId: number
+  /** true ならブリーフィング画面を飛ばしてすぐ始める（「もう一度」「最初から」用） */
+  autoStart?: boolean
+  onStart: () => void
   onClear: (result: GameClearResult) => void
+  onRestart: () => void
+  onQuit: () => void
 }
 
-export default function Game({ nickname, departmentId, onClear }: GameProps) {
+// E2E テスト用のフック（NEXT_PUBLIC_E2E=1 でビルドしたときだけ有効。本番ビルドでは消える）
+declare global {
+  interface Window {
+    __kosendash?: { engine: GameEngine; autopilot: () => Promise<void> }
+  }
+}
+
+export default function Game({ nickname, departmentId, autoStart = false, onStart, onClear, onRestart, onQuit }: GameProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const engineRef = useRef<GameEngine | null>(null)
-  const [started, setStarted] = useState(false)
+  const [started, setStarted] = useState(autoStart)
   const [isPortrait, setIsPortrait] = useState(false)
   const [paused, setPaused] = useState(false)
   // 生物応用化学科（液体スイム）だけは長押しで浮上する操作。他学科はタップでジャンプ。
   const isSwim = departmentId === 4
 
+  // autoStart のときはマウント時にプレイ開始を通知する
+  const startNotified = useRef(false)
+  useEffect(() => {
+    if (started && !startNotified.current) {
+      startNotified.current = true
+      onStart()
+    }
+  }, [started, onStart])
+
   const handleJump = useCallback(() => {
     engineRef.current?.jump()
   }, [])
 
-  const handlePause = useCallback(() => {
+  const setEnginePaused = useCallback((next: boolean) => {
     const engine = engineRef.current
     if (!engine) return
-    engine.togglePause()
-    setPaused(p => !p)
+    if (next) engine.pause()
+    else engine.resume()
+    setPaused(engine.paused)
   }, [])
+
+  const handlePause = useCallback(() => {
+    const engine = engineRef.current
+    if (engine) setEnginePaused(!engine.paused)
+  }, [setEnginePaused])
 
   useEffect(() => {
     if (!started) return
@@ -40,6 +67,11 @@ export default function Game({ nickname, departmentId, onClear }: GameProps) {
     mql.addEventListener('change', update)
     return () => mql.removeEventListener('change', update)
   }, [started])
+
+  // 縦向きにしている間は止めておく（「横向きにしてください」の裏で進まないように）
+  useEffect(() => {
+    if (isPortrait) setEnginePaused(true)
+  }, [isPortrait, setEnginePaused])
 
   useEffect(() => {
     if (!started) return
@@ -57,9 +89,21 @@ export default function Game({ nickname, departmentId, onClear }: GameProps) {
     engineRef.current = engine
     engine.start()
 
+    if (process.env.NEXT_PUBLIC_E2E === '1') {
+      window.__kosendash = {
+        engine,
+        autopilot: async () => {
+          const { Autopilot } = await import('@/lib/game/autopilot')
+          const pilot = new Autopilot(engine)
+          engine.setBeforeStep(() => pilot.act())
+        },
+      }
+    }
+
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'Space' || e.code === 'ArrowUp') {
         e.preventDefault()
+        if (e.repeat) return
         if (isSwim) engine.setThrust(true)
         else handleJump()
       }
@@ -76,13 +120,26 @@ export default function Game({ nickname, departmentId, onClear }: GameProps) {
       else handleJump()
     }
     const onTouchEnd = () => { if (isSwim) engine.setThrust(false) }
-    const onPointerDown = () => { if (isSwim) engine.setThrust(true) }
+    const onPointerDown = (e: PointerEvent) => {
+      // タッチは touchstart で処理済み。マウスのクリックだけここで扱う
+      if (e.pointerType === 'touch') return
+      if (isSwim) engine.setThrust(true)
+      else handleJump()
+    }
     const onPointerUp = () => { if (isSwim) engine.setThrust(false) }
     const onBlur = () => { if (isSwim) engine.setThrust(false) }
+    // 別のアプリやタブに切り替えたら一時停止（戻ってきたら「再開」を押して続ける）
+    const onVisibility = () => {
+      if (document.hidden && !engine.paused) {
+        engine.pause()
+        setPaused(true)
+      }
+    }
 
     window.addEventListener('keydown', onKeyDown)
     window.addEventListener('keyup', onKeyUp)
     window.addEventListener('blur', onBlur)
+    document.addEventListener('visibilitychange', onVisibility)
     canvas.addEventListener('touchstart', onTouchStart, { passive: false })
     canvas.addEventListener('touchend', onTouchEnd)
     canvas.addEventListener('touchcancel', onTouchEnd)
@@ -92,9 +149,12 @@ export default function Game({ nickname, departmentId, onClear }: GameProps) {
 
     return () => {
       engine.destroy()
+      engineRef.current = null
+      if (window.__kosendash?.engine === engine) delete window.__kosendash
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
       window.removeEventListener('blur', onBlur)
+      document.removeEventListener('visibilitychange', onVisibility)
       canvas.removeEventListener('touchstart', onTouchStart)
       canvas.removeEventListener('touchend', onTouchEnd)
       canvas.removeEventListener('touchcancel', onTouchEnd)
@@ -168,7 +228,7 @@ export default function Game({ nickname, departmentId, onClear }: GameProps) {
                 ? '⌨ スペース / ↑ 長押し ・ 📱 画面タップ長押し：浮上（離すと沈む）'
                 : '⌨ スペース / ↑ ・ 📱 タップ：ジャンプ（二段ジャンプあり）'}
             </p>
-            <p className="text-xs text-gray-400 mt-1">⚠ 障害物や穴はノックバック（後退）だけ。ゲームオーバーなし！</p>
+            <p className="text-xs text-gray-400 mt-1">⚠ 障害物はノックバック（後退）だけ。ゲームオーバーなし！</p>
           </div>
         </div>
 
@@ -178,6 +238,9 @@ export default function Game({ nickname, departmentId, onClear }: GameProps) {
           style={{ backgroundColor: accent, boxShadow: `0 8px 24px ${accent}55` }}
         >
           ▶ スタート！
+        </button>
+        <button onClick={onQuit} className="text-gray-500 hover:text-gray-300 text-sm transition-colors">
+          ← 学科選択に戻る
         </button>
       </main>
     )
@@ -199,14 +262,40 @@ export default function Game({ nickname, departmentId, onClear }: GameProps) {
           ref={canvasRef}
           className="w-full rounded-xl border border-gray-800 touch-none"
           style={{ imageRendering: 'pixelated' }}
-          onClick={isSwim ? undefined : handleJump}
+          data-testid="game-canvas"
         />
-        <button
-          onClick={handlePause}
-          className="absolute bottom-2 right-2 px-3 py-1.5 bg-black/60 hover:bg-black/80 text-white text-sm font-bold rounded-lg border border-gray-600 transition-colors"
-        >
-          {paused ? '▶ 再開' : '⏸ 一時停止'}
-        </button>
+        {paused && !isPortrait && (
+          <div className="absolute inset-0 flex items-center justify-center rounded-xl">
+            <div className="flex flex-col gap-2 w-48 mt-[12%]">
+              <button
+                onClick={() => setEnginePaused(false)}
+                className="py-2.5 bg-yellow-400 hover:bg-yellow-300 text-gray-950 font-black rounded-xl"
+              >
+                ▶ 再開
+              </button>
+              <button
+                onClick={onRestart}
+                className="py-2 bg-gray-800/90 hover:bg-gray-700 text-white font-bold rounded-xl border border-gray-600 text-sm"
+              >
+                ↺ 最初からやり直す
+              </button>
+              <button
+                onClick={onQuit}
+                className="py-2 bg-gray-800/90 hover:bg-gray-700 text-white font-bold rounded-xl border border-gray-600 text-sm"
+              >
+                学科選択に戻る
+              </button>
+            </div>
+          </div>
+        )}
+        {!paused && (
+          <button
+            onClick={handlePause}
+            className="absolute bottom-2 right-2 px-3 py-1.5 bg-black/60 hover:bg-black/80 text-white text-sm font-bold rounded-lg border border-gray-600 transition-colors"
+          >
+            ⏸ 一時停止
+          </button>
+        )}
       </div>
       <p className="text-gray-600 text-xs mt-4 sm:hidden">
         {isSwim ? 'タップ長押し：浮上（離すと沈む）｜⏸ボタンで一時停止' : 'タップでジャンプ（二段ジャンプあり）｜⏸ボタンで一時停止'}

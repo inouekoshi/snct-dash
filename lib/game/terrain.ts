@@ -1,11 +1,12 @@
 import type { TerrainSegment } from './engine-types'
 import { STAGE_LENGTH, CANVAS_W, DEFAULT_GROUND_Y } from './constants'
+import type { Rand } from './rng'
 
 // ステージ開始時に全地形を一括生成する。
 // 段差（山登り階段）があるのは機械工学科だけ。生物応化は地面なし、それ以外は平坦。
 // 穴（type: 'hole'）は engine 側に落下フローとして残しているが、現在どの学科も使っていない。
-export function buildStage(departmentId: number): TerrainSegment[] {
-  if (departmentId === 1) return buildStageMech()
+export function buildStage(departmentId: number, rand: Rand = Math.random): TerrainSegment[] {
+  if (departmentId === 1) return buildStageMech(rand)
   if (departmentId === 4) return []  // 生物応用化学科（液体スイム）：地面・壁・穴すべてなし
   return buildStageFlat()
 }
@@ -26,26 +27,26 @@ const STEP_H = 40  // 1段の高さ。1ジャンプ（最大約140px）で余裕
 
 // 山型階段を1まとまり生成して新しい cursor を返す。
 // 段（2〜4段）を上って頂上の平坦部に達する。下りは無く、頂上の端から基準高さへ急落下する。
-function pushMountain(segments: TerrainSegment[], startCursor: number): number {
+function pushMountain(segments: TerrainSegment[], startCursor: number, rand: Rand): number {
   let cursor = startCursor
-  const steps = 2 + Math.floor(Math.random() * 3)  // 2〜4段
+  const steps = 2 + Math.floor(rand() * 3)  // 2〜4段
 
   // 上り
   for (let i = 1; i <= steps; i++) {
     const groundY = DEFAULT_GROUND_Y - STEP_H * i
-    const width = 90 + Math.random() * 50
+    const width = 90 + rand() * 50
     segments.push({ type: 'ground', stageX: cursor, width, groundY })
     cursor += width
   }
   // 頂上の平坦部（この端から次の基準高さ地面へ急落下する）
-  const topWidth = 120 + Math.random() * 60
+  const topWidth = 120 + rand() * 60
   segments.push({ type: 'ground', stageX: cursor, width: topWidth, groundY: DEFAULT_GROUND_Y - STEP_H * steps })
   cursor += topWidth
 
   return cursor
 }
 
-function buildStageMech(): TerrainSegment[] {
+function buildStageMech(rand: Rand): TerrainSegment[] {
   const segments: TerrainSegment[] = []
   let cursor = 0
   let currentLevel = DEFAULT_GROUND_Y  // 現在の地面高さ（単段差で変化）
@@ -56,16 +57,16 @@ function buildStageMech(): TerrainSegment[] {
   const SAFE_ZONE_END = STAGE_LENGTH - 600
 
   while (cursor < SAFE_ZONE_END) {
-    const groundWidth = 140 + Math.random() * 180
+    const groundWidth = 140 + rand() * 180
     segments.push({ type: 'ground', stageX: cursor, width: groundWidth, groundY: currentLevel })
     cursor += groundWidth
 
     if (cursor >= SAFE_ZONE_END) break
 
-    const pat = Math.random()
+    const pat = rand()
     if (pat < 0.45 && cursor + 700 < SAFE_ZONE_END) {
       // 山登り（メインギミック）：上って下る山型階段
-      cursor = pushMountain(segments, cursor)
+      cursor = pushMountain(segments, cursor, rand)
       currentLevel = DEFAULT_GROUND_Y  // 山型の後は必ず基準高さへ戻る
     } else if (pat < 0.70) {
       // 単段差（軽い起伏）：1段だけ上下トグル
