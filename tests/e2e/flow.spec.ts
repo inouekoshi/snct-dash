@@ -31,7 +31,8 @@ test.describe('プレイ → クリア → 登録', () => {
     await setNickname(page)
     await startDepartment(page, '電子情報工学科')
     await expect.poll(() => calls.filter(c => c.url === '/api/runs').length).toBe(1)
-    expect(calls[0].body).toEqual({ department: 3 })
+    expect(calls[0].body).toMatchObject({ department: 3 })
+    expect((calls[0].body as { startedAgoMs: number }).startedAgoMs).toBeLessThan(5000)
 
     await warpToGoal(page, 95_430)
     await expect(page.getByText('STAGE CLEAR!')).toBeVisible({ timeout: 10_000 })
@@ -68,7 +69,7 @@ test.describe('プレイ → クリア → 登録', () => {
     await expect(page.getByTestId('game-canvas')).toBeVisible()
     await expect(page.getByRole('button', { name: '▶ スタート！' })).toHaveCount(0)
     await expect.poll(() => calls.filter(c => c.url === '/api/runs').length).toBe(2)
-    expect(calls.filter(c => c.url === '/api/runs').map(c => c.body)).toEqual([{ department: 1 }, { department: 1 }])
+    expect(calls.filter(c => c.url === '/api/runs').map(c => (c.body as { department: number }).department)).toEqual([1, 1])
   })
 
   test('材料工学科はクリア後に眼鏡フレーム完成の演出が出る', async ({ page }) => {
@@ -177,4 +178,19 @@ test.describe('PWA', () => {
     expect(res.status()).toBe(200)
     expect(res.headers()['content-type']).toContain('image/png')
   })
+})
+
+test('クリア直後（結果画面に移る前）にタブを切り替えても、一時停止メニューは出ずに登録される', async ({ page }) => {
+  const calls = await mockApi(page)
+  await setNickname(page)
+  await startDepartment(page, '電気電子工学科')
+  await warpToGoal(page)
+  await expect.poll(() => page.evaluate(() => window.__kosendash!.engine.snapshot.cleared)).toBe(true)
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => true })
+    document.dispatchEvent(new Event('visibilitychange'))
+  })
+  await expect(page.getByRole('button', { name: '↺ 最初からやり直す' })).toHaveCount(0)
+  await expect(page.getByText('STAGE CLEAR!')).toBeVisible()
+  await expect.poll(() => calls.filter(c => c.url === '/api/stage-clears').length).toBe(1)
 })

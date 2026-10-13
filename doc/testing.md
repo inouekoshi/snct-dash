@@ -8,7 +8,7 @@
 | `npm run test:e2e` | E2E（Playwright）：画面の流れ・スマホ操作・PWA。本番ビルドを起動して試す | 約1分 |
 | `npm run test:e2e:full` | ↑＋実時間の通しプレイ（全学科）・描画性能・メモリ | 約5分 |
 | `npm run autoplay:report -- 5 1,2,3,4,5` | 学科ごとに5回自動プレイしてクリアタイムを表示（バランス調整用） | 学科あたり約1分/回 |
-| `supabase/tests/rpc_test.sql` | DB関数のテスト。開発DBの SQL エディタで実行（最後に ROLLBACK） | 数秒 |
+| `supabase/tests/rpc_test.sql` | DB関数のテスト（21項目）。SQL エディタで実行（最後に ROLLBACK） | 数秒 |
 
 初回だけ `npm install` が必要。Playwright のブラウザは `npx playwright install chromium` で入れる（クラウド環境では入っている）。
 

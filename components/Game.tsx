@@ -129,11 +129,11 @@ export default function Game({ nickname, departmentId, autoStart = false, onStar
     const onPointerUp = () => { if (isSwim) engine.setThrust(false) }
     const onBlur = () => { if (isSwim) engine.setThrust(false) }
     // 別のアプリやタブに切り替えたら一時停止（戻ってきたら「再開」を押して続ける）
+    // クリア直後（結果画面に移るまでの0.8秒）は pause() が何もしないので、メニューも出さない
     const onVisibility = () => {
-      if (document.hidden && !engine.paused) {
-        engine.pause()
-        setPaused(true)
-      }
+      if (!document.hidden) return
+      engine.pause()
+      setPaused(engine.paused)
     }
 
     window.addEventListener('keydown', onKeyDown)

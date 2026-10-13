@@ -1,4 +1,6 @@
+import { cache } from 'react'
 import { createServerClient } from '@/lib/supabase-server'
+import { isUuid } from '@/lib/uuid'
 
 export interface ClearRecord {
   id: string
@@ -9,11 +11,12 @@ export interface ClearRecord {
   rank: number
 }
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
-/** シェアページ用にクリア記録を1件読む（非表示・存在しない・DBエラーは null） */
-export async function getClear(id: string): Promise<ClearRecord | null> {
-  if (!UUID_RE.test(id)) return null
+/**
+ * シェアページ用にクリア記録を1件読む（非表示・存在しない・DBエラーは null）。
+ * 同じリクエスト内（generateMetadata とページ本体）では1回だけ DB に問い合わせる。
+ */
+export const getClear = cache(async (id: string): Promise<ClearRecord | null> => {
+  if (!isUuid(id)) return null
   try {
     const { data, error } = await createServerClient().rpc('get_clear', { p_id: id })
     if (error || !Array.isArray(data) || data.length === 0) return null
@@ -21,4 +24,4 @@ export async function getClear(id: string): Promise<ClearRecord | null> {
   } catch {
     return null
   }
-}
+})

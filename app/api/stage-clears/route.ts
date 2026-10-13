@@ -3,9 +3,8 @@ import { createServerClient } from '@/lib/supabase-server'
 import { apiError, codeFromDbError } from '@/lib/server/api-error'
 import { normalizeNickname } from '@/lib/nickname'
 import { MAX_CLEAR_TIME_MS } from '@/lib/game/limits'
+import { isUuid } from '@/lib/uuid'
 import type { SubmitClearResponse } from '@/lib/types'
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 // クリアタイム登録。検証（学科ごとの最短タイム・開始からの経過時間・1プレイ1回・NGワード）は
 // DB関数 submit_clear() が行う（API を通さず直接呼ばれても同じ検証がかかるように）。
@@ -19,7 +18,7 @@ export async function POST(request: NextRequest) {
   }
   const { runId, nickname, clear_time_ms, misses } = (body ?? {}) as Record<string, unknown>
 
-  if (typeof runId !== 'string' || !UUID_RE.test(runId)) return apiError('run_not_found')
+  if (!isUuid(runId)) return apiError('run_not_found')
   if (typeof nickname !== 'string') return apiError('invalid_nickname')
   const name = normalizeNickname(nickname)
   if (!name) return apiError('invalid_nickname')

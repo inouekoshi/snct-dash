@@ -3,9 +3,9 @@ import { createServerClient } from '@/lib/supabase-server'
 import { apiError } from '@/lib/server/api-error'
 
 // 学科別ランキング TOP10（同じニックネームは最速1件だけ。DB関数 get_leaderboard()）。
-// 高専祭当日の負荷対策として、CDN に5秒キャッシュさせる（その後30秒は古い結果を返しつつ裏で更新）。
-// クリア直後の自分の順位は POST /api/stage-clears のレスポンスで返すので、少し古くても困らない。
-const CACHE_HEADERS = { 'Cache-Control': 'public, s-maxage=5, stale-while-revalidate=30' }
+// 高専祭当日の負荷対策として、CDN に5秒キャッシュさせる（その後5秒は古い結果を返しつつ裏で更新）。
+// 登録してからランキングに出るまで最大10秒ほどかかりうる。クリア直後の順位は POST /api/stage-clears が返す。
+const CACHE_HEADERS = { 'Cache-Control': 'public, s-maxage=5, stale-while-revalidate=5' }
 
 export async function GET(request: NextRequest) {
   const departmentParam = request.nextUrl.searchParams.get('department')

@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
   } catch {
     return apiError('invalid_request')
   }
-  const { department } = (body ?? {}) as Record<string, unknown>
+  const { department, startedAgoMs } = (body ?? {}) as Record<string, unknown>
   if (typeof department !== 'number' || !Number.isInteger(department) || department < 1 || department > 5) {
     return apiError('invalid_department')
   }
@@ -24,6 +24,8 @@ export async function POST(request: NextRequest) {
       p_department: department,
       p_client_key: clientKeyFrom(request.headers),
       p_device: deviceFrom(request.headers.get('user-agent')),
+      // ゲーム開始からこのリクエストまでの遅れ。DB側で最大30秒に切り詰めて開始時刻をさかのぼる
+      p_started_ago_ms: typeof startedAgoMs === 'number' && Number.isFinite(startedAgoMs) ? Math.round(startedAgoMs) : 0,
     })
     if (error || typeof data !== 'string') {
       const code = codeFromDbError(error)

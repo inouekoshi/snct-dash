@@ -83,10 +83,11 @@ select played_at, department, nickname, clear_time_ms, misses, hidden from publi
 
 | 症状 | 原因と対応 |
 |------|-----------|
+| 登録したのにランキングに出ない | ランキングは CDN に数秒キャッシュするので、最大10秒ほど遅れて出る（リザルト画面の順位は即時） |
 | ゲームは動くが「登録されませんでした」「ランキングを読み込めませんでした」 | Supabase が止まっている／障害。Supabase の Project Status を確認し、Paused なら **Restore**（数分）。ゲーム自体は遊べるので、来場者には「ランキングは後で復旧します」と案内 |
 | 全員「このプレイはすでに登録済み」「プレイ情報が見つかりません」 | 本番DBに `..._100` マイグレーションが当たっていない。`select to_regclass('public.runs');` が null なら `supabase/migrations/20261013000100_*.sql` を SQL Editor で実行 |
 | 「クリアタイムが正しくありません」が多発 | ステージの長さや速度を変えたのに最短タイムを直していない。`lib/game/limits.ts` と `min_clear_time_ms()` を確認 |
-| 「短時間に何度も始めすぎです」 | 同じ回線（IP）から1分に120回以上スタートした。会場の Wi-Fi で非常に大勢が同時に遊ぶと起きうる。起きたら `start_run()` の `120` を増やす（マイグレーションの関数定義を書き換えて SQL Editor で実行） |
+| 「短時間に何度も始めすぎです」 | 同じ回線（IP）から1分に120回以上、または全員の合計で1分に600回以上スタートした。会場の Wi-Fi で非常に大勢が同時に遊ぶと起きうる。起きたら `start_run()` の `120` / `600` を増やす（`supabase/migrations/20261013000400_review_fixes.sql` の関数定義を書き換えて SQL Editor で実行） |
 | ページが開かない | Vercel の障害・デプロイ失敗。Deployments で直前の Ready なデプロイを **Promote to Production**（ロールバック） |
 | 古い画面のまま | Service Worker のキャッシュ。ページを再読み込み（2回）すれば最新になる（画面はネット優先で取りに行く設定） |
 
@@ -95,7 +96,8 @@ select played_at, department, nickname, clear_time_ms, misses, hidden from publi
 ## 不適切なニックネーム・不正な記録への対応
 
 ```sql
--- ランキングから隠す（消さない。戻すときは hidden = false）
+-- ランキングから隠す（消さない。戻すときは hidden = false）。
+-- 一度隠したニックネームは、その人がもう一度クリアしても最初から隠れる
 update public.stage_clears set hidden = true where nickname = '〇〇';
 
 -- 禁止語を追加する（以後の登録で弾く。小文字で入れる。部分一致なので短すぎる語は避ける）

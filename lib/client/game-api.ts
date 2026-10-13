@@ -4,12 +4,13 @@ import type { ApiError, ApiErrorCode, StageClearEntry, StartRunResponse, SubmitC
 
 export type Result<T> = { ok: true; data: T } | { ok: false; code: ApiErrorCode; message: string }
 
-async function post<T>(url: string, body: unknown): Promise<Result<T>> {
+async function post<T>(url: string, body: unknown, timeoutMs = 10_000): Promise<Result<T>> {
   try {
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(timeoutMs),
     })
     const json = await res.json().catch(() => null)
     if (res.ok) return { ok: true, data: json as T }
@@ -20,10 +21,16 @@ async function post<T>(url: string, body: unknown): Promise<Result<T>> {
   }
 }
 
-/** プレイ開始を登録して runId を得る。通信エラーは少し待って2回まで再試行する */
+/**
+ * プレイ開始を登録して runId を得る（ゲームはこの完了を待たずに始まる）。通信エラーは少し待って2回まで再試行する。
+ * サーバーは「開始からの経過時間」でクリアタイムを検証するので、ゲーム開始から何ms後に送ったかも伝える
+ * （サーバー側で最大30秒に切り詰める）。
+ */
 export async function startRun(department: number): Promise<string | null> {
+  const startedAt = performance.now()
   for (let attempt = 0; attempt < 3; attempt++) {
-    const r = await post<StartRunResponse>('/api/runs', { department })
+    const startedAgoMs = Math.round(performance.now() - startedAt)
+    const r = await post<StartRunResponse>('/api/runs', { department, startedAgoMs }, 8_000)
     if (r.ok) return r.data.runId
     if (r.code !== 'server_error') return null // レート制限などは再試行しない
     await new Promise(resolve => setTimeout(resolve, 800 * (attempt + 1)))
@@ -44,7 +51,7 @@ export function submitClear(params: {
 
 export async function fetchLeaderboard(department: number): Promise<StageClearEntry[] | null> {
   try {
-    const res = await fetch(`/api/leaderboard?department=${department}`)
+    const res = await fetch(`/api/leaderboard?department=${department}`, { cache: 'no-store' })
     if (!res.ok) return null
     const { entries } = await res.json()
     return entries as StageClearEntry[]

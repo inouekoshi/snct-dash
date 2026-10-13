@@ -115,7 +115,7 @@ snct-dash/
 [タイトル] ニックネーム（localStorage: snct_nickname）
     ↓
 [学科選択 → ブリーフィング → ▶スタート！]
-    ↓ POST /api/runs { department }            → start_run()   … runs に1行（プレイ記録）
+    ↓ POST /api/runs { department, startedAgoMs } → start_run()  … runs に1行（プレイ記録）
     ↓   ← { runId }（裏で取得。失敗してもプレイはできる）
 [GameEngine] キーボード/タッチ → jump() / setThrust() / pause()
     ↓ onClear({ timeMs, departmentId, misses })

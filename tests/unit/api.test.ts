@@ -26,7 +26,7 @@ beforeEach(() => {
 describe('POST /api/runs', () => {
   it('runId を返し、IP はハッシュ化して渡す', async () => {
     rpc.mockResolvedValue({ data: RUN_ID, error: null })
-    const res = await startRun(post('/api/runs', { department: 3 }, { 'x-forwarded-for': '203.0.113.9', 'user-agent': 'iPhone Mobile' }))
+    const res = await startRun(post('/api/runs', { department: 3, startedAgoMs: 1234.4 }, { 'x-forwarded-for': '203.0.113.9', 'user-agent': 'iPhone Mobile' }))
     expect(res.status).toBe(201)
     expect(await res.json()).toEqual({ runId: RUN_ID })
     const [fn, args] = rpc.mock.calls[0]
@@ -34,6 +34,13 @@ describe('POST /api/runs', () => {
     expect(args.p_department).toBe(3)
     expect(args.p_device).toBe('mobile')
     expect(args.p_client_key).toMatch(/^[0-9a-f]{32}$/)
+    expect(args.p_started_ago_ms).toBe(1234)
+  })
+
+  it('startedAgoMs がなければ 0 を渡す', async () => {
+    rpc.mockResolvedValue({ data: RUN_ID, error: null })
+    await startRun(post('/api/runs', { department: 1, startedAgoMs: 'x' }))
+    expect(rpc.mock.calls[0][1].p_started_ago_ms).toBe(0)
   })
 
   it.each([[{ department: 0 }], [{ department: 6 }], [{ department: '1' }], [{}]])('学科が不正なら 400（%j）', async (body) => {
@@ -117,7 +124,7 @@ describe('GET /api/leaderboard', () => {
     const res = await leaderboard(new NextRequest('http://localhost/api/leaderboard?department=1'))
     expect(res.status).toBe(200)
     expect((await res.json()).entries).toHaveLength(1)
-    expect(res.headers.get('cache-control')).toContain('s-maxage=5')
+    expect(res.headers.get('cache-control')).toBe('public, s-maxage=5, stale-while-revalidate=5')
     expect(rpc).toHaveBeenCalledWith('get_leaderboard', { p_department: 1, p_limit: 10 })
   })
 

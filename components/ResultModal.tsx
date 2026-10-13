@@ -76,7 +76,7 @@ export default function ResultModal({ nickname, result, runId, onRetry, onSelect
             ) : (
               <p className="text-xs text-gray-400">自己ベスト {formatTime(state.data.bestMs)}</p>
             )}
-            <p className="text-gray-400 text-sm">ランキング</p>
+            <p className="text-gray-400 text-sm">{state.data.isPersonalBest ? 'ランキング' : '今回のタイムなら'}</p>
             <p className="text-2xl font-black text-blue-400">
               {state.data.rank} 位 <span className="text-sm text-gray-400 font-bold">/ {state.data.totalPlayers}人中</span>
             </p>

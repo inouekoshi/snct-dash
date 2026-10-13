@@ -8,6 +8,7 @@
 | `20261013000100_runs_anticheat_leaderboard.sql` | `runs`・NGワード・DB関数・analytics ビュー | ✅ 2026-10-13 | ✅ 2026-10-13 |
 | `20261013000200_lockdown_direct_insert.sql` | `stage_clears` への直接 INSERT を禁止 | ✅ 2026-10-13 | ⏳ **main に新コードをデプロイした直後に適用** |
 | `20261013000300_archive_legacy_scores.sql` | 旧 `scores` テーブルを `archive` スキーマへ退避 | ✅ 2026-10-13 | ✅ 2026-10-13 |
+| `20261013000400_review_fixes.sql` | 順位の数え方の統一・隠した名前の再登録・通信遅れの補正・直接呼び出しの制限 | ✅ 2026-10-13 | ✅ 2026-10-13 |
 
 > ⚠ `..._200_lockdown` を本番に先に当てると、旧コード（直接 INSERT する API）の本番でクリア登録が失敗する。
 > 手順は [doc/operations.md の「本番リリース手順」](operations.md#本番リリース手順dev--main)。
@@ -21,11 +22,13 @@
 | `id` | uuid PK | シェアページ `/r/{id}` に使う |
 | `nickname` | text | 1〜20文字 |
 | `department` | int | 1=機械, 2=電気電子, 3=電子情報, 4=生物応用化学, 5=材料 |
-| `clear_time_ms` | int | クリアタイム（ミリ秒・小さいほど上位）。`min_clear_time_ms(department)` 以上 600000 以下（CHECK 制約） |
+| `clear_time_ms` | int | クリアタイム（ミリ秒・小さいほど上位）。`min_clear_time_ms(department)` 以上 600000 以下（CHECK 制約。`hidden` の行は対象外） |
 | `played_at` | timestamptz | 登録日時 |
 | `run_id` | uuid | どのプレイの記録か（`runs.id`・一意） |
 | `misses` | int | ミス回数 |
-| `hidden` | bool | `true` でランキング・シェアページから消える（運営が不適切な名前を隠す用） |
+| `hidden` | bool | `true` でランキング・シェアページから消える（運営が不適切な名前を隠す用）。一度隠したニックネームは、以後の登録も最初から隠れる |
+
+ランキング・順位の対象は「`hidden` でなく、学科の最短タイム以上の記録」（`is_ranked_clear()`）。旧APIで入った不可能なタイムは表示されない。
 
 RLS：SELECT は誰でも可。INSERT は `with check (false)`（直接は不可・`submit_clear()` 経由のみ）。UPDATE / DELETE はポリシーなし＝不可。
 
@@ -35,9 +38,10 @@ RLS：SELECT は誰でも可。INSERT は `with check (false)`（直接は不可
 |----|------|
 | `id` | runId（スタート時に発行し、クリア登録に1回だけ使える） |
 | `department` | 学科 |
-| `client_key` | 接続元IPのハッシュ（連続開始の制限用。生のIPは保存しない） |
+| `client_key` | 来場者のIPのハッシュ（API が渡す。連続開始の制限用。生のIPは保存しない） |
+| `source_key` | DB に直接つないできた接続元のIPのハッシュ（API 経由なら Vercel のサーバー） |
 | `device` | `mobile` / `tablet` / `desktop` / `unknown`（User-Agent から推定） |
-| `started_at` / `finished_at` | 開始（サーバー時刻）／クリア登録した時刻（未クリアなら null） |
+| `started_at` / `finished_at` | 開始（サーバー時刻から、ゲーム開始〜リクエストまでの遅れ（最大30秒）をさかのぼった時刻）／クリア登録した時刻（未クリアなら null） |
 | `clear_time_ms` / `misses` | クリア時の値 |
 
 RLS 有効・ポリシーなし、anon / authenticated の権限も剥奪（DB関数からのみ触れる）。
@@ -53,12 +57,13 @@ RLS 有効・ポリシーなし、anon / authenticated の権限も剥奪（DB�
 
 | 関数 | 呼べる人 | 内容 |
 |------|---------|------|
-| `start_run(p_department, p_client_key, p_device) → uuid` | anon | プレイ開始。同じ `client_key`（IPのハッシュ）は1分に120回まで（`rate_limited` / 429） |
-| `submit_clear(p_run_id, p_nickname, p_clear_time_ms, p_misses)` | anon | クリア登録。下の検証をすべて通ったら `stage_clears` に追加し、`clear_id, rank, best_ms, is_personal_best, total_players` を返す |
+| `start_run(p_department, p_client_key, p_device, p_started_ago_ms) → uuid` | anon | プレイ開始。同じ `client_key` は1分に120回まで、同じ接続元（`source_key`）は1分に600回まで（`rate_limited` / 429）。`p_client_key` を渡さない直接呼び出しは接続元IPで数える |
+| `submit_clear(p_run_id, p_nickname, p_clear_time_ms, p_misses)` | anon | クリア登録。下の検証をすべて通ったら `stage_clears` に追加し、`clear_id, rank, best_ms, is_personal_best, total_players` を返す。`rank` は「今回のタイムなら何位か」（自分以外のプレイヤーの自己ベストと比べる）。自己ベスト更新なら ランキングの順位と同じ |
 | `get_leaderboard(p_department, p_limit = 10)` | anon | ランキング。同じニックネームは最速1件（`distinct on`）。`hidden` を除く |
-| `get_clear(p_id)` | anon | 1件＋順位（シェアページ用） |
+| `get_clear(p_id)` | anon | 1件＋順位（シェアページ用。`submit_clear` の `rank` と同じ数え方） |
 | `min_clear_time_ms(p_department)` | — | 学科ごとの最短タイム（`lib/game/limits.ts` と同じ値。テストで一致を確認） |
-| `rank_of(...)` / `is_nickname_allowed(...)` | 内部用 | API からは呼べない |
+| `rank_of(...)` / `is_nickname_allowed(...)` / `is_ranked_clear(...)` | 内部用 | API からは呼べない |
+| `start_run_legacy` / `rank_of_legacy` | 旧版 | 引数を変えたときに改名して残したもの（誰も呼べない。不要なら drop してよい） |
 
 > Supabase の Security Advisor は「anon が SECURITY DEFINER 関数を実行できる」「RLS が有効でポリシーがない」（`runs` / `ng_words`）と表示するが、
 > どちらも意図した設計（ゲームが呼ぶ4関数だけを公開し、テーブルは関数経由でしか触らせない）。
@@ -76,7 +81,8 @@ RLS 有効・ポリシーなし、anon / authenticated の権限も剥奪（DB�
 | **サーバーで測った開始からの経過時間 + 10秒 ≥ タイム** | `time_mismatch`（422） |
 
 最後のチェックで「開始直後に好タイムを送る」不正ができない（好タイムを出すには少なくともそのタイムぶん待つ必要があり、
-そのタイムも物理的な最短タイム以上でなければならない）。10秒は通信の遅れの余裕。
+そのタイムも物理的な最短タイム以上でなければならない）。10秒は登録時の通信の遅れの余裕。
+スタート時の通信の遅れは、クライアントが「ゲーム開始から何ms後に送ったか」を `start_run` に渡し、開始時刻をそのぶん（最大30秒）さかのぼって補正する。
 ゲーム内時間は一時停止中に進まないので、正しいプレイでは経過時間 ≥ ゲーム内時間になる。
 
 ### 学科ごとの最短タイム

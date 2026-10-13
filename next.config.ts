@@ -1,10 +1,10 @@
 import type { NextConfig } from "next";
 
+// E2E テスト用のフック（components/Game.tsx）。未設定でも "0" としてビルド時に埋め込ませ、
+// 本番ビルドからコードごと消す（NEXT_PUBLIC_* は設定されているときだけ埋め込まれるため）
+process.env.NEXT_PUBLIC_E2E = process.env.NEXT_PUBLIC_E2E === "1" ? "1" : "0";
+
 const nextConfig: NextConfig = {
-  // E2E テスト用のフック（components/Game.tsx）。未設定でも '0' としてビルド時に埋め込み、本番ビルドからコードごと消す
-  env: {
-    NEXT_PUBLIC_E2E: process.env.NEXT_PUBLIC_E2E === "1" ? "1" : "0",
-  },
   async headers() {
     return [
       {
