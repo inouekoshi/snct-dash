@@ -30,12 +30,16 @@
    ```
 
 5. 本番で1回クリアして、登録・順位・ランキングが出ることを確認する
-6. **ランキングのテストデータを消す**（本番。2026-10-13 時点の15件は `archive.stage_clears_20261013` に退避済み）：
+6. **ランキングのテストデータ**：2026-10-13 時点の15件は `archive.stage_clears_20261013` に退避したうえで、
+   `hidden = true`・ニックネームを `reset-xxxxxxxx` に変更済み（新コードのランキングには出ない）。
+   旧コード（main マージ前の本番）は `hidden` を見ないので、マージまでは本番ランキングに `reset-…` が見える。
+   行ごと消したいとき・当日の朝にリハーサルの記録を消すときは SQL Editor で：
 
    ```sql
    -- 退避済みの行（テストデータ）だけを消す
    delete from public.stage_clears where id in (select id from archive.stage_clears_20261013);
-   -- 当日の朝、リハーサルで入れた記録も消すなら（全消し）：
+   -- リハーサルの記録も含めて全部消す（先に archive へコピーしておくと安心）
+   -- create table archive.stage_clears_YYYYMMDD as table public.stage_clears;
    -- truncate public.stage_clears;  truncate public.runs cascade;
    ```
 

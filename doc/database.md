@@ -115,7 +115,7 @@ API には公開しない。
 | テーブル | 中身 |
 |---------|------|
 | `archive.scores_20261013` | 旧仕様の `scores`（本番61件） |
-| `archive.stage_clears_20261013` | 本番 `stage_clears` の 2026-10-13 時点のコピー（テストデータ15件） |
+| `archive.stage_clears_20261013` | 本番 `stage_clears` の 2026-10-13 時点のコピー（テストデータ15件。本番の元の行は hidden・名前を `reset-…` に変更済み） |
 
 ## Supabase クライアント
 
