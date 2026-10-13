@@ -48,7 +48,7 @@ export default function Leaderboard() {
             >
               <span className="text-lg">{theme.emoji}</span>
               <span className="leading-tight text-center" style={{ fontSize: '10px' }}>
-                {theme.name.replace('工学科', '')}
+                {theme.short}
               </span>
             </button>
           )

@@ -40,9 +40,9 @@ begin
   -- 存在しない run
   begin perform public.submit_clear(gen_random_uuid(), 'a', 105000, 0); insert into t_results values ('unknown run rejected', false, '');
   exception when others then insert into t_results values ('unknown run rejected', sqlerrm = 'run_not_found', sqlerrm); end;
-  -- レート制限：同じクライアントは1分に30回まで
+  -- レート制限：同じクライアントは1分に120回まで
   begin
-    for i in 1..40 loop perform public.start_run(3, 'flood-key', null); end loop;
+    for i in 1..130 loop perform public.start_run(3, 'flood-key', null); end loop;
     insert into t_results values ('rate limit', false, '');
   exception when others then insert into t_results values ('rate limit', sqlerrm = 'rate_limited', sqlerrm); end;
   -- 学科IDの範囲外

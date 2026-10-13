@@ -82,7 +82,7 @@ export default function Home() {
               style={{ borderColor: `${dept.groundLineColor}88`, backgroundColor: `${dept.groundLineColor}1a` }}
             >
               <span className="text-2xl">{dept.emoji}</span>
-              <span className="text-gray-300">{dept.name.replace(/工学科|学科$/, '')}</span>
+              <span className="text-gray-300">{dept.short}</span>
             </div>
           )
         })}

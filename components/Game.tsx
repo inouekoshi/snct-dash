@@ -150,7 +150,7 @@ export default function Game({ nickname, departmentId, autoStart = false, onStar
     return () => {
       engine.destroy()
       engineRef.current = null
-      if (window.__kosendash?.engine === engine) delete window.__kosendash
+      if (process.env.NEXT_PUBLIC_E2E === '1' && window.__kosendash?.engine === engine) delete window.__kosendash
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
       window.removeEventListener('blur', onBlur)
@@ -297,10 +297,10 @@ export default function Game({ nickname, departmentId, autoStart = false, onStar
           </button>
         )}
       </div>
-      <p className="text-gray-600 text-xs mt-4 sm:hidden">
+      <p className="text-gray-600 text-xs mt-4 hidden pointer-coarse:block">
         {isSwim ? 'タップ長押し：浮上（離すと沈む）｜⏸ボタンで一時停止' : 'タップでジャンプ（二段ジャンプあり）｜⏸ボタンで一時停止'}
       </p>
-      <p className="text-gray-600 text-xs mt-4 hidden sm:block">
+      <p className="text-gray-600 text-xs mt-4 pointer-coarse:hidden">
         {isSwim ? 'スペース / 上キー長押し: 浮上（離すと沈む）｜P / Esc: 一時停止' : 'スペース / クリック: ジャンプ（二段ジャンプあり）｜P / Esc: 一時停止'}
       </p>
     </main>

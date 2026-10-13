@@ -122,11 +122,12 @@ begin
   if p_department is null or p_department not between 1 and 5 then
     raise exception 'invalid_department' using errcode = 'PT400';
   end if;
-  -- 同じクライアントからの開始は1分に30回まで（通常のリトライ連打でも届かない回数）
+  -- 同じクライアント（IP）からの開始は1分に120回まで。目的は機械的な連打の防止。
+  -- 会場の Wi-Fi などで大勢が同じ IP を共有しても引っかからないよう、緩めにしている
   if p_client_key is not null and (
     select count(*) from public.runs
     where client_key = p_client_key and started_at > now() - interval '1 minute'
-  ) >= 30 then
+  ) >= 120 then
     raise exception 'rate_limited' using errcode = 'PT429';
   end if;
   insert into public.runs (department, client_key, device)

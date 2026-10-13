@@ -36,6 +36,9 @@ import { buildStage } from './terrain'
 // （120Hz の端末で2倍速になったり、重い端末でスローになったりしないようにする）。
 export const STEP_MS = 1000 / 60
 const MAX_STEPS_PER_FRAME = 5   // 重い端末で処理落ちしたときに追いつく上限（それ以上は捨てる）
+// 描画が重い端末の自動軽量化：フレーム間隔の移動平均がこれを超えた状態が続いたら、光彩（shadowBlur）を切る
+const SLOW_FRAME_MS = 22        // 約45fps
+const SLOW_FRAMES_TO_DEGRADE = 90
 const CLEAR_CALLBACK_DELAY_MS = 800
 
 export interface GameEngineOptions {
@@ -58,6 +61,9 @@ export class GameEngine {
   private spawner: Spawner
   private silent: boolean
   private beforeStep: (() => void) | null = null
+  private avgFrameMs = STEP_MS
+  private slowFrames = 0
+  private lowQuality = false
 
   // Player
   private py = DEFAULT_GROUND_Y
@@ -278,8 +284,10 @@ export class GameEngine {
   // 端数は accumulator に持ち越す（四捨五入相当にして 60Hz 端末でのカクつきを防ぐ）。
   private loop = (now: number) => {
     if (this.lastFrameTime === 0) this.lastFrameTime = now - STEP_MS
-    this.accumulator += Math.min(now - this.lastFrameTime, STEP_MS * MAX_STEPS_PER_FRAME)
+    const dt = now - this.lastFrameTime
+    this.accumulator += Math.min(dt, STEP_MS * MAX_STEPS_PER_FRAME)
     this.lastFrameTime = now
+    this.watchFrameRate(dt)
     let steps = 0
     while (this.accumulator >= STEP_MS / 2 && steps < MAX_STEPS_PER_FRAME && !this.isCleared) {
       this.beforeStep?.()
@@ -294,6 +302,20 @@ export class GameEngine {
     }
     if (!this.isPaused) this.raf = requestAnimationFrame(this.loop)
   }
+
+  // 描画が重い端末では光彩（shadowBlur）を無効にする。いちばん GPU 負荷が高く、無くても遊びに影響しない。
+  // 各描画関数を書き換えずに済むよう、コンテキストの shadowBlur への代入を無視させる。
+  private watchFrameRate(dt: number) {
+    if (this.lowQuality || !this.ctx || dt > 250) return // 250ms 超はタブ復帰などなので数えない
+    this.avgFrameMs += (dt - this.avgFrameMs) * 0.1
+    this.slowFrames = this.avgFrameMs > SLOW_FRAME_MS ? this.slowFrames + 1 : 0
+    if (this.slowFrames >= SLOW_FRAMES_TO_DEGRADE) {
+      this.lowQuality = true
+      Object.defineProperty(this.ctx, 'shadowBlur', { configurable: true, get: () => 0, set: () => {} })
+    }
+  }
+
+  get isLowQuality(): boolean { return this.lowQuality }
 
   private finish() {
     if (!this.silent) playClear()
