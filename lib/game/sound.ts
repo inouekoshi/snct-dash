@@ -28,11 +28,6 @@ export function playJump() {
   setTimeout(() => playTone(440, 0.08, 'sine'), 60)
 }
 
-export function playHurt() {
-  playTone(200, 0.08, 'square', 0.25)
-  setTimeout(() => playTone(150, 0.12, 'square', 0.2), 80)
-}
-
 export function playKnockback() {
   playTone(180, 0.1, 'square', 0.2)
   setTimeout(() => playTone(120, 0.15, 'square', 0.18), 100)

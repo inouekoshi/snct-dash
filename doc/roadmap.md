@@ -92,20 +92,19 @@
 
 ### Phase 4: 高専祭仕様化（〜2026-10）
 
-残タスクは GitHub Issues（マイルストーン「高専祭 2026-11-03」）で管理する。
-
 | # | 施策 | 概要 | 状態 |
 |---|------|------|------|
-| **4-0** | 本番公開 | dev（材料工学科・ライトモード修正など）を main へマージ | 🔲 [#1](https://github.com/inouekoshi/snct-dash/issues/1) |
-| **4-0** | 材料工学科の実機調整 | バウンド・加速・看板の読みやすさ・全体の難易度 | 🔲 [#2](https://github.com/inouekoshi/snct-dash/issues/2) |
-| **4-1** | スパム対策・不正タイム対策 | タイム下限の検証・レート制限・RLS の見直し | 🔲 [#3](https://github.com/inouekoshi/snct-dash/issues/3) |
-| **4-2** | PWA化 | `app/manifest.ts` はあるがアイコン・Service Worker が未対応 | 🔲 [#9](https://github.com/inouekoshi/snct-dash/issues/9) |
-| **4-3** | リザルト画像シェア | `next/og` でタイム・学科をOGP画像化しX/LINEで共有 | 🔲 [#10](https://github.com/inouekoshi/snct-dash/issues/10) |
-| **4-4** | アナリティクス導入 | `@vercel/analytics` で離脱箇所・プレイ傾向を可視化 | 🔲 [#8](https://github.com/inouekoshi/snct-dash/issues/8) |
-| **4-5** | パフォーマンス保証 | 低スペック端末での60fps確認・メモリリーク対策 | 🔲 [#4](https://github.com/inouekoshi/snct-dash/issues/4) |
-| **4-6** | ランキング改善 | 同一プレイヤーは最速タイムのみ表示 | 🔲 [#11](https://github.com/inouekoshi/snct-dash/issues/11) |
+| **4-0** | 本番公開 | dev を main へマージし、本番DBに lockdown を適用（[手順](operations.md#本番リリース手順dev--main)） | 🔲 [#1](https://github.com/inouekoshi/snct-dash/issues/1)（実機確認後） |
+| **4-0** | 材料工学科の実機調整 | 自動プレイで全工程を通しで確認済み（約102秒・他学科と同程度）。手触りは実機で | 🔄 [#2](https://github.com/inouekoshi/snct-dash/issues/2)（実機チェックリスト） |
+| **4-1** | スパム対策・不正タイム対策 | プレイID（runs）・DB関数での検証（学科ごとの最短タイム・経過時間・1プレイ1登録）・直接INSERT禁止・レート制限・NGワード | ✅ 2026-10-13 [#3](https://github.com/inouekoshi/snct-dash/issues/3) |
+| **4-2** | PWA化 | アイコン・Service Worker（オフラインでも画面を開ける）・マニフェスト | ✅ 2026-10-13 [#9](https://github.com/inouekoshi/snct-dash/issues/9) |
+| **4-3** | リザルト画像シェア | `/r/[id]` ページと OGP 画像（`next/og`）、X / LINE / 端末の共有 | ✅ 2026-10-13 [#10](https://github.com/inouekoshi/snct-dash/issues/10) |
+| **4-4** | アナリティクス導入 | Supabase の `runs` に全プレイを記録し、`analytics` ビューで学科別のプレイ数・クリア率・時間帯を集計 | ✅ 2026-10-13 [#8](https://github.com/inouekoshi/snct-dash/issues/8) |
+| **4-5** | パフォーマンス保証 | 固定タイムステップ（120Hz端末で倍速にならない）・CPU4倍遅くても60fps・重い端末で光彩を自動オフ・メモリ増加なし | ✅ 計測済み／実機確認 🔲 [#4](https://github.com/inouekoshi/snct-dash/issues/4) |
+| **4-6** | ランキング改善 | 同一ニックネームは最速タイムのみ・順位と自己ベストをリザルトに表示 | ✅ 2026-10-13 [#11](https://github.com/inouekoshi/snct-dash/issues/11) |
+| — | 遊びやすさ | 同じ学科で「もう一度」・一時停止メニュー（再開/最初から/学科選択）・タブ切替や縦向きで自動停止 | ✅ 2026-10-13 |
+| — | テスト | 単体（Vitest）・全学科の自動プレイ・E2E（Playwright）・DB関数のテスト | ✅ 2026-10-13（[doc/testing.md](testing.md)） |
 | — | Supabase 自動停止対策 | Vercel Cron で1日1回ウォームアップ | ✅ 実装済み |
-| — | ライトモードで画面が白くなる不具合 | 配色をダークに固定 | ✅ dev で修正（main 未反映） |
 
 ---
 
@@ -113,11 +112,11 @@
 
 | # | 作業 | 概要 | 状態 |
 |---|------|------|------|
-| **5-1** | 本番負荷試験 | 同時アクセスのシミュレーション | 🔲 [#6](https://github.com/inouekoshi/snct-dash/issues/6) |
-| **5-2** | モニタリング体制 | Vercel + Supabase のログ監視・停止時の復旧手順 | 🔲 [#7](https://github.com/inouekoshi/snct-dash/issues/7) |
-| **5-3** | 運営引き継ぎ | 当日運営学生への操作説明・緊急連絡フロー | 🔲 [#7](https://github.com/inouekoshi/snct-dash/issues/7) |
-| **5-4** | 利用規約の確認 | Vercel Hobby を高専祭で使ってよいか | 🔲 [#5](https://github.com/inouekoshi/snct-dash/issues/5) |
-| **5-5** | 後片付け | 不要な環境変数・旧 `scores` テーブルの削除 | 🔲 [#12](https://github.com/inouekoshi/snct-dash/issues/12) [#13](https://github.com/inouekoshi/snct-dash/issues/13) |
+| **5-1** | 本番負荷試験 | DB関数を2万件のデータで計測（1回 0.35〜7ms）・見積もりは十分余裕。HTTP 越しの試験は未実施 | ✅ 見積もり済み [#6](https://github.com/inouekoshi/snct-dash/issues/6) |
+| **5-2** | モニタリング体制 | 監視する場所・SQL・トラブル対応表（[doc/operations.md](operations.md)） | ✅ 資料作成済み [#7](https://github.com/inouekoshi/snct-dash/issues/7) |
+| **5-3** | 運営引き継ぎ | 来場者への案内文・よくある質問・連絡フロー（当番表は要記入） | 🔄 [#7](https://github.com/inouekoshi/snct-dash/issues/7) |
+| **5-4** | 利用規約の確認 | 非商用（課金・広告・報酬なし）なら Hobby の範囲と考えられる。学校運営として出すなら要判断 | 🔄 判断待ち [#5](https://github.com/inouekoshi/snct-dash/issues/5) |
+| **5-5** | 後片付け | 旧 `scores` は archive へ退避済み。Vercel の不要な環境変数は手作業で削除 | 🔄 [#12](https://github.com/inouekoshi/snct-dash/issues/12)（手作業） ✅ [#13](https://github.com/inouekoshi/snct-dash/issues/13) |
 
 ---
 
@@ -149,7 +148,7 @@
 |---------|------|---------|
 | Phase 2 | ✅ 2026-05 完了 | 1学科でタイムアタックが成立する状態 |
 | Phase 3 | ✅ 2026-10 完了 | 5学科全て遊べる状態 |
-| Phase 4 | 〜2026-10 | 高専祭運用に耐える品質 |
+| Phase 4 | 〜2026-10（実装は 2026-10-13 完了・実機確認待ち） | 高専祭運用に耐える品質 |
 | Phase 5 | 〜2026-11-01 | 本番準備完了 |
 | Phase 6 | 2026-11-03 | 高専祭当日 |
 
@@ -159,11 +158,11 @@
 
 | リスク | 内容 | 対策 |
 |--------|------|------|
-| **Supabase Free 同時接続60** | 祭当日に詰む可能性 | Realtime不使用、キャッシュ活用 |
-| **Vercel Hobby の商用利用問題** | 規約上Pro必須の解釈あり | 高専祭運用前に要確認（[#5](https://github.com/inouekoshi/snct-dash/issues/5)） |
-| **スパム・不正タイム** | クリアタイムの改ざん。RLS が INSERT を public に許可しており、API を通さない直接書き込みも可能 | タイム下限の検証・レート制限・RLS の見直し（[#3](https://github.com/inouekoshi/snct-dash/issues/3)） |
+| **Supabase Free 同時接続60** | 祭当日に詰む可能性 | REST（PostgREST）経由なので直接接続を使わない。ランキングは CDN に5秒キャッシュ |
+| **Vercel Hobby の商用利用問題** | Hobby は個人・非商用のみ | 課金・広告・報酬なしの学生作品なら範囲内と考えられる。判断材料は [operations.md](operations.md#vercel-hobby-プランで公開してよいか)（[#5](https://github.com/inouekoshi/snct-dash/issues/5)） |
+| **スパム・不正タイム** | クリアタイムの改ざん | 対策済み：DB関数で検証（最短タイム・経過時間・1プレイ1登録・NGワード）、直接 INSERT 禁止。残るのは「本当に待って理論値近くのタイムを送る」ことだけ（運営が `hidden` で隠せる） |
 | **Supabase Free の自動停止** | 約7日アクセスがないと停止し、API が 500 になる | Vercel Cron で毎日ウォームアップ（実装済み）。停止時はダッシュボードで Restore |
-| **当日ピーク負荷** | 同時数百人のDB書き込み集中 | インデックス設計・事前負荷試験 |
+| **当日ピーク負荷** | 同時数百人のDB書き込み集中 | DB関数の計測で十分な余裕を確認（[operations.md](operations.md#負荷の見積もり)） |
 
 ---
 

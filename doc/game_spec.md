@@ -53,7 +53,8 @@
 
 ### ステージの流れ
 
-- ステージ距離：`STAGE_LENGTH = 70000`（約1分半でクリア）
+- ステージ距離：`STAGE_LENGTH = 70000`（ミスなしで約1分半〜2分半。自動プレイでは機械・電気電子 約105秒、電子情報 約89秒、材料 約102秒、生物応化 約149秒）
+- ゲームは1/60秒刻みで進む（固定タイムステップ）。画面のリフレッシュレート（60/90/120Hz）や端末の重さで速さが変わらない
 - 進むほど速度・障害物密度が上昇（序盤は遅く簡単、終盤は速く密度が高い）
 - ゴールポールに到達するとクリア・クリアタイムが記録される
 
@@ -215,9 +216,24 @@
 
 ## リーダーボード
 
-- **学科別・全期間**のクリアタイム上位10件を表示
-- タイムが**短いほど上位**
-- 同一プレイヤーが複数回プレイした場合、**最速タイムのみ** ランキングに残る（未実装・[#11](https://github.com/inouekoshi/snct-dash/issues/11)）
+- **学科別・全期間**のクリアタイム上位10件を表示（タイムが**短いほど上位**）
+- 同じニックネームで何度クリアしても、ランキングには**最速タイムの1件だけ**が載る（順位もニックネーム単位で数える）
+- クリア直後のリザルト画面に順位（「今回のタイムなら何位か」。自己ベスト更新ならランキングの順位と同じ）と「M人中」、自己ベスト（更新したら「🎉 自己ベスト更新！」）を表示。シェアページの順位も同じ数え方
+- クリアタイムはサーバー（DB関数）で検証してから登録する（学科ごとの最短タイム・プレイ開始からの経過時間・1プレイ1回・NGワード。詳細は [doc/database.md](database.md)）
+- 運営は不適切な記録を `hidden` で隠せる（[doc/operations.md](operations.md)）
+- ランキング表示は CDN に5秒キャッシュするので、登録から反映まで最大10秒ほどかかることがある
+
+## リザルト・シェア
+
+- 「もう一度！」で同じ学科をすぐ始める（ブリーフィングは出さない）。「学科を選ぶ」「ランキング」「タイトルに戻る」も選べる
+- 材料工学科はクリア後にチタン眼鏡フレームの完成演出（`components/MatProductReveal.tsx`）
+- 登録できたら X / LINE / 端末の共有メニューでシェアできる。共有URL `/r/{記録ID}` はタイム・学科・順位入りの画像（OGP）付き
+
+## 一時停止
+
+- ⏸ボタン・P / Esc キーで一時停止。メニューから「再開」「最初からやり直す」「学科選択に戻る」
+- 別のアプリやタブに切り替えたとき、スマホを縦向きにしたときは自動で一時停止する
+- 一時停止中はタイムが進まない（クリアタイムはゲーム内時間）
 
 ---
 
@@ -225,26 +241,30 @@
 
 ```typescript
 const engine = new GameEngine(
-  canvasElement,
+  canvasElement,                   // null ならロジックだけ動かす（テスト・ボット用）
   departmentId,                    // 1〜5 の学科ID
-  (result: GameClearResult) => {   // クリア時コールバック（GameClearResult型）
-    // result.timeMs, result.departmentId
-  }
+  (result: GameClearResult) => {}, // クリア時コールバック
+  { seed?: number, silent?: boolean },  // 乱数シード（再現用）・効果音/パーティクルなし
 )
 
-engine.start()        // ゲームループ開始
+engine.start()        // ゲームループ開始（固定タイムステップ：1/60秒刻みで update、描画は rAF ごと）
 engine.jump()         // ジャンプ入力
-engine.togglePause()  // 一時停止/再開
-engine.pause()        // 一時停止
-engine.resume()       // 再開
+engine.setThrust(on)  // 浮上の長押し（生物応用化学科）
+engine.pause() / engine.resume() / engine.togglePause() / engine.paused
 engine.destroy()      // ゲームループ停止（アンマウント時）
+
+// テスト・ボット用
+engine.step()         // 1ステップ進める（描画なし）
+engine.clone()        // 状態を丸ごと複製（乱数・スポーナー含む）
+engine.snapshot       // 進捗・タイム・ミス数・障害物などの読み取り
 ```
 
 ### GameClearResult 型（`lib/types.ts`）
 
 ```typescript
 export interface GameClearResult {
-  timeMs: number       // クリアタイム（ミリ秒）
+  timeMs: number       // クリアタイム（ゲーム内時間・ミリ秒）
   departmentId: number // 学科ID（1〜5）
+  misses: number       // ミス（ノックバック）の回数
 }
 ```

@@ -11,6 +11,7 @@
 - [アイテムシステム](#アイテムシステム)
 - [障害物の種類を追加する](#障害物の種類を追加する)
 - [ゲームバランスの調整](#ゲームバランスの調整)
+- [自動プレイで確かめる](#自動プレイで確かめる)
 - [よくあるトラブル](#よくあるトラブル)
 
 ---
@@ -23,22 +24,29 @@
 
 ```typescript
 const engine = new GameEngine(
-  canvasElement,
-  departmentId,                       // 1〜5 の学科ID
-  (result: GameClearResult) => { ... } // クリア時コールバック（{ timeMs, departmentId }）
+  canvasElement,                        // null ならロジックだけ（テスト・ボット用）
+  departmentId,                         // 1〜5 の学科ID
+  (result: GameClearResult) => { ... }, // クリア時コールバック（{ timeMs, departmentId, misses }）
+  { seed, silent },                     // 省略可：乱数シード／効果音・パーティクルなし
 )
 ```
 
-### ゲームループ
+### ゲームループ（固定タイムステップ）
 
 ```
 start() → requestAnimationFrame
-  └── loop()
-        ├── update()  物理演算・衝突判定・スポーン処理・進捗更新
-        └── render()  Canvas への描画
+  └── loop(now)
+        ├── 経過時間を STEP_MS（1/60秒）刻みに区切って update() を0〜5回
+        │     update()  物理演算・衝突判定・スポーン処理・進捗更新（1回 = 1/60秒）
+        ├── render()    Canvas への描画（1回）
+        └── フレーム間隔を見て、重ければ光彩（shadowBlur）を自動で切る
 ```
 
-`update()` と `render()` は 60fps を目標に呼ばれます。
+- **「1フレーム」＝ `update()` 1回＝1/60秒**。定数の「〜frames」はすべてこの単位
+- 120Hz の端末でも2倍速にならない。重い端末では1フレームで最大5回 `update()` して追いつく
+- クリアタイムは `update()` の回数 × 1/60秒（ゲーム内時間）
+- ゲームロジックの乱数は `this.rng.next()`（シード付き）を使う。`Math.random()` は描画だけのゆらぎ（パーティクル等）に限る。
+  こうしておくと同じシードで同じステージが再現でき、`clone()` で先読みできる
 
 ### 座標系
 
@@ -113,8 +121,8 @@ Canvas上のX座標 = PLAYER_X + (stageX - stageProgress)
 学科ごとの地形パターンはこのファイルで定義します。`buildStage()` が `departmentId` で分岐します。
 
 ```typescript
-export function buildStage(departmentId: number): TerrainSegment[] {
-  if (departmentId === 1) return buildStageMech()  // 機械：穴なし・山登り階段
+export function buildStage(departmentId: number, rand: Rand): TerrainSegment[] {
+  if (departmentId === 1) return buildStageMech(rand)  // 機械：穴なし・山登り階段
   if (departmentId === 4) return []                // 生物応化：地面なし（液体スイム）
   return buildStageFlat()                          // 電気電子・電子情報・材料：完全な平坦
 }
@@ -232,8 +240,8 @@ drawGoal(ctx, areaId, theme, stageProgress, frame)
    ```typescript
    if (this.isElec && --this.nextBattery <= 0) {
      const nextStageX = this.stageProgress + CANVAS_W
-     const y = this.getGroundHeightAt(nextStageX) - (74 + Math.random() * 46)
-     this.items.push({ stageX: nextStageX, x: CANVAS_W + 10, y, effect: 'charge', wobble: Math.random() * Math.PI * 2 })
+     const y = this.getGroundHeightAt(nextStageX) - (74 + this.rng.next() * 46)
+     this.items.push({ stageX: nextStageX, x: CANVAS_W + 10, y, effect: 'charge', wobble: this.rng.next() * Math.PI * 2 })
      ...
    }
    ```
@@ -268,18 +276,21 @@ export const OBSTACLE_DRAWERS: Record<Obstacle['shape'], ObstacleDrawFn> = {
 ### 3. スポーン関数で使用（`spawner.ts`）
 
 学科ごとのパターンは `SpawnFn` の配列にまとめ、`ShuffleBag` で偏りなく順番に出します（機械＝`dept1Spawners`、電気電子＝`dept2Spawners`、電子情報＝`dept3RedSpawners`、材料＝`meltSpawners` / `rollSpawners`）。
+バッグの残りと乱数は `Spawner` クラス（エンジンごとに1つ）が持ちます。乱数は引数の `rand()` を使い、`Math.random()` は使いません。
 
 ```typescript
 // push(o) は o.x の Canvas オフセット（CANVAS_W+10 基準）を stageX に変換して登録する
 // groundY は地形の高さ（段差上なら DEFAULT_GROUND_Y より小さい値が渡る）
 const dept1Spawners: SpawnFn[] = [
   // ...既存...
-  (push, groundY) => {
-    const h = 50
+  (push, groundY, rand) => {
+    const h = 44 + rand() * 12
     push({ x: CANVAS_W + 10, y: groundY - h, w: 35, h, shape: 'new_shape' })
   },
 ]
 ```
+
+追加したら `npm run test:autoplay` で全学科が最後まで走り切れる（詰まない）ことを確かめる。
 
 複合障害物の場合は `x` に異なる offset を渡すことで正しい間隔に配置される：
 
@@ -344,6 +355,14 @@ export const BATTERY_GAP: [number, number] = [110, 80]  // 電池スポーン間
 
 動作確認では `STAGE_LENGTH` を一時的に `15000`（約30秒）にしてよい。**`6000` は12秒でクリアになるので使わない。** コミット・マージ前に必ず `70000` に戻す。材料工学科の工程の区間は比率で決まるので、縮めても4工程すべて確認できる。
 
+> 縮めたままだとクリアタイムがサーバーの下限（`lib/game/limits.ts` の `MIN_CLEAR_TIME_MS`）を下回るので、**登録は「クリアタイムが正しくありません」で失敗する**（正常な動作）。
+> 70000 のまま画面だけ確かめたいときは、E2E 用ビルド（`NEXT_PUBLIC_E2E=1`）で `window.__kosendash.engine` の `stageProgress` を書き換えてワープできる。
+
+### 速度・ステージ長・加速倍率を変えたら
+
+学科ごとの最短タイム（不正判定の下限）が変わる。`npm test` の `limits.test.ts` が落ちたら、
+`lib/game/limits.ts` の `MIN_CLEAR_TIME_MS` と、DB関数 `min_clear_time_ms()`（新しいマイグレーションを作って両方のDBに適用）を直す。
+
 ### 穴落下・段差の閾値（`engine.ts` 内）
 
 ```typescript
@@ -363,6 +382,19 @@ CANVAS_H + 60          // = 340px
 
 ---
 
+## 自動プレイで確かめる
+
+`lib/game/autopilot.ts` のボットで、ステージを最後まで走らせてクリアタイムを測れる（[doc/testing.md](testing.md)）。
+
+```bash
+npm run autoplay:report -- 5 4      # 生物応化を5回（シード違い）自動プレイ
+npm run test:autoplay               # 全学科を各2回。詰んだら失敗する
+```
+
+ボットは人間より上手いとは限らないので、絶対値ではなく「変更前後の差」「学科どうしの差」を見る目安にする。
+
+---
+
 ## よくあるトラブル
 
 ### ゲームが重い（フレームレートが低い）
@@ -374,7 +406,9 @@ CANVAS_H + 60          // = 340px
 
 ### クリアタイムが登録されない
 
-1. ブラウザの DevTools → **Network タブ**で `POST /api/stage-clears` のレスポンスを確認
+1. ブラウザの DevTools → **Network タブ**で `POST /api/runs`（スタート時）と `POST /api/stage-clears`（クリア時）のレスポンスを確認。
+   `code` で原因がわかる（`invalid_time`＝タイムが学科の下限未満、`time_mismatch`＝開始からの経過時間と合わない、
+   `nickname_rejected`＝NGワード、`run_not_found`＝スタート時の通信に失敗していた など。一覧は [doc/database.md](database.md)）
 2. **HTTP 500 "Missing Supabase server env vars"** の場合:
    - Vercel ダッシュボード → Settings → Environment Variables を開く
    - `NEXT_PUBLIC_SUPABASE_URL` と `NEXT_PUBLIC_SUPABASE_ANON_KEY` が **All Environments** になっているか確認
@@ -384,19 +418,16 @@ CANVAS_H + 60          // = 340px
    - まず Supabase プロジェクトが一時停止（INACTIVE）していないか確認する。Free プランは約7日アクセスがないと止まる（Cron ウォームアップで防いでいるが、止まったらダッシュボードの Restore で復旧）
    - Vercel のランタイムログに `Invalid API key` が出ていたら、その環境の `NEXT_PUBLIC_SUPABASE_ANON_KEY` が正しいか確認する
    - それ以外は Supabase ダッシュボードの **Logs** でエラーを確認
-4. RLS ポリシーの確認:
+4. DB にマイグレーションが当たっているかの確認:
    ```sql
-   SELECT policyname, cmd FROM pg_policies WHERE tablename = 'stage_clears';
-   -- SELECT と INSERT の両方のポリシーが存在すること
+   select to_regclass('public.runs');                     -- runs テーブルがあること
+   select proname from pg_proc where proname in ('start_run', 'submit_clear', 'get_leaderboard');
    ```
 
 ### ランキングが表示されない
 
 1. `GET /api/leaderboard?department=N` のレスポンスを確認
-2. Supabase の RLS ポリシーが正しく設定されているか確認:
-   ```sql
-   SELECT * FROM pg_policies WHERE tablename = 'stage_clears';
-   ```
+2. DB関数 `get_leaderboard()` があるか確認（上と同じ SQL）
 3. `NEXT_PUBLIC_SUPABASE_URL` と `NEXT_PUBLIC_SUPABASE_ANON_KEY` が正しいか確認
 
 ### Vercel Preview デプロイの注意事項

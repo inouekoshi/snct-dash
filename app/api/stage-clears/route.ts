@@ -1,57 +1,55 @@
 import { NextRequest } from 'next/server'
 import { createServerClient } from '@/lib/supabase-server'
+import { apiError, codeFromDbError } from '@/lib/server/api-error'
+import { normalizeNickname } from '@/lib/nickname'
+import { MAX_CLEAR_TIME_MS } from '@/lib/game/limits'
+import { isUuid } from '@/lib/uuid'
+import type { SubmitClearResponse } from '@/lib/types'
 
-const MAX_CLEAR_TIME_MS = 600_000 // 10分上限
-
+// クリアタイム登録。検証（学科ごとの最短タイム・開始からの経過時間・1プレイ1回・NGワード）は
+// DB関数 submit_clear() が行う（API を通さず直接呼ばれても同じ検証がかかるように）。
+// ここでは形式だけを見て、明らかにおかしいものを DB に送らずに返す。
 export async function POST(request: NextRequest) {
   let body: unknown
   try {
     body = await request.json()
   } catch {
-    return Response.json({ error: 'Invalid JSON' }, { status: 400 })
+    return apiError('invalid_request')
   }
+  const { runId, nickname, clear_time_ms, misses } = (body ?? {}) as Record<string, unknown>
 
-  const { nickname, department, clear_time_ms } = body as Record<string, unknown>
-
-  if (
-    typeof nickname !== 'string' ||
-    nickname.trim().length === 0 ||
-    nickname.length > 20
-  ) {
-    return Response.json({ error: 'Invalid nickname' }, { status: 400 })
-  }
-  if (
-    typeof department !== 'number' ||
-    !Number.isInteger(department) ||
-    department < 1 ||
-    department > 5
-  ) {
-    return Response.json({ error: 'Invalid department' }, { status: 400 })
-  }
-  if (
-    typeof clear_time_ms !== 'number' ||
-    !Number.isInteger(clear_time_ms) ||
-    clear_time_ms <= 0 ||
-    clear_time_ms > MAX_CLEAR_TIME_MS
-  ) {
-    return Response.json({ error: 'Invalid clear_time_ms' }, { status: 400 })
+  if (!isUuid(runId)) return apiError('run_not_found')
+  if (typeof nickname !== 'string') return apiError('invalid_nickname')
+  const name = normalizeNickname(nickname)
+  if (!name) return apiError('invalid_nickname')
+  if (typeof clear_time_ms !== 'number' || !Number.isInteger(clear_time_ms) || clear_time_ms <= 0 || clear_time_ms > MAX_CLEAR_TIME_MS) {
+    return apiError('invalid_time')
   }
 
   try {
-    // 環境変数が欠けている場合は createServerClient() が例外を投げ、下の catch で 500 を返す
     const supabase = createServerClient()
-    const { error } = await supabase
-      .from('stage_clears')
-      .insert({ nickname: nickname.trim(), department, clear_time_ms })
-
-    if (error) {
-      console.error('Supabase insert error:', error.message, error.code)
-      return Response.json({ error: error.message }, { status: 500 })
+    const { data, error } = await supabase.rpc('submit_clear', {
+      p_run_id: runId,
+      p_nickname: name,
+      p_clear_time_ms: clear_time_ms,
+      p_misses: typeof misses === 'number' && Number.isInteger(misses) ? misses : null,
+    })
+    const row = Array.isArray(data) ? data[0] : null
+    if (error || !row) {
+      const code = codeFromDbError(error)
+      if (code === 'server_error') console.error('submit_clear error:', error)
+      return apiError(code)
     }
+    const res: SubmitClearResponse = {
+      id: row.clear_id,
+      rank: row.rank,
+      bestMs: row.best_ms,
+      isPersonalBest: row.is_personal_best,
+      totalPlayers: row.total_players,
+    }
+    return Response.json(res, { status: 201 })
   } catch (e) {
-    console.error('Unexpected error:', e)
-    return Response.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 })
+    console.error('submit_clear unexpected error:', e)
+    return apiError('server_error')
   }
-
-  return Response.json({ ok: true }, { status: 201 })
 }

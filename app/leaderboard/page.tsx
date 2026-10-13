@@ -2,8 +2,6 @@ import Link from 'next/link'
 import { Suspense } from 'react'
 import Leaderboard from '@/components/Leaderboard'
 
-export const revalidate = 10
-
 export default function LeaderboardPage() {
   return (
     <main className="flex flex-col items-center min-h-screen gap-6 px-4 py-8">

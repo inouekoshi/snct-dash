@@ -27,16 +27,43 @@ import { drawBg, drawGround, type BgContext } from './background-renderers'
 import { drawPlayer } from './player-renderer'
 import { drawGoal } from './goal-renderer'
 import { drawHUD, renderPauseOverlay, renderMissOverlay, renderRevivalHint } from './hud-renderer'
-import { spawnObstacle, spawnCeilingObstacle, spawnBug, spawnPipePair, resetSpawnerBags, spawnMat, spawnHeatSet } from './spawner'
+import { Spawner } from './spawner'
+import { Rng } from './rng'
 import { drawMatPlayer, drawMatItem, drawMatGround, drawMatHud, drawMatCutin, type MatState } from './mat-renderers'
 import { buildStage } from './terrain'
 
+// 1ステップ = 1/60秒。描画は requestAnimationFrame ごとだが、ゲームの更新は常にこの刻みで行う
+// （120Hz の端末で2倍速になったり、重い端末でスローになったりしないようにする）。
+export const STEP_MS = 1000 / 60
+const MAX_STEPS_PER_FRAME = 5   // 重い端末で処理落ちしたときに追いつく上限（それ以上は捨てる）
+// 描画が重い端末の自動軽量化：フレーム間隔の移動平均がこれを超えた状態が続いたら、光彩（shadowBlur）を切る
+const SLOW_FRAME_MS = 22        // 約45fps
+const SLOW_FRAMES_TO_DEGRADE = 90
+const CLEAR_CALLBACK_DELAY_MS = 800
+
+export interface GameEngineOptions {
+  /** 乱数シード（テスト・ボット用。省略時はランダム） */
+  seed?: number
+  /** true なら効果音とパーティクルを出さない（テスト・ボットの先読み用） */
+  silent?: boolean
+}
+
 export class GameEngine {
-  private canvas: HTMLCanvasElement
-  private ctx: CanvasRenderingContext2D
+  private canvas: HTMLCanvasElement | null
+  private ctx: CanvasRenderingContext2D | null
   private raf = 0
+  private lastFrameTime = 0
+  private accumulator = 0
+  private clearTimer: ReturnType<typeof setTimeout> | null = null
   private departmentId: number
   private onClear: (result: GameClearResult) => void
+  private rng: Rng
+  private spawner: Spawner
+  private silent: boolean
+  private beforeStep: (() => void) | null = null
+  private avgFrameMs = STEP_MS
+  private slowFrames = 0
+  private lowQuality = false
 
   // Player
   private py = DEFAULT_GROUND_Y
@@ -59,6 +86,7 @@ export class GameEngine {
   private isCleared = false
   private isPaused = false
   private frame = 0
+  private missCount = 0
 
   // Terrain
   private terrain: TerrainSegment[]
@@ -110,15 +138,24 @@ export class GameEngine {
   // Background scroll
   private bgX = 0
 
+  /**
+   * @param canvas 描画先。null ならロジックだけ動かす（テスト・ボット用）
+   */
   constructor(
-    canvas: HTMLCanvasElement,
+    canvas: HTMLCanvasElement | null,
     departmentId: number,
     onClear: (result: GameClearResult) => void,
+    options: GameEngineOptions = {},
   ) {
     this.canvas = canvas
-    this.ctx = canvas.getContext('2d')!
-    canvas.width = CANVAS_W
-    canvas.height = CANVAS_H
+    this.ctx = canvas?.getContext('2d') ?? null
+    if (canvas) {
+      canvas.width = CANVAS_W
+      canvas.height = CANVAS_H
+    }
+    this.rng = new Rng(options.seed)
+    this.spawner = new Spawner(() => this.rng.next())
+    this.silent = options.silent ?? false
     this.departmentId = departmentId
     this.isElec = departmentId === 2
     this.isCode = departmentId === 3
@@ -129,8 +166,7 @@ export class GameEngine {
       this.py = CANVAS_H / 2
     }
     this.onClear = onClear
-    resetSpawnerBags()
-    this.terrain = buildStage(departmentId)
+    this.terrain = buildStage(departmentId, () => this.rng.next())
   }
 
   // ── 公開インターフェース ───────────────────────────────────────────────────
@@ -158,14 +194,15 @@ export class GameEngine {
   pause() {
     if (this.isCleared || this.isPaused) return
     this.isPaused = true
+    this.thrustHeld = false
     cancelAnimationFrame(this.raf)
-    renderPauseOverlay(this.ctx)
+    if (this.ctx) renderPauseOverlay(this.ctx)
   }
 
   resume() {
     if (!this.isPaused) return
     this.isPaused = false
-    this.raf = requestAnimationFrame(() => this.loop())
+    this.requestFrame()
   }
 
   togglePause() {
@@ -173,15 +210,117 @@ export class GameEngine {
     else this.pause()
   }
 
-  start() { this.raf = requestAnimationFrame(() => this.loop()) }
-  destroy() { cancelAnimationFrame(this.raf) }
+  get paused(): boolean { return this.isPaused }
+
+  start() { this.requestFrame() }
+
+  destroy() {
+    cancelAnimationFrame(this.raf)
+    if (this.clearTimer) clearTimeout(this.clearTimer)
+  }
+
+  // ── テスト・ボット用の読み取り口 ─────────────────────────────────────────────
+
+  /** 毎ステップの直前に呼ぶ関数（E2E テストで自動操縦をつなぐ用） */
+  setBeforeStep(fn: (() => void) | null) {
+    this.beforeStep = fn
+  }
+
+  /** 1ステップ（1/60秒）だけ進める。描画はしない */
+  step() {
+    if (!this.isCleared) this.update()
+  }
+
+  /** 状態を丸ごと複製する（描画・コールバックなし）。ボットの先読みに使う */
+  clone(): GameEngine {
+    const c = Object.create(GameEngine.prototype) as GameEngine
+    Object.assign(c, this)
+    c.canvas = null
+    c.ctx = null
+    c.raf = 0
+    c.clearTimer = null
+    c.beforeStep = null
+    c.silent = true
+    c.onClear = () => {}
+    c.rng = this.rng.clone()
+    c.spawner = this.spawner.clone(() => c.rng.next())
+    c.obstacles = this.obstacles.map(o => ({ ...o }))
+    c.items = this.items.map(it => ({ ...it }))
+    c.particles = []
+    return c
+  }
+
+  get snapshot() {
+    return {
+      departmentId: this.departmentId,
+      stageProgress: this.stageProgress,
+      elapsedMs: this.elapsedMs,
+      cleared: this.isCleared,
+      missCount: this.missCount,
+      py: this.py,
+      pvy: this.pvy,
+      jumpCount: this.jumpCount,
+      inMiss: this.missOverlayTimer > 0 || this.hitStopTimer > 0,
+      invincible: this.invincible,
+      obstacles: this.obstacles as readonly Obstacle[],
+      items: this.items as readonly Item[],
+      charge: this.charge,
+      debugMode: this.debugMode,
+      matState: this.matState,
+      thrustHeld: this.thrustHeld,
+      frame: this.frame,
+    }
+  }
 
   // ── メインループ ──────────────────────────────────────────────────────────
 
-  private loop() {
-    this.update()
+  private requestFrame() {
+    this.lastFrameTime = 0
+    this.accumulator = 0
+    this.raf = requestAnimationFrame(this.loop)
+  }
+
+  // 固定タイムステップ：経過時間ぶんだけ STEP_MS 刻みで update し、描画は1回。
+  // 端数は accumulator に持ち越す（四捨五入相当にして 60Hz 端末でのカクつきを防ぐ）。
+  private loop = (now: number) => {
+    if (this.lastFrameTime === 0) this.lastFrameTime = now - STEP_MS
+    const dt = now - this.lastFrameTime
+    this.accumulator += Math.min(dt, STEP_MS * MAX_STEPS_PER_FRAME)
+    this.lastFrameTime = now
+    this.watchFrameRate(dt)
+    let steps = 0
+    while (this.accumulator >= STEP_MS / 2 && steps < MAX_STEPS_PER_FRAME && !this.isCleared) {
+      this.beforeStep?.()
+      this.update()
+      this.accumulator -= STEP_MS
+      steps++
+    }
     this.render()
-    if (!this.isCleared) this.raf = requestAnimationFrame(() => this.loop())
+    if (this.isCleared) {
+      this.finish()
+      return
+    }
+    if (!this.isPaused) this.raf = requestAnimationFrame(this.loop)
+  }
+
+  // 描画が重い端末では光彩（shadowBlur）を無効にする。いちばん GPU 負荷が高く、無くても遊びに影響しない。
+  // 各描画関数を書き換えずに済むよう、コンテキストの shadowBlur への代入を無視させる。
+  private watchFrameRate(dt: number) {
+    if (this.lowQuality || !this.ctx || dt > 250) return // 250ms 超はタブ復帰などなので数えない
+    this.avgFrameMs += (dt - this.avgFrameMs) * 0.1
+    this.slowFrames = this.avgFrameMs > SLOW_FRAME_MS ? this.slowFrames + 1 : 0
+    if (this.slowFrames >= SLOW_FRAMES_TO_DEGRADE) {
+      this.lowQuality = true
+      Object.defineProperty(this.ctx, 'shadowBlur', { configurable: true, get: () => 0, set: () => {} })
+    }
+  }
+
+  get isLowQuality(): boolean { return this.lowQuality }
+
+  private finish() {
+    if (!this.silent) playClear()
+    const result = { timeMs: Math.round(this.elapsedMs), departmentId: this.departmentId, misses: this.missCount }
+    this.clearTimer = setTimeout(() => this.onClear(result), CLEAR_CALLBACK_DELAY_MS)
   }
 
   private update() {
@@ -193,8 +332,8 @@ export class GameEngine {
     // MISS オーバーレイ中は物理を止める（frame は進みアニメ継続）
     if (this.missOverlayTimer > 0) { this.missOverlayTimer--; return }
 
-    // タイマー加算
-    this.elapsedMs += 1000 / 60
+    // タイマー加算（ゲーム内時間。ポーズ・処理落ちで捨てたフレームは数えない）
+    this.elapsedMs += STEP_MS
 
     // 復活スロー：revivalTimer 中は最低速度に固定
     if (this.revivalTimer > 0) this.revivalTimer--
@@ -273,23 +412,19 @@ export class GameEngine {
       this.burst(this.toCanvasX(STAGE_LENGTH), 30, goalTheme.groundLineColor, 3)
     }
 
-    // クリア判定
+    // クリア判定（コールバックはメインループの finish() で呼ぶ）
     if (this.stageProgress >= STAGE_LENGTH && !this.isCleared) {
       this.isCleared = true
       this.burst(PLAYER_X, DEFAULT_GROUND_Y - 100, AREAS[this.departmentId as AreaId].groundLineColor, 20)
-      cancelAnimationFrame(this.raf)
-      this.render() // 最後のフレームを描画
-      playClear()
-      setTimeout(() => this.onClear({ timeMs: Math.round(this.elapsedMs), departmentId: this.departmentId }), 800)
       return
     }
 
     if (this.isCode && --this.nextBug <= 0) {
       const nextStageX = this.stageProgress + CANVAS_W
       if (this.hasGroundAt(nextStageX) && this.hasGroundAt(nextStageX + 65)) {
-        spawnBug(nextStageX, this.obstacles, this.getGroundHeightAt(nextStageX))
+        this.spawner.bug(nextStageX, this.obstacles, this.getGroundHeightAt(nextStageX))
       }
-      this.nextBug = 60 + Math.random() * 48 // 以前の約半分の出現頻度
+      this.nextBug = 60 + this.rng.next() * 48 // 以前の約半分の出現頻度
       this.nextObs = Math.max(this.nextObs, 25) // 重ならないように障害物をずらす
     }
 
@@ -298,32 +433,32 @@ export class GameEngine {
     if (--this.nextObs <= 0) {
       const nextStageX = this.stageProgress + CANVAS_W
       if (this.isBio) {
-        spawnPipePair(nextStageX, this.obstacles, bioZone(this.stageProgress))
+        this.spawner.pipePair(nextStageX, this.obstacles, bioZone(this.stageProgress))
       } else if (this.isMat) {
         const ph = matPhase(nextStageX)
         if ((ph === 'melt' || ph === 'roll') && this.isMatSafeToSpawn(nextStageX, 260)) {
-          spawnMat(ph, nextStageX, this.obstacles, this.getGroundHeightAt(nextStageX))
+          this.spawner.mat(ph, nextStageX, this.obstacles, this.getGroundHeightAt(nextStageX))
         }
       } else {
         if (this.hasGroundAt(nextStageX) && this.hasGroundAt(nextStageX + 65) && this.hasGroundAt(nextStageX + 130)
             && this.isFlatAt(nextStageX, 130)) {
           // ここに来るのは地上走行型の機械・電気電子・電子情報（1〜3）のみ
-          spawnObstacle(this.departmentId as 1 | 2 | 3, nextStageX, this.obstacles, this.getGroundHeightAt(nextStageX))
+          this.spawner.obstacle(this.departmentId as 1 | 2 | 3, nextStageX, this.obstacles, this.getGroundHeightAt(nextStageX))
         }
       }
       const [mn, r] = this.isMat
         ? MAT_SPAWN_GAPS[matPhase(this.stageProgress) === 'roll' ? 'roll' : 'melt']
         : SPAWN_GAPS[this.departmentId] ?? SPAWN_GAPS[1]
-      this.nextObs = mn + Math.random() * r
+      this.nextObs = mn + this.rng.next() * r
       this.nextCeilingObs = Math.max(this.nextCeilingObs, CEIL_GROUND_GAP)
       if (this.isCode) this.nextBug = Math.max(this.nextBug, 25) // 重ならないようにバグをずらす
     }
     // 天井障害（電気電子・電子情報）
     if ((this.isElec || this.isCode) && --this.nextCeilingObs <= 0) {
       const nextStageX = this.stageProgress + CANVAS_W
-      spawnCeilingObstacle(nextStageX, this.obstacles)
+      this.spawner.ceiling(nextStageX, this.obstacles)
       const base = Math.max(100, 260 - this.departmentId * 25)
-      this.nextCeilingObs = base + Math.random() * 100
+      this.nextCeilingObs = base + this.rng.next() * 100
       this.nextObs = Math.max(this.nextObs, CEIL_GROUND_GAP)
     }
 
@@ -332,19 +467,19 @@ export class GameEngine {
     if (this.isElec && --this.nextBattery <= 0) {
       const nextStageX = this.stageProgress + CANVAS_W
       const groundY = this.getGroundHeightAt(nextStageX)
-      const y = groundY - (74 + Math.random() * 46) // ジャンプの上昇〜頂点で取れる高さ
-      this.items.push({ stageX: nextStageX, x: CANVAS_W + 10, y, effect: 'charge', wobble: Math.random() * Math.PI * 2 })
+      const y = groundY - (74 + this.rng.next() * 46) // ジャンプの上昇〜頂点で取れる高さ
+      this.items.push({ stageX: nextStageX, x: CANVAS_W + 10, y, effect: 'charge', wobble: this.rng.next() * Math.PI * 2 })
       const [mn, r] = BATTERY_GAP
-      this.nextBattery = mn + Math.random() * r
+      this.nextBattery = mn + this.rng.next() * r
     }
 
     // バリアアイテムスポーン（生物応用化学科）：培養液中を浮遊。取ると1回被弾を無効化。
     if (this.isBio && --this.nextShield <= 0) {
       const nextStageX = this.stageProgress + CANVAS_W
-      const y = 55 + Math.random() * (CANVAS_H - 110) // 上下壁を避けた高さ
-      this.items.push({ stageX: nextStageX, x: CANVAS_W + 10, y, effect: 'shield', wobble: Math.random() * Math.PI * 2 })
+      const y = 55 + this.rng.next() * (CANVAS_H - 110) // 上下壁を避けた高さ
+      this.items.push({ stageX: nextStageX, x: CANVAS_W + 10, y, effect: 'shield', wobble: this.rng.next() * Math.PI * 2 })
       const [mn, r] = SHIELD_GAP
-      this.nextShield = mn + Math.random() * r
+      this.nextShield = mn + this.rng.next() * r
     }
 
     // オブジェクトのCanvas座標を更新・画面外を除去
@@ -391,7 +526,7 @@ export class GameEngine {
           this.obstacles = this.obstacles.filter(x => x !== o)
           this.burst(o.x + o.w / 2, o.y + o.h / 2, '#ff7aff', 16)
           this.burst(o.x + o.w / 2, o.y + o.h * 0.2, MAT_HARD_COLOR, 8)
-          playKnockback()
+          this.sfx(playKnockback)
           continue
         }
         // バリア（生物応用化学科）：保持中なら1回だけ被弾を無効化して通過。
@@ -400,7 +535,7 @@ export class GameEngine {
           this.bioShield = false
           this.invincible = KNOCKBACK_INVINCIBLE
           this.burst(PLAYER_X, this.py, SHIELD_COLOR, 18)
-          playJump()
+          this.sfx(playJump)
           break
         }
         // 通常被弾：チャージ大幅減（電気電子）＋ノックバック
@@ -447,7 +582,7 @@ export class GameEngine {
         // 拾うとバリアを保持（1回被弾を無効化）
         this.bioShield = true
         this.burst(it.x, it.y, SHIELD_COLOR, 12)
-        playJump()
+        this.sfx(playJump)
         break
       case 'furnace':
       case 'quench': {
@@ -456,7 +591,7 @@ export class GameEngine {
         this.matState = kind
         this.matStateUntilX = it.stageX - HEAT_GATE_OFFSET + HEAT_STATE_SPAN[kind]
         this.burst(it.x, it.y, kind === 'flex' ? MAT_FLEX_COLOR : MAT_HARD_COLOR, 16)
-        playJump()
+        this.sfx(playJump)
         break
       }
     }
@@ -543,14 +678,14 @@ export class GameEngine {
     const heatEnd = MAT_PHASE_START.inspect * STAGE_LENGTH - MAT_SAFE_MARGIN
     if (this.stageProgress + CANVAS_W >= this.nextHeatSetX && this.nextHeatSetX + HEAT_STATE_SPAN.flex < heatEnd) {
       const forced = this.heatSetCount === 0
-      let kind: 'flex' | 'hard' = forced ? 'flex' : Math.random() < 0.5 ? 'flex' : 'hard'
+      let kind: 'flex' | 'hard' = forced ? 'flex' : this.rng.next() < 0.5 ? 'flex' : 'hard'
       if (!forced && kind === this.lastHeatKind && this.heatKindStreak >= 2) kind = kind === 'flex' ? 'hard' : 'flex'
       this.heatKindStreak = kind === this.lastHeatKind ? this.heatKindStreak + 1 : 1
       this.lastHeatKind = kind
-      spawnHeatSet(this.nextHeatSetX, kind, forced, this.obstacles, this.items, this.getGroundHeightAt(this.nextHeatSetX))
+      this.spawner.heatSet(this.nextHeatSetX, kind, forced, this.obstacles, this.items, this.getGroundHeightAt(this.nextHeatSetX))
       this.heatSetCount++
       const [mn, r] = HEAT_SET_GAP
-      this.nextHeatSetX += mn + Math.random() * r
+      this.nextHeatSetX += mn + this.rng.next() * r
     }
   }
 
@@ -570,7 +705,7 @@ export class GameEngine {
     this.boostTimer = 0
     this.boostMult = Math.min(MAT_BOOST_MAX, 1.15 + Math.abs(this.pvy) * 0.02)
     this.burst(o.x + o.w / 2, o.y + 10, '#ffd34d', 12)
-    playJump()
+    this.sfx(playJump)
   }
 
   // stageProgress基準のCanvas X座標変換
@@ -578,33 +713,35 @@ export class GameEngine {
     return PLAYER_X + (stageX - this.stageProgress)
   }
 
+  // stageX を含む地形セグメントの添字（無ければ -1）。セグメントは stageX 昇順に隙間なく並ぶので二分探索する
+  private segmentIndexAt(stageX: number): number {
+    const t = this.terrain
+    let lo = 0, hi = t.length - 1
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1
+      const seg = t[mid]
+      if (stageX < seg.stageX) hi = mid - 1
+      else if (stageX >= seg.stageX + seg.width) lo = mid + 1
+      else return mid
+    }
+    return -1
+  }
+
   // プレイヤー直下の地面Y（穴ならInfinity）
   private getGroundY(): number {
-    for (const seg of this.terrain) {
-      const segEnd = seg.stageX + seg.width
-      if (seg.stageX <= this.stageProgress && this.stageProgress < segEnd) {
-        return seg.type === 'hole' ? Infinity : seg.groundY
-      }
-    }
-    return DEFAULT_GROUND_Y
+    const seg = this.terrain[this.segmentIndexAt(this.stageProgress)]
+    if (!seg) return DEFAULT_GROUND_Y
+    return seg.type === 'hole' ? Infinity : seg.groundY
   }
 
   private hasGroundAt(stageX: number): boolean {
-    for (const seg of this.terrain) {
-      if (stageX >= seg.stageX && stageX < seg.stageX + seg.width) {
-        return seg.type !== 'hole'
-      }
-    }
-    return true
+    const seg = this.terrain[this.segmentIndexAt(stageX)]
+    return !seg || seg.type !== 'hole'
   }
 
   private getGroundHeightAt(stageX: number): number {
-    for (const seg of this.terrain) {
-      if (stageX >= seg.stageX && stageX < seg.stageX + seg.width) {
-        return seg.type === 'hole' ? DEFAULT_GROUND_Y : seg.groundY
-      }
-    }
-    return DEFAULT_GROUND_Y
+    const seg = this.terrain[this.segmentIndexAt(stageX)]
+    return !seg || seg.type === 'hole' ? DEFAULT_GROUND_Y : seg.groundY
   }
 
   // 区間 [stageX, stageX+width] が同じ高さの平坦な地面か（段差・階段の途中に障害物を出さないため）
@@ -616,18 +753,19 @@ export class GameEngine {
     return true
   }
 
+  // 目の前（このフレームで進む距離以内）に上り段差があり、まだその高さまで跳んでいなければ進めない
   private isBlockedByStep(): boolean {
+    if (this.terrain.length < 2) return false
     const speed = this.effectiveSpeed
-    for (let i = 1; i < this.terrain.length; i++) {
-      const prev = this.terrain[i - 1]
-      const curr = this.terrain[i]
-      if (prev.type !== 'ground' || curr.type !== 'ground') continue
-      const stepHeight = prev.groundY - curr.groundY  // 正なら上り段差
-      if (stepHeight < 20) continue
+    const i = Math.max(1, this.segmentIndexAt(this.stageProgress))
+    for (let j = i; j < this.terrain.length; j++) {
+      const prev = this.terrain[j - 1]
+      const curr = this.terrain[j]
       const dist = curr.stageX - this.stageProgress
-      if (dist >= 0 && dist <= speed + 3) {
-        if (this.py > curr.groundY + 5) return true
-      }
+      if (dist > speed + 3) break
+      if (dist < 0 || prev.type !== 'ground' || curr.type !== 'ground') continue
+      const stepHeight = prev.groundY - curr.groundY  // 正なら上り段差
+      if (stepHeight >= 20 && this.py > curr.groundY + 5) return true
     }
     return false
   }
@@ -644,7 +782,8 @@ export class GameEngine {
     if (this.isBio) this.pvy = 0
     // 材料工学科：曲げ・加速・減速の途中状態は持ち越さない
     this.bendTimer = 0; this.boostTimer = 0; this.matSlowTimer = 0
-    playKnockback()
+    this.missCount++
+    this.sfx(playKnockback)
     this.burst(PLAYER_X, this.py - 20, '#ff8800', 10)
   }
 
@@ -653,7 +792,7 @@ export class GameEngine {
     this.pState = 'jumping'
     this.jumpCount++
     this.coyoteTime = 0
-    playJump()
+    this.sfx(playJump)
     this.burst(PLAYER_X, this.py, '#ffffff', 4)
   }
 
@@ -665,7 +804,7 @@ export class GameEngine {
     this.pState = 'jumping'
     this.combo++
     this.burst(o.x + o.w / 2, o.y, AREAS[3].groundLineColor, 8)
-    playJump()
+    this.sfx(playJump)
     if (this.combo >= COMBO_NEEDED) {
       this.debugMode = DEBUG_FRAMES
       this.combo = 0
@@ -673,7 +812,12 @@ export class GameEngine {
     }
   }
 
+  private sfx(play: () => void) {
+    if (!this.silent) play()
+  }
+
   private burst(x: number, y: number, color: string, n: number) {
+    if (this.silent) return
     for (let i = 0; i < n; i++) {
       const a = Math.random() * Math.PI * 2, s = 1.5 + Math.random() * 3.5
       this.particles.push({
@@ -687,6 +831,7 @@ export class GameEngine {
 
   private render() {
     const ctx = this.ctx
+    if (!ctx) return
     const theme = AREAS[this.departmentId as AreaId]
     const bg: BgContext = { frame: this.frame, bgX: this.bgX, speed: this.missOverlayTimer > 0 ? 0 : this.effectiveSpeed, debug: this.debugMode > 0, stageProgress: this.stageProgress, isBio: this.isBio }
 

@@ -2,6 +2,7 @@
 
 import { AREAS } from '@/lib/game/areas'
 import type { AreaId } from '@/lib/game/areas'
+import { STAGE_INFO } from '@/lib/game/stage-info'
 
 const DEPARTMENTS = [1, 2, 3, 4, 5] as const
 
@@ -21,22 +22,16 @@ export default function DepartmentSelect({ onSelect, onBack }: Props) {
       <div className="flex flex-col gap-3 w-full max-w-sm">
         {DEPARTMENTS.map((id) => {
           const theme = AREAS[id as AreaId]
-          const isUnavailable = false
           return (
             <button
               key={id}
-              onClick={() => !isUnavailable && onSelect(id)}
-              disabled={isUnavailable}
-              className={`flex items-center gap-4 p-4 rounded-2xl transition-colors text-left border ${
-                isUnavailable 
-                  ? 'bg-gray-900/50 border-gray-800 opacity-60 cursor-not-allowed' 
-                  : 'bg-gray-800 hover:bg-gray-700 border-gray-700 hover:border-gray-500 active:scale-95'
-              }`}
+              onClick={() => onSelect(id)}
+              className="flex items-center gap-4 p-4 rounded-2xl transition-colors text-left border bg-gray-800 hover:bg-gray-700 border-gray-700 hover:border-gray-500 active:scale-95"
             >
-              <span className={`text-4xl w-12 text-center ${isUnavailable ? 'grayscale opacity-50' : ''}`}>{theme.emoji}</span>
+              <span className="text-4xl w-12 text-center">{theme.emoji}</span>
               <div>
                 <p className="font-black text-lg">{theme.name}</p>
-                {isUnavailable && <p className="text-xs text-red-400 font-bold mt-1">現在は利用できません</p>}
+                <p className="text-xs text-gray-400 mt-0.5">{STAGE_INFO[id].catch}</p>
               </div>
             </button>
           )

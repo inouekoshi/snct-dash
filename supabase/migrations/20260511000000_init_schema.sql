@@ -1,6 +1,5 @@
--- 高専ダッシュ！クリアタイムテーブル
--- 本番DB（kosendash）・開発DB（kosendash-dev）とも同じスキーマ。
--- 旧仕様の scores テーブルはコードからは使っていない（DB からの削除は Issue #13）。
+-- 高専ダッシュ！クリアタイムテーブル（初期スキーマ・2026-05）
+-- 本番DB（kosendash）・開発DB（kosendash-dev）とも適用済み。以降の変更は後続のマイグレーションを参照。
 
 CREATE TABLE stage_clears (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -20,9 +19,7 @@ CREATE TABLE stage_clears (
 -- 学科別ランキング取得を高速化
 CREATE INDEX idx_stage_clears_dept_time ON stage_clears(department, clear_time_ms ASC);
 
--- RLS：読み取り・書き込みとも public に許可する。
--- APIルート（lib/supabase-server.ts）は anon キーで接続し、このポリシーに従って INSERT する。
--- 値の妥当性は app/api/stage-clears/route.ts のバリデーションと上の CHECK 制約で担保する。
+-- RLS：読み取り・書き込みとも public に許可（INSERT は 20261013000200 で禁止に変更）
 ALTER TABLE stage_clears ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Anyone can read stage_clears" ON stage_clears FOR SELECT USING (true);
 CREATE POLICY "API can insert stage_clears" ON stage_clears FOR INSERT WITH CHECK (true);
