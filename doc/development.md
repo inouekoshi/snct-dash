@@ -411,8 +411,8 @@ npm run test:autoplay               # 全学科を各2回。詰んだら失敗�
    `nickname_rejected`＝NGワード、`run_not_found`＝スタート時の通信に失敗していた など。一覧は [doc/database.md](database.md)）
 2. **HTTP 500 "Missing Supabase server env vars"** の場合:
    - Vercel ダッシュボード → Settings → Environment Variables を開く
-   - `NEXT_PUBLIC_SUPABASE_URL` と `NEXT_PUBLIC_SUPABASE_ANON_KEY` が **All Environments** になっているか確認
-   - Production のみだと Preview（dev ブランチ）では動かない
+   - `NEXT_PUBLIC_SUPABASE_URL` と `NEXT_PUBLIC_SUPABASE_ANON_KEY` が、エラーの出た環境（Production / Preview / Development）に設定されているか確認
+   - Production にしかないと Preview（dev ブランチ）では動かない。Preview と Development には開発DB（`kosendash-dev`）の値を入れる（本番DBの値は入れない）
    - 変更後は必ず**再デプロイ**が必要（`NEXT_PUBLIC_*` はビルド時に埋め込まれるため）
 3. **HTTP 500 その他** の場合:
    - まず Supabase プロジェクトが一時停止（INACTIVE）していないか確認する。Free プランは約7日アクセスがないと止まる（Cron ウォームアップで防いでいるが、止まったらダッシュボードの Restore で復旧）

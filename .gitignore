@@ -25,7 +25,6 @@ Thumbs.db
 # Editor
 .vscode/
 .idea/
-.vercel
 
 # Tests
 /test-results/

@@ -178,7 +178,7 @@ Vercel のフェアユースガイドラインでは、作った人が金銭的�
 
 ## Vercel の不要な環境変数を消す
 
-`SUPABASE_SERVICE_ROLE_KEY` はコードから使っていない（API は anon キーで DB関数を呼ぶ）。本番に残っていれば消す。
+`SUPABASE_SERVICE_ROLE_KEY` はコードから使っていない（API は anon キーで DB関数を呼ぶ）。2026-10-14 時点で Production・Preview・Development の3環境すべてに残っているので消す（[#12](https://github.com/inouekoshi/snct-dash/issues/12)）。
 
 1. Vercel ダッシュボード → kosendash → **Settings → Environment Variables**
 2. `SUPABASE_SERVICE_ROLE_KEY` の「…」→ **Remove**（Production / Preview / Development すべて）

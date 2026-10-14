@@ -158,7 +158,8 @@ DB の詳細は [doc/database.md](database.md)。
 
 ### Vercel 設定の注意点
 
-- すべての変数を **All Environments**（Production・Preview・Development）に設定すること
+- `NEXT_PUBLIC_SUPABASE_URL` と `NEXT_PUBLIC_SUPABASE_ANON_KEY` は **環境ごとに別の値**を設定する。Production は本番DB（`kosendash`）、Preview と Development は開発DB（`kosendash-dev`）を指す
+- 「All Environments」で同じ値を入れない。Preview に本番DBの値が入ると、dev ブランチでのテストプレイが本番ランキングに載る
+- Preview に設定がないと、dev ブランチの API ルートが 500 エラーになる
 - `NEXT_PUBLIC_*` はビルド時に埋め込まれるため、**設定変更後は再デプロイが必要**
-- Preview 環境に設定されていないと dev ブランチのAPIルートが 500 エラーになる
-- `SUPABASE_SERVICE_ROLE_KEY` は使っていない（本番に残っていれば削除してよい。手順は [doc/operations.md](operations.md)）
+- `SUPABASE_SERVICE_ROLE_KEY` は使っていない。2026-10-14 時点で3環境すべてに残っている（削除手順は [doc/operations.md](operations.md#vercel-の不要な環境変数を消す)）

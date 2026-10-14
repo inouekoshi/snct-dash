@@ -18,7 +18,7 @@
 - **`main`**: 本番。直接コミットせず、dev で確認できたものをマージする。手順は [doc/operations.md の「本番リリース手順」](doc/operations.md#本番リリース手順dev--main)（**マージ後に本番DBへ1つ SQL を当てる**）。
 - マージ前に `lib/game/constants.ts` の `STAGE_LENGTH` が **70000**（本番値）になっていることを必ず確認する。
 
-## 開発状況（2026-10-13 時点）
+## 開発状況（2026-10-14 時点）
 
 - **Phase 2・3**（エンジン刷新・5学科のステージ）✅ 完了
   - 機械：山登り階段／電気電子：充電サバイバル／電子情報：デバッグ踏みつけ／生物応用化学：液体スイム／材料：製品ができるまでラン
@@ -27,9 +27,12 @@
   - シェア（X / LINE・OGP画像）、PWA、プレイ記録の集計（analytics）
   - 固定タイムステップ（どの端末でも同じ速さ）、重い端末の自動軽量化、一時停止メニュー、同じ学科でもう一度
   - 自動テスト一式（単体・全学科の自動プレイ・E2E・DB関数）
+  - Next.js 16.4.0 への更新（脆弱性の修正版）
 - **Phase 5**（直前準備）🔄 運用資料・負荷見積もりは作成済み。実機確認・本番マージ・当番表が残り
 
-残タスクは GitHub の [Issues](https://github.com/inouekoshi/snct-dash/issues) で管理しています（ラベル `P1: 高専祭までに必須` が最優先）。全体像は [doc/roadmap.md](doc/roadmap.md)。
+ここまでの変更は `dev` にあり、**本番（`main`）にはまだ出ていません**。
+
+残タスクは GitHub の [Issues](https://github.com/inouekoshi/snct-dash/issues) で管理しています（ラベル `P1: 高専祭までに必須` が最優先）。まとめは [#14](https://github.com/inouekoshi/snct-dash/issues/14)、期限つきの一覧は [doc/roadmap.md](doc/roadmap.md#残タスク2026-10-14-時点)。
 
 ## ドキュメント
 
