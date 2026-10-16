@@ -32,7 +32,7 @@
 
 ここまでの変更は `dev` にあり、**本番（`main`）にはまだ出ていません**。
 
-残タスクは GitHub の [Issues](https://github.com/inouekoshi/snct-dash/issues) で管理しています（ラベル `P1: 高専祭までに必須` が最優先）。まとめは [#14](https://github.com/inouekoshi/snct-dash/issues/14)、期限つきの一覧は [doc/roadmap.md](doc/roadmap.md#残タスク2026-10-14-時点)。
+残タスクは GitHub の [Issues](https://github.com/inouekoshi/snct-dash/issues) で管理しています（ラベル `P1: 高専祭までに必須` が最優先）。まとめは [#14](https://github.com/inouekoshi/snct-dash/issues/14)、期限つきの一覧は [doc/roadmap.md](doc/roadmap.md#残タスク2026-10-16-時点)。
 
 ## ドキュメント
 

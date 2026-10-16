@@ -34,7 +34,8 @@ snct-dash/
 │       └── cron/warmup/route.ts     # GET: Supabase 自動停止防止の定期アクセス（Vercel Cron・1日1回）
 │
 ├── components/
-│   ├── Game.tsx                     # Canvasゲームの React ラッパー（ブリーフィング・入力・一時停止メニュー・自動ポーズ）
+│   ├── Game.tsx                     # Canvasゲームの React ラッパー（入力・一時停止メニュー・自動ポーズ）
+│   ├── StageBriefing.tsx            # プレイ開始前のブリーフィング画面（学科紹介・特徴・操作説明）
 │   ├── DepartmentSelect.tsx         # 学科選択UI
 │   ├── ResultModal.tsx              # リザルト（タイム・順位・自己ベスト・登録エラー表示）
 │   ├── ShareButtons.tsx             # X / LINE / 端末の共有メニュー
@@ -52,12 +53,13 @@ snct-dash/
 │   ├── og/                          # OGP画像の描画（日本語フォントは必要な文字だけ取得）
 │   └── game/
 │       ├── engine.ts                # GameEngine（固定タイムステップのループ・状態・衝突判定・学科別ギミック）
+│       ├── forge-system.ts          # ForgeSystem クラス：材料工学科（鍛えてカン！）の状態・叩き判定・チュートリアル管理
 │       ├── engine-types.ts          # Obstacle / TerrainSegment / Item / Particle 型定義
 │       ├── constants.ts             # 全定数（速度・スポーン間隔・ステージ長・学科別ギミックの値）
 │       ├── limits.ts                # 学科ごとのクリアタイムの受付範囲（不正判定）と理論最短タイム
 │       ├── rng.ts                   # シード付き乱数（エンジンごとに1つ）
 │       ├── spawner.ts               # Spawner クラス：学科別の障害物・アイテム生成（ShuffleBag で偏りを抑える）
-│       ├── terrain.ts               # 地形生成（機械の山登り階段／平坦／生物応化は地面なし）
+│       ├── terrain.ts               # 地形生成（機械の山登り階段／平坦／生物応化は地面なし）と地形検索クエリ
 │       ├── autopilot.ts             # 自動プレイ（テスト・バランス調整用のボット）
 │       ├── areas.ts                 # 5学科のテーマ定義（色・名前・絵文字）と生物応化のゾーン判定
 │       ├── stage-info.ts            # ブリーフィング画面の学科紹介・ステージ特徴
@@ -107,7 +109,7 @@ snct-dash/
 | 2 電気電子 | `isElec` | 充電ゲージの減少・🔋電池・天井障害 |
 | 3 電子情報 | `isCode` | バグの独立スポーン・踏みつけ・デバッグモード・天井障害 |
 | 4 生物応化 | `isBio` | `updateBio()`（長押し浮上の物理）・パイプ・バリア |
-| 5 材料 | `isMat` | `strike()` による叩き判定・連打抑止硬直・最大コンボボーナス（-0.14s/コンボ）・チュートリアル減速待機 |
+| 5 材料 | `isMat` | `ForgeSystem`（`forge-system.ts`）による叩き判定・連打抑止硬直・最大コンボボーナス（-0.14s/コンボ）・チュートリアル減速待機 |
 
 ## データフロー
 
@@ -137,7 +139,7 @@ DB の詳細は [doc/database.md](database.md)。
   ↓ ニックネーム入力（初回のみ）
 ゲーム (app/game/page.tsx)
   ├ 学科選択 (DepartmentSelect.tsx)
-  ├ ブリーフィング → プレイ (Game.tsx)
+  ├ ブリーフィング (StageBriefing.tsx) → プレイ (Game.tsx)
   │    └ ⏸一時停止メニュー：再開／最初からやり直す／学科選択に戻る
   │      （タブ切替・縦向きでも自動で一時停止）
   └ クリア → リザルト (ResultModal.tsx)
@@ -163,4 +165,4 @@ DB の詳細は [doc/database.md](database.md)。
 - 「All Environments」で同じ値を入れない。Preview に本番DBの値が入ると、dev ブランチでのテストプレイが本番ランキングに載る
 - Preview に設定がないと、dev ブランチの API ルートが 500 エラーになる
 - `NEXT_PUBLIC_*` はビルド時に埋め込まれるため、**設定変更後は再デプロイが必要**
-- `SUPABASE_SERVICE_ROLE_KEY` は使っていない。2026-10-14 時点で3環境すべてに残っている（削除手順は [doc/operations.md](operations.md#vercel-の不要な環境変数を消す)）
+- `SUPABASE_SERVICE_ROLE_KEY` は使っていない（2026-10-16 に3環境すべてから削除済み。詳細は [doc/operations.md](operations.md#vercel-の不要な環境変数を消す)）

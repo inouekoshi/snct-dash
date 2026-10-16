@@ -190,16 +190,21 @@ if (isFallingIntoHole && py > CANVAS_H + 60) {
 
 ### 段差壁ブロック（`isBlockedByStep()`）
 
-上り段差に対してジャンプなしで接近した場合、スクロールを止めて壁として機能させる。
+上り段差に対してジャンプなしで接近した場合、スクロールを止めて壁として機能させる（`lib/game/terrain.ts`）。
 
 ```typescript
-private isBlockedByStep(): boolean {
+export function isBlockedByStep(
+  terrain: readonly TerrainSegment[],
+  stageProgress: number,
+  speed: number,
+  py: number,
+): boolean {
   // 上り段差（20px以上）の境界に speed+3px 以内まで近づいており
   // プレイヤーが段差の上面より低い位置（py > curr.groundY + 5）にいるとき true を返す
 }
 ```
 
-`stageProgress` の更新条件: `!isFallingIntoHole && !isBlockedByStep()`
+`stageProgress` の更新条件: `!isFallingIntoHole && !isBlockedByStep(...)`
 
 **「世界が前に流れる = プレイヤーが後退した見た目」** になります。
 ノックバック量は `constants.ts` の `KNOCKBACK_AMOUNT` / `HOLE_KNOCKBACK` で調整できます。
@@ -214,7 +219,7 @@ private isBlockedByStep(): boolean {
 drawGoal(ctx, areaId, theme, stageProgress, frame)
 ```
 
-- `stageX = STAGE_LENGTH` の位置に台座・ポール・学科emoji入りの旗を描画
+- `stageX = STAGE_LENGTH` の位置に台座・ポール・学科emoji入りの旗を描画（台座は通常ステージでは `DEFAULT_GROUND_Y`、地面がない生物応用化学科ではタンク底面 `CANVAS_H - 4` に接地）
 - 750px 以内に近づくとグロー強度が増しパルスアニメーション
 - 450px 以内で「GOAL」テキストがフェードイン
 - 旗は `Math.sin(frame * 0.12 + t * 3.5)` の波打ちアニメーション
@@ -236,11 +241,11 @@ drawGoal(ctx, areaId, theme, stageProgress, frame)
 新しいアイテムは次の4か所に追加します。
 
 1. **種類を追加する**：`Item.effect` に追加する（`engine-types.ts`）
-2. **スポーンする**：`engine.ts` の `update()` でタイマーをカウントダウンし、画面右端（`stageProgress + CANVAS_W`）の `stageX` で `items` に push する。学科限定のものはフラグ（`isElec` など）で囲む
+2. **スポーンする**：`engine.ts` の `spawnEntities()` でタイマーをカウントダウンし、画面右端（`stageProgress + CANVAS_W`）の `stageX` で `items` に push する。学科限定のものはフラグ（`isElec` など）で囲む
    ```typescript
    if (this.isElec && --this.nextBattery <= 0) {
      const nextStageX = this.stageProgress + CANVAS_W
-     const y = this.getGroundHeightAt(nextStageX) - (74 + this.rng.next() * 46)
+     const y = getGroundHeightAt(this.terrain, nextStageX) - (74 + this.rng.next() * 46)
      this.items.push({ stageX: nextStageX, x: CANVAS_W + 10, y, effect: 'charge', wobble: this.rng.next() * Math.PI * 2 })
      ...
    }
