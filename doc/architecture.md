@@ -38,7 +38,7 @@ snct-dash/
 │   ├── DepartmentSelect.tsx         # 学科選択UI
 │   ├── ResultModal.tsx              # リザルト（タイム・順位・自己ベスト・登録エラー表示）
 │   ├── ShareButtons.tsx             # X / LINE / 端末の共有メニュー
-│   ├── MatProductReveal.tsx         # 材料工学科のクリア演出（チタン眼鏡フレーム完成）
+│   ├── MatProductReveal.tsx         # 材料工学科のクリア演出（鍛造による結晶粒微細化）
 │   ├── Leaderboard.tsx              # ランキング表示（学科別タブ）
 │   └── ServiceWorkerRegister.tsx    # 本番ビルドでだけ Service Worker を登録
 │
@@ -107,7 +107,7 @@ snct-dash/
 | 2 電気電子 | `isElec` | 充電ゲージの減少・🔋電池・天井障害 |
 | 3 電子情報 | `isCode` | バグの独立スポーン・踏みつけ・デバッグモード・天井障害 |
 | 4 生物応化 | `isBio` | `updateBio()`（長押し浮上の物理）・パイプ・バリア |
-| 5 材料 | `isMat` | `updateMat()`（工程・状態・タイマー）・熱処理セット・工程ごとの当たり判定 |
+| 5 材料 | `isMat` | `strike()` による叩き判定・4段階加速・連打抑止・チュートリアル減速待機 |
 
 ## データフロー
 

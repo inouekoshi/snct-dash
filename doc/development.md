@@ -230,8 +230,8 @@ drawGoal(ctx, areaId, theme, stageProgress, frame)
 |--------|------|------|
 | `charge` | 電気電子 | 🔋電池。充電ゲージを回復 |
 | `shield` | 生物応化 | バリア。1回だけ被弾を無効化 |
-| `furnace` / `quench` | 材料 | 熱処理ゲート。🔥炉で「しなる」、💧水槽で「かたい」 |
-| `sign_flex` / `sign_hard` | 材料 | 熱処理の看板（取得判定なし・表示のみ） |
+
+※ 材料工学科は赤熱塊（`hot_ingot`）をハンマーで叩くギミックのため、固有アイテムはありません（障害物としてスポーンします）。
 
 新しいアイテムは次の4か所に追加します。
 
@@ -275,7 +275,7 @@ export const OBSTACLE_DRAWERS: Record<Obstacle['shape'], ObstacleDrawFn> = {
 
 ### 3. スポーン関数で使用（`spawner.ts`）
 
-学科ごとのパターンは `SpawnFn` の配列にまとめ、`ShuffleBag` で偏りなく順番に出します（機械＝`dept1Spawners`、電気電子＝`dept2Spawners`、電子情報＝`dept3RedSpawners`、材料＝`meltSpawners` / `rollSpawners`）。
+学科ごとのパターンは `SpawnFn` の配列にまとめ、`ShuffleBag` で偏りなく順番に出します（機械＝`dept1Spawners`、電気電子＝`dept2Spawners`、電子情報＝`dept3RedSpawners`。材料工学科は時間キュー基準で `hot_ingot` をスポーン）。
 バッグの残りと乱数は `Spawner` クラス（エンジンごとに1つ）が持ちます。乱数は引数の `rand()` を使い、`Math.random()` は使いません。
 
 ```typescript
