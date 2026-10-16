@@ -15,15 +15,14 @@
 
 ---
 
-## 本番リリース手順（dev → main）
+## 本番リリース手順（dev → main・2026-10-16 完了）
 
-本番DBには「新しいコードとも旧コードとも互換」なマイグレーション（`..._100`, `..._300`）を適用済み。
-**直接 INSERT の禁止（`..._200_lockdown`）だけは、main に新コードが出てから適用する**（先に当てると旧コードの登録が失敗する）。
+全5学科完成版の本番リリースは 2026-10-16 に完了した。手順の履歴は以下の通り。
 
-1. dev のプレビュー（`https://kosendash-git-dev-koshiinoues-projects.vercel.app`）で全5学科をプレイし、クリア登録・順位・ランキング・シェアを確認する
-2. `lib/game/constants.ts` の `STAGE_LENGTH` が **70000** であることを確認する
-3. dev → main をマージ（GitHub で PR を作ってマージ）。Vercel が本番を自動デプロイする
-4. **デプロイが終わったら、本番DB に lockdown と材料工学科下限タイム更新を適用する**（`supabase/release_main_lockdown.sql` の内容を Supabase ダッシュボード → 本番 `kosendash` → SQL Editor で実行）：
+1. [x] dev のプレビュー（`https://kosendash-git-dev-koshiinoues-projects.vercel.app`）で全5学科のクリア登録・順位・ランキング・シェアを確認
+2. [x] `lib/game/constants.ts` の `STAGE_LENGTH` が **70000** であることを確認
+3. [x] dev → main をマージ（PR #17）。Vercel の本番自動デプロイ完了（コミット `4b221b6`）
+4. [x] **デプロイ後に、本番DB へ lockdown と材料工学科下限タイム更新を適用完了**（`supabase/release_main_lockdown.sql` の内容を SQL Editor で実行済み・API検証済み）：
 
    ```sql
    -- 直接 INSERT の禁止
