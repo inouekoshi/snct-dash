@@ -86,3 +86,66 @@ function buildStageMech(rand: Rand): TerrainSegment[] {
 
   return segments
 }
+
+// ── 地形クエリ（engine.ts から利用） ───────────────────────────────────────
+
+/** stageX を含む地形セグメントの添字（無ければ -1）。セグメントは stageX 昇順に隙間なく並ぶので二分探索する */
+export function segmentIndexAt(terrain: readonly TerrainSegment[], stageX: number): number {
+  let lo = 0, hi = terrain.length - 1
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1
+    const seg = terrain[mid]
+    if (stageX < seg.stageX) hi = mid - 1
+    else if (stageX >= seg.stageX + seg.width) lo = mid + 1
+    else return mid
+  }
+  return -1
+}
+
+/** 指定 stageX 直下の地面Y（穴なら Infinity） */
+export function getGroundYAt(terrain: readonly TerrainSegment[], stageX: number): number {
+  const seg = terrain[segmentIndexAt(terrain, stageX)]
+  if (!seg) return DEFAULT_GROUND_Y
+  return seg.type === 'hole' ? Infinity : seg.groundY
+}
+
+export function hasGroundAt(terrain: readonly TerrainSegment[], stageX: number): boolean {
+  const seg = terrain[segmentIndexAt(terrain, stageX)]
+  return !seg || seg.type !== 'hole'
+}
+
+export function getGroundHeightAt(terrain: readonly TerrainSegment[], stageX: number): number {
+  const seg = terrain[segmentIndexAt(terrain, stageX)]
+  return !seg || seg.type === 'hole' ? DEFAULT_GROUND_Y : seg.groundY
+}
+
+/** 区間 [stageX, stageX+width] が同じ高さの平坦な地面か（段差・階段の途中に障害物を出さないため） */
+export function isFlatAt(terrain: readonly TerrainSegment[], stageX: number, width: number): boolean {
+  const base = getGroundHeightAt(terrain, stageX)
+  for (let dx = 30; dx <= width; dx += 30) {
+    if (getGroundHeightAt(terrain, stageX + dx) !== base) return false
+  }
+  return true
+}
+
+/** 目の前（このフレームで進む距離以内）に上り段差があり、まだその高さまで跳んでいなければ進めない */
+export function isBlockedByStep(
+  terrain: readonly TerrainSegment[],
+  stageProgress: number,
+  speed: number,
+  py: number,
+): boolean {
+  if (terrain.length < 2) return false
+  const i = Math.max(1, segmentIndexAt(terrain, stageProgress))
+  for (let j = i; j < terrain.length; j++) {
+    const prev = terrain[j - 1]
+    const curr = terrain[j]
+    const dist = curr.stageX - stageProgress
+    if (dist > speed + 3) break
+    if (dist < 0 || prev.type !== 'ground' || curr.type !== 'ground') continue
+    const stepHeight = prev.groundY - curr.groundY // 正なら上り段差
+    if (stepHeight >= 20 && py > curr.groundY + 5) return true
+  }
+  return false
+}
+
