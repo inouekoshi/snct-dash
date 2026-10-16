@@ -4,7 +4,7 @@
 
 - 状態：実装完了（2026-10-16）
 - 対象：`dev` ブランチ（デモ版）だけ。**`main`（本番）には触らない**。本番リリースは材料工学科の完成後に別途行う
-- 今のデモ版では、材料工学科はメンテナンス中にしてある（Vercel の Preview に `NEXT_PUBLIC_MAINTENANCE_DEPARTMENTS=5`）。デモ版で実機確認するときは、この変数を外して再デプロイする
+- デモ版での材料工学科のメンテナンス設定（`NEXT_PUBLIC_MAINTENANCE_DEPARTMENTS=5`）は解除済み。全5学科がプレイ可能。
 
 1〜3章で何を作るかを、4〜6章でどう作るかを書いた。数値は7章の表にまとめてある。
 
@@ -242,7 +242,7 @@
 ## 6. 進め方の約束
 
 - 作業ブランチは `dev` から切り、`dev` へ PR でマージする。`main` には触らない
-- デモ版で触って確かめるときは、Vercel の Preview から `NEXT_PUBLIC_MAINTENANCE_DEPARTMENTS` を外して再デプロイする（手順は `doc/operations.md` の「学科をメンテナンス中にする」）
+- デモ版で触って確かめるときは、Vercel の Preview から `NEXT_PUBLIC_MAINTENANCE_DEPARTMENTS` を外して再デプロイする（解除・再デプロイ済み）
 - `STAGE_LENGTH` は 70000 のまま。動作確認で縮めたら、コミット前に戻す
 - 完成したら、この設計書の「状態」を更新し、`doc/game_spec.md` の材料工学科の節も書き直す
 
