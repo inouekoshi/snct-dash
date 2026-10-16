@@ -68,7 +68,7 @@ export default function MatProductReveal({ accent }: { accent: string }) {
         チタン眼鏡フレーム 完成！
       </p>
       <p className="text-xs text-gray-300 transition-opacity duration-500" style={{ opacity: frameDone ? 1 : 0 }}>
-        ゴムのように曲がるチタン眼鏡は、材料工学科の卒業生が実現させた製品です
+        ゴムのように曲がるチタン製眼鏡フレームは、鈴鹿高専の卒業生が実現させた製品です
       </p>
     </div>
   )
