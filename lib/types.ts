@@ -43,4 +43,5 @@ export type ApiErrorCode =
   | 'run_already_finished'
   | 'run_expired'
   | 'rate_limited'
+  | 'department_maintenance'
   | 'server_error'

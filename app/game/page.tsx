@@ -6,6 +6,7 @@ import Game from '@/components/Game'
 import DepartmentSelect from '@/components/DepartmentSelect'
 import ResultModal from '@/components/ResultModal'
 import { startRun } from '@/lib/client/game-api'
+import { isUnderMaintenance } from '@/lib/maintenance'
 import { NICKNAME_STORAGE_KEY } from '@/lib/nickname'
 import type { GameClearResult } from '@/lib/types'
 
@@ -61,6 +62,7 @@ export default function GamePage() {
     return (
       <DepartmentSelect
         onSelect={id => {
+          if (isUnderMaintenance(id)) return
           setDepartmentId(id)
           setAutoStart(false)
           setPlayKey(k => k + 1)

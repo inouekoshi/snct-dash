@@ -67,6 +67,18 @@ describe('POST /api/runs', () => {
     onTestFinished(() => spy.mockRestore())
     expect((await startRun(post('/api/runs', { department: 1 }))).status).toBe(500)
   })
+
+  it('メンテナンス中の学科は 503 で断り、DB を呼ばない', async () => {
+    vi.stubEnv('NEXT_PUBLIC_MAINTENANCE_DEPARTMENTS', '4')
+    onTestFinished(() => { vi.unstubAllEnvs() })
+    const res = await startRun(post('/api/runs', { department: 4 }))
+    expect(res.status).toBe(503)
+    expect((await res.json()).code).toBe('department_maintenance')
+    expect(rpc).not.toHaveBeenCalled()
+
+    rpc.mockResolvedValue({ data: RUN_ID, error: null })
+    expect((await startRun(post('/api/runs', { department: 3 }))).status).toBe(201)
+  })
 })
 
 describe('POST /api/stage-clears', () => {

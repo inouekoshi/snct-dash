@@ -12,6 +12,7 @@ const ERRORS: Record<ApiErrorCode, { status: number; message: string }> = {
   run_already_finished: { status: 409, message: 'このプレイはすでに登録済みです' },
   run_expired:          { status: 410, message: 'プレイ開始から時間が経ちすぎたため登録できません' },
   rate_limited:         { status: 429, message: '短時間に何度も始めすぎです。少し待ってから遊んでね' },
+  department_maintenance: { status: 503, message: 'この学科のステージはメンテナンス中です' },
   server_error:         { status: 500, message: 'サーバーでエラーが起きました' },
 }
 

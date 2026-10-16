@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { createServerClient } from '@/lib/supabase-server'
 import { apiError, codeFromDbError } from '@/lib/server/api-error'
 import { clientKeyFrom, deviceFrom } from '@/lib/server/client-key'
+import { isUnderMaintenance } from '@/lib/maintenance'
 import type { StartRunResponse } from '@/lib/types'
 
 // プレイ開始（「スタート！」を押したとき）。クリア登録に必要な runId を発行する。
@@ -16,6 +17,9 @@ export async function POST(request: NextRequest) {
   const { department, startedAgoMs } = (body ?? {}) as Record<string, unknown>
   if (typeof department !== 'number' || !Number.isInteger(department) || department < 1 || department > 5) {
     return apiError('invalid_department')
+  }
+  if (isUnderMaintenance(department)) {
+    return apiError('department_maintenance')
   }
 
   try {

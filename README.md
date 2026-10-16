@@ -75,5 +75,6 @@ npm run dev                        # http://localhost:3000
 | `NEXT_PUBLIC_SUPABASE_URL` | ✅ | Supabase プロジェクトの API URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅ | Supabase の匿名キー（公開可）。APIルートもこのキーで DB 関数を呼ぶ |
 | `CRON_SECRET` | 任意 | Cron ウォームアップの認証 |
+| `NEXT_PUBLIC_MAINTENANCE_DEPARTMENTS` | 任意 | メンテナンス中にする学科ID（例: `5`）。その学科は遊べなくなる（[運用ガイド](doc/operations.md#学科をメンテナンス中にする)） |
 
 Supabase ダッシュボード → プロジェクト → **Settings > API** で確認できます。DB のスキーマは `supabase/migrations/`（適用状況は [doc/database.md](doc/database.md)）。

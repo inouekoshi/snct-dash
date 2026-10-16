@@ -154,6 +154,7 @@ DB の詳細は [doc/database.md](database.md)。
 | `NEXT_PUBLIC_SUPABASE_URL` | ✅ | Supabase API URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅ | 匿名キー（公開可）。APIルートもこのキーで DB 関数（RPC）を呼ぶ |
 | `CRON_SECRET` | 任意 | 設定すると `/api/cron/warmup` が Authorization ヘッダーを検証する |
+| `NEXT_PUBLIC_MAINTENANCE_DEPARTMENTS` | 任意 | メンテナンス中にする学科ID（カンマ区切り。例: `5`）。その学科は選択画面で押せなくなり、`/api/runs` もプレイ開始を 503 で断る。2026-10-16 時点で Preview にだけ `5`（材料工学科）を設定 |
 | `NEXT_PUBLIC_E2E` | テスト専用 | `1` でビルドすると `window.__kosendash`（自動操縦・ワープ）が有効になる。**本番では設定しない** |
 
 ### Vercel 設定の注意点

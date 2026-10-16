@@ -3,6 +3,7 @@
 import { AREAS } from '@/lib/game/areas'
 import type { AreaId } from '@/lib/game/areas'
 import { STAGE_INFO } from '@/lib/game/stage-info'
+import { isUnderMaintenance } from '@/lib/maintenance'
 
 const DEPARTMENTS = [1, 2, 3, 4, 5] as const
 
@@ -22,16 +23,23 @@ export default function DepartmentSelect({ onSelect, onBack }: Props) {
       <div className="flex flex-col gap-3 w-full max-w-sm">
         {DEPARTMENTS.map((id) => {
           const theme = AREAS[id as AreaId]
+          const closed = isUnderMaintenance(id)
           return (
             <button
               key={id}
               onClick={() => onSelect(id)}
-              className="flex items-center gap-4 p-4 rounded-2xl transition-colors text-left border bg-gray-800 hover:bg-gray-700 border-gray-700 hover:border-gray-500 active:scale-95"
+              disabled={closed}
+              aria-disabled={closed}
+              className={closed
+                ? 'flex items-center gap-4 p-4 rounded-2xl text-left border bg-gray-900 border-gray-800 cursor-not-allowed'
+                : 'flex items-center gap-4 p-4 rounded-2xl transition-colors text-left border bg-gray-800 hover:bg-gray-700 border-gray-700 hover:border-gray-500 active:scale-95'}
             >
-              <span className="text-4xl w-12 text-center">{theme.emoji}</span>
+              <span className={`text-4xl w-12 text-center ${closed ? 'grayscale opacity-40' : ''}`}>{theme.emoji}</span>
               <div>
-                <p className="font-black text-lg">{theme.name}</p>
-                <p className="text-xs text-gray-400 mt-0.5">{STAGE_INFO[id].catch}</p>
+                <p className={`font-black text-lg ${closed ? 'text-gray-500' : ''}`}>{theme.name}</p>
+                {closed
+                  ? <p className="text-xs text-amber-400 mt-0.5">🔧 メンテナンス中のため、いまは遊べません</p>
+                  : <p className="text-xs text-gray-400 mt-0.5">{STAGE_INFO[id].catch}</p>}
               </div>
             </button>
           )
