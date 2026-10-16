@@ -2,73 +2,59 @@
 
 import { useEffect, useState } from 'react'
 
-// 材料工学科のクリア演出：工程が並び、チタン眼鏡フレームが組み上がる。
+// 材料工学科のクリア演出：粗い粒の塊を叩いて、細かい粒の板になる絵を見せる。
+// 絵は、教員の研究キーワード「結晶粒微細化」を表したもの。叩くと粒が細かくなる、とは書かない。
 // （ゲームのキャンバスはクリア時に描画を止めるので、結果画面側で見せる）
-const STEPS = ['🔥 溶解', '🛞 圧延', '♨️ 熱処理', '🔬 検査']
-
 export default function MatProductReveal({ accent }: { accent: string }) {
-  const [shown, setShown] = useState(0)
+  const [step, setStep] = useState(0)
 
   useEffect(() => {
-    const timers = STEPS.map((_, i) => setTimeout(() => setShown(i + 1), 300 + i * 350))
-    const done = setTimeout(() => setShown(STEPS.length + 1), 300 + STEPS.length * 350 + 200)
-    return () => { timers.forEach(clearTimeout); clearTimeout(done) }
+    const timers = [
+      setTimeout(() => setStep(1), 300),
+      setTimeout(() => setStep(2), 1100),
+    ]
+    return () => timers.forEach(clearTimeout)
   }, [])
 
-  const frameDone = shown > STEPS.length
+  const done = step >= 2
 
   return (
     <div
       className="w-full max-w-xs rounded-2xl px-4 py-3 space-y-2"
       style={{ backgroundColor: `${accent}14`, border: `1px solid ${accent}40` }}
     >
-      <div className="flex items-center justify-center gap-1 text-xs font-bold flex-wrap">
-        {STEPS.map((s, i) => (
-          <span key={s} className="flex items-center gap-1">
-            <span
-              className="px-2 py-0.5 rounded-full transition-all duration-300"
-              style={{
-                opacity: i < shown ? 1 : 0.15,
-                transform: i < shown ? 'scale(1)' : 'scale(0.8)',
-                backgroundColor: `${accent}33`,
-                color: '#fff',
-              }}
-            >
-              {s}
-            </span>
-            {i < STEPS.length - 1 && <span className="text-gray-500">›</span>}
-          </span>
-        ))}
-      </div>
+      <svg viewBox="0 0 220 80" className="w-full h-20" aria-label="粗い粒の塊と、細かい粒の板">
+        {/* 粗い粒の塊 */}
+        <g style={{ opacity: step >= 1 ? 1 : 0, transition: 'opacity 0.4s' }}>
+          <rect x="10" y="22" width="64" height="44" rx="6" fill="#d9482a" stroke="#ffd9a0" strokeWidth="2" />
+          <path
+            d="M32 22 L28 42 L42 52 L40 66 M28 42 L10 38 M42 52 L58 46 L54 22 M58 46 L74 50"
+            fill="none" stroke="#5a0a05" strokeWidth="2" strokeLinejoin="round"
+          />
+          <text x="42" y="78" textAnchor="middle" fontSize="9" fill="#cccccc">粗い粒の塊</text>
+        </g>
 
-      <svg viewBox="0 0 200 70" className="w-full h-16" aria-label="チタン眼鏡フレーム">
-        <path
-          d="M10 30 Q12 14 30 14 L46 14 Q72 14 74 32 Q74 54 46 54 L36 54 Q10 54 10 30 Z
-             M126 32 Q128 14 154 14 L170 14 Q188 14 190 30 Q190 54 164 54 L154 54 Q126 54 126 32 Z
-             M74 30 Q100 18 126 30"
-          fill="none"
-          stroke="#d7dde6"
-          strokeWidth="4"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          pathLength={1}
-          style={{
-            strokeDasharray: 1,
-            strokeDashoffset: frameDone ? 0 : 1,
-            transition: 'stroke-dashoffset 1.2s ease-out',
-            filter: `drop-shadow(0 0 6px ${accent})`,
-          }}
-        />
+        <text x="110" y="48" textAnchor="middle" fontSize="18" fill="#aaaaaa" style={{ opacity: done ? 1 : 0, transition: 'opacity 0.4s' }}>›</text>
+
+        {/* 細かい粒の板 */}
+        <g style={{ opacity: done ? 1 : 0, transform: done ? 'translateY(0)' : 'translateY(-8px)', transition: 'opacity 0.5s, transform 0.5s' }}>
+          <rect x="140" y="46" width="70" height="14" rx="3" fill="#cfd6e0" stroke="#ffffff" strokeWidth="1.5" />
+          <path
+            d={Array.from({ length: 13 }, (_, i) => `M${145 + i * 5} 47 L${147 + i * 5} 53 L${144 + i * 5} 59`).join(' ')}
+            fill="none" stroke="#6d7888" strokeWidth="1"
+          />
+          <text x="175" y="78" textAnchor="middle" fontSize="9" fill="#cccccc">細かい粒の板</text>
+        </g>
       </svg>
 
       <p
         className="text-sm font-black transition-opacity duration-500"
-        style={{ color: accent, opacity: frameDone ? 1 : 0 }}
+        style={{ color: accent, opacity: done ? 1 : 0 }}
       >
-        チタン眼鏡フレーム 完成！
+        叩いて板ができた！
       </p>
-      <p className="text-xs text-gray-300 transition-opacity duration-500" style={{ opacity: frameDone ? 1 : 0 }}>
-        ゴムのように曲がるチタン製眼鏡フレームは、鈴鹿高専の卒業生が実現させた製品です
+      <p className="text-xs text-gray-300 transition-opacity duration-500" style={{ opacity: done ? 1 : 0 }}>
+        鈴鹿高専の材料工学科には、「加工熱処理」や「結晶粒微細化」を研究している先生がいます
       </p>
     </div>
   )

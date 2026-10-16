@@ -3,7 +3,7 @@ import type { AreaId } from './areas'
 import { AREAS } from './areas'
 import { DEFAULT_GROUND_Y as GROUND_Y, mallocSolid } from './constants'
 import { rrect } from './helpers'
-import { dLeafSpring, dBrittleCrystal, dRoller } from './mat-renderers'
+import { dHotIngot } from './mat-renderers'
 
 type Theme = typeof AREAS[AreaId]
 export type ObstacleDrawFn = (ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme, frame: number) => void
@@ -97,56 +97,6 @@ function dBug(ctx: CanvasRenderingContext2D, o: Obstacle, _theme: Theme, frame: 
   ctx.shadowColor = '#3dff7e'; ctx.shadowBlur = 6
   ctx.beginPath(); ctx.moveTo(cx - 6, ay); ctx.lineTo(cx + 6, ay); ctx.lineTo(cx, ay + 8); ctx.closePath(); ctx.fill()
   ctx.shadowBlur = 0; ctx.globalAlpha = 1
-}
-
-function dCrystal(ctx: CanvasRenderingContext2D, o: Obstacle) {
-  const cx = o.x + o.w / 2
-  ctx.beginPath()
-  ctx.moveTo(cx, o.y); ctx.lineTo(cx + o.w * 0.18, o.y + o.h * 0.38); ctx.lineTo(o.x + o.w, o.y + o.h); ctx.lineTo(o.x, o.y + o.h); ctx.lineTo(cx - o.w * 0.18, o.y + o.h * 0.38); ctx.closePath()
-  ctx.fill(); ctx.stroke()
-  ctx.lineWidth = 1; ctx.globalAlpha = 0.5
-  ctx.beginPath(); ctx.moveTo(cx, o.y); ctx.lineTo(cx + o.w * 0.08, o.y + o.h * 0.55); ctx.stroke()
-  ctx.globalAlpha = 1
-}
-
-function dIngot(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme) {
-  const bv = Math.min(o.h * 0.38, 9)
-  ctx.beginPath()
-  ctx.moveTo(o.x + bv, o.y); ctx.lineTo(o.x + o.w - bv, o.y)
-  ctx.lineTo(o.x + o.w, o.y + o.h); ctx.lineTo(o.x, o.y + o.h)
-  ctx.closePath(); ctx.fill(); ctx.stroke()
-  ctx.fillStyle = theme.obstacleStroke + '44'
-  ctx.beginPath()
-  ctx.moveTo(o.x + bv + 3, o.y + 3); ctx.lineTo(o.x + o.w * 0.52, o.y + 3)
-  ctx.lineTo(o.x + o.w * 0.52 + 2, o.y + o.h - 3); ctx.lineTo(o.x + bv + 1, o.y + o.h - 3)
-  ctx.closePath(); ctx.fill()
-  ctx.strokeStyle = theme.obstacleStroke + '44'; ctx.lineWidth = 1
-  const midY = o.y + o.h * 0.5
-  ctx.beginPath(); ctx.moveTo(o.x + bv * 0.5, midY); ctx.lineTo(o.x + o.w - bv * 0.5, midY); ctx.stroke()
-}
-
-function dLattice(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme) {
-  ctx.fillStyle = theme.obstacleColor + '55'
-  ctx.fillRect(o.x, o.y, o.w, o.h)
-  const cols = Math.max(2, Math.round(o.w / 15))
-  const rows = Math.max(2, Math.round(o.h / 15))
-  ctx.strokeStyle = theme.obstacleStroke; ctx.lineWidth = 2.5
-  for (let c = 0; c <= cols; c++) {
-    const x = o.x + (o.w / cols) * c
-    ctx.beginPath(); ctx.moveTo(x, o.y); ctx.lineTo(x, o.y + o.h); ctx.stroke()
-  }
-  for (let r = 0; r <= rows; r++) {
-    const y = o.y + (o.h / rows) * r
-    ctx.beginPath(); ctx.moveTo(o.x, y); ctx.lineTo(o.x + o.w, y); ctx.stroke()
-  }
-  ctx.fillStyle = theme.obstacleStroke
-  for (let c = 0; c <= cols; c++) {
-    for (let r = 0; r <= rows; r++) {
-      ctx.beginPath()
-      ctx.arc(o.x + (o.w / cols) * c, o.y + (o.h / rows) * r, 3, 0, Math.PI * 2)
-      ctx.fill()
-    }
-  }
 }
 
 function dStalactite(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme) {
@@ -734,9 +684,6 @@ export const OBSTACLE_DRAWERS: Record<Obstacle['shape'], ObstacleDrawFn> = {
   coil: dCoil,
   capacitor: dCapacitor,
   bug: dBug,
-  crystal: (ctx, o) => dCrystal(ctx, o),
-  ingot: dIngot,
-  lattice: dLattice,
   stalactite: dStalactite,
   wrench: dWrench,
   spring: dSpring,
@@ -760,9 +707,7 @@ export const OBSTACLE_DRAWERS: Record<Obstacle['shape'], ObstacleDrawFn> = {
   segfault: dSegfault,
   reagent_tube: dReagentTube,
   cell_wall: dCellWall,
-  leaf_spring: dLeafSpring,
-  brittle_crystal: dBrittleCrystal,
-  roller: dRoller,
+  hot_ingot: dHotIngot,
 }
 
 export function drawObstacle(ctx: CanvasRenderingContext2D, o: Obstacle, theme: Theme, frame: number) {

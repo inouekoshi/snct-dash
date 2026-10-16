@@ -15,7 +15,7 @@ export const HOLE_KNOCKBACK       = 200
 export const KNOCKBACK_INVINCIBLE = 90
 
 // [最小frames, ランダム幅frames]。インデックス0は未使用、1〜4がdepartmentId対応
-// （4=生物応化はパイプの間隔。材料工学科は工程別の MAT_SPAWN_GAPS を使う）
+// （4=生物応化はパイプの間隔。材料工学科は鍛造専用キューを使う）
 export const SPAWN_GAPS: [number, number][] = [
   [0, 0], [44, 28], [85, 50], [38, 30], [78, 46],
 ]
@@ -66,49 +66,34 @@ export const BIO_SPEED_END   = 10
 export const SHIELD_GAP: [number, number] = [240, 300]
 export const SHIELD_COLOR = '#5ffbf1'
 
-// 材料工学科（製品ができるまでラン）専用
-// 自分自身が材料になり「溶解 → 圧延 → 熱処理 → 検査」と加工されるたびに性質（物理）が変わる。
-// 区間境界は STAGE_LENGTH に対する比率で持つ（テスト時に STAGE_LENGTH を縮めても比率が保たれる）。
-export type MatPhase = 'melt' | 'roll' | 'heat' | 'inspect'
-export const MAT_PHASE_ORDER: MatPhase[] = ['melt', 'roll', 'heat', 'inspect']
-export const MAT_PHASE_START: Record<MatPhase, number> = {
-  melt:    0,
-  roll:    0.28,
-  heat:    0.56,
-  inspect: 0.955,
-}
-// 区間は保存せず stageProgress から毎回計算する（ノックバックで戻っても矛盾しない）
-export function matPhase(stageProgress: number): MatPhase {
-  const t = stageProgress / STAGE_LENGTH
-  if (t >= MAT_PHASE_START.inspect) return 'inspect'
-  if (t >= MAT_PHASE_START.heat) return 'heat'
-  if (t >= MAT_PHASE_START.roll) return 'roll'
-  return 'melt'
-}
-// 区間境界の stageX 一覧（工程ゲートの描画・安全区間の判定に使う）
-export function matBoundaries(): { x: number; phase: MatPhase }[] {
-  return MAT_PHASE_ORDER.slice(1).map(phase => ({ x: MAT_PHASE_START[phase] * STAGE_LENGTH, phase }))
-}
-// 区間ごとのプレイヤー当たり判定の高さ（通常は46）。液滴は丸く低め、薄板はぺたんこ。
-export const MAT_HITBOX_H: Record<MatPhase, number> = { melt: 34, roll: 22, heat: 40, inspect: 40 }
-export const MAT_SAFE_MARGIN   = 400    // 区間境界の前後この距離には障害物を出さない
-export const MELT_BOUNCE_VY    = -5.5   // 溶解（液滴）：着地のたびに小さく自動で弾む
-export const ROLL_GAP          = 26     // 圧延：ローラー下面と床のすき間（薄板22pxなら潜れる）
-// 熱処理：看板 → ゲート → 課題 のセット配置（セット先頭からの stageX オフセット）
-// 🔥炉は空中なのでジャンプで通過する。着地が板バネを飛び越えないよう、板バネは遠めに置く
-// （ジャンプの滞空は約41フレーム＝速度8〜15で330〜615px）。
-export const HEAT_GATE_OFFSET = 240
-export const HEAT_CHALLENGE_OFFSET: Record<'flex' | 'hard', number> = { flex: 820, hard: 520 }
-// セット先頭からこの距離で状態が通常に戻る（課題を越えた少し先）
-export const HEAT_STATE_SPAN: Record<'flex' | 'hard', number> = { flex: 1060, hard: 720 }
-export const HEAT_SET_GAP: [number, number] = [1250, 300]  // セット同士の間隔 [最小, ランダム幅]
-// 材料工学科の通常スポーン間隔 [最小frames, ランダム幅]。圧延はローラーの手前で必ず着地できるよう広め
-export const MAT_SPAWN_GAPS: Record<'melt' | 'roll', [number, number]> = { melt: [40, 26], roll: [58, 28] }
-export const MAT_BEND_FRAMES   = 18     // 板バネで曲がっている時間（0.3秒・この間は減速）
-export const MAT_BOOST_FRAMES  = 60     // 形が戻った反動の加速時間
-export const MAT_BOOST_MAX     = 1.4    // 加速倍率の上限（重ねがけしない）
-export const MAT_SLOW_FRAMES   = 60     // 結晶壁を砕かず迂回したときの減速（1秒）
-export const MAT_SLOW_MULT     = 0.6
-export const MAT_CUTIN_FRAMES  = 48     // 工程カットインの表示時間（0.8秒）
-export const MAT_FLEX_COLOR    = '#ff8a3d'
-export const MAT_HARD_COLOR    = '#7fd4ff'
+// 材料工学科（鍛えてカン！）専用
+export const FORGE_RING_OFFSET     = 175 // 輪の中心の、自キャラからの距離（px）
+export const FORGE_INGOT_W         = 40  // 塊の幅（px）
+export const FORGE_PERFECT         = 2.5 // PERFECT の幅（±フレーム、t は小数）
+export const FORGE_GOOD_EARLY      = 4.5 // GOOD の早い側の端（フレーム）
+export const FORGE_GOOD_LATE       = 6.5 // GOOD の遅い側の端（フレーム）
+export const FORGE_EARLY_LIMIT     = 20  // これより遠い塊へのタップは罰なしの空振り（フレーム）
+export const FORGE_COOLDOWN        = 12  // 空振り後の硬直（フレーム）
+export const FORGE_TIER_MAX        = 4   // 速度段階の最大
+export const MAT_BOOST_MAX         = 1.4 // 加速倍率の上限（limits.ts が使用）
+export const FORGE_TIER_STEP       = (MAT_BOOST_MAX - 1) / FORGE_TIER_MAX // 1段あたりの速度倍率の増分（0.1）
+export const FORGE_HITSTOP         = 2   // PERFECT のヒットストップ（フレーム）
+export const FORGE_SPAWN_DIST      = 560 // 輪の中心から、塊を置く位置（x=845）までの距離（px）
+export const FORGE_CUTIN_FRAMES    = 48  // 区間の切り替わりのカットイン表示時間
+export const FORGE_CHAIN_GAP       = 18  // 2連・3連の間隔（フレーム）
+export const FORGE_TUTORIAL_DELAY  = 90  // 開始から最初の塊までのフレーム数（1.5秒）
+export const FORGE_TUTORIAL_SLOW   = 0.2 // 最初の2個の、輪に入ったときの世界の速さ
+export const FORGE_TUTORIAL_WAIT   = 120 // 最初の2個で待つ最大フレーム数（2秒）
+export const FORGE_RING_R          = 26  // 判定の輪の半径（px）
+export const FORGE_SWING_FRAMES    = 8   // ハンマーを振る動きのフレーム数
+export const FORGE_TUTORIAL_HITS   = 2   // 「タップでたたけ！」を出し続ける、叩いた数の上限
+// 速度段階ごとの見た目の色（0＝赤、1〜2＝オレンジ、3＝黄色、4＝白熱）
+export const FORGE_TIER_COLORS = ['#ff4a3a', '#ff8a2a', '#ff8a2a', '#ffe04a', '#ffffff'] as const
+// 区間の切り替わりのカットイン文言（0〜25%は出さない）
+export const FORGE_ZONE_CUTIN: readonly (readonly [string, string])[] = [
+  ['', ''],
+  ['火が入ってきた！', 'ぴったり叩くほど速く走れる'],
+  ['炉が燃えさかる！', '2連・3連のリズムに乗れ'],
+  ['白熱の最終区間！', '最後まで叩ききれ'],
+]
+

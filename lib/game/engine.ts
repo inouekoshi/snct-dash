@@ -14,10 +14,10 @@ import {
   STOMP_BOUNCE, STOMP_MARGIN, mallocSolid,
   SWIM_THRUST, SWIM_DRAG, SWIM_MAX_VY, BIO_WALL_KNOCKBACK, BIO_SPEED_START, BIO_SPEED_END,
   SHIELD_GAP, SHIELD_COLOR,
-  matPhase, matBoundaries, MAT_PHASE_ORDER, MAT_PHASE_START, MAT_HITBOX_H, MAT_SAFE_MARGIN, MELT_BOUNCE_VY,
-  HEAT_GATE_OFFSET, HEAT_STATE_SPAN, HEAT_SET_GAP, MAT_SPAWN_GAPS,
-  MAT_BEND_FRAMES, MAT_BOOST_FRAMES, MAT_BOOST_MAX, MAT_SLOW_FRAMES, MAT_SLOW_MULT, MAT_CUTIN_FRAMES,
-  MAT_FLEX_COLOR, MAT_HARD_COLOR, type MatPhase,
+  FORGE_RING_OFFSET, FORGE_PERFECT, FORGE_GOOD_EARLY, FORGE_GOOD_LATE, FORGE_SWING_FRAMES,
+  FORGE_EARLY_LIMIT, FORGE_COOLDOWN, FORGE_TIER_MAX, FORGE_TIER_STEP, FORGE_HITSTOP,
+  FORGE_CUTIN_FRAMES, FORGE_TUTORIAL_SLOW, FORGE_TUTORIAL_WAIT, FORGE_ZONE_CUTIN,
+  FORGE_TUTORIAL_HITS,
 } from './constants'
 import type { PlayerState, Obstacle, TerrainSegment, Item, Particle } from './engine-types'
 import { overlaps, playerHitbox, itemHitbox, type Box } from './helpers'
@@ -29,7 +29,10 @@ import { drawGoal } from './goal-renderer'
 import { drawHUD, renderPauseOverlay, renderMissOverlay, renderRevivalHint } from './hud-renderer'
 import { Spawner } from './spawner'
 import { Rng } from './rng'
-import { drawMatPlayer, drawMatItem, drawMatGround, drawMatHud, drawMatCutin, type MatState } from './mat-renderers'
+import {
+  drawMatGround, drawMatCutin, drawForgeHammer, drawForgeRings, drawForgeHud, drawForgeResult,
+  type ForgeJudge,
+} from './mat-renderers'
 import { buildStage } from './terrain'
 
 // 1ステップ = 1/60秒。描画は requestAnimationFrame ごとだが、ゲームの更新は常にこの刻みで行う
@@ -119,21 +122,23 @@ export class GameEngine {
   private bioShield = false      // バリア保持中か（1回だけ被弾を無効化）
   private nextShield = 150       // 次のバリアアイテム出現までのframe
 
-  // 製品ができるまでラン（材料工学科 = departmentId 5 のみ稼働）
+  // 鍛えてカン！（材料工学科 = departmentId 5 のみ稼働）
   private isMat = false
-  private matState: MatState = 'normal'
-  private matStateUntilX = 0       // この stageX を過ぎたら状態が通常に戻る
-  private nextHeatSetX = 0         // 次の熱処理セットの先頭 stageX
-  private heatSetCount = 0
-  private bendTimer = 0            // 板バネで曲がっている残りフレーム（減速）
-  private boostTimer = 0           // 形が戻った反動の加速の残りフレーム
-  private boostMult = 1
-  private matSlowTimer = 0         // 結晶壁を迂回したときの減速の残りフレーム
-  private maxMatPhaseIdx = -1      // 到達した最も先の工程（カットインは初到達時のみ）
-  private lastHeatKind: 'flex' | 'hard' | null = null
-  private heatKindStreak = 0
+  private forgeTier = 0              // 速度段階（0〜FORGE_TIER_MAX）
+  private forgeCombo = 0             // PERFECT/GOOD の連続回数
+  private forgeMaxCombo = 0
+  private forgeHits = 0              // 叩いた塊の数（チュートリアルの文字を消す判断に使う）
+  private strikeCooldown = 0         // 空振り後の硬直の残りフレーム
+  private swingTimer = 0             // ハンマーを振っている残りフレーム
+  private judge: ForgeJudge | null = null
+  private judgeTimer = 0
+  private tierFlash = 0              // 速度段階が上がった瞬間の縁の光
+  private forgeHolding = false       // チュートリアルで世界を遅くして待っているか
+  private forgeWait = 0              // 待っているフレーム数
+  private shake = 0                  // PERFECT の画面の揺れ
+  private maxForgeZone = 0           // 到達した最も先の区間（カットインは初到達時のみ）
   private cutinTimer = 0
-  private cutinPhase: MatPhase = 'melt'
+  private cutinZone = 0
 
   // Background scroll
   private bgX = 0
@@ -161,7 +166,6 @@ export class GameEngine {
     this.isCode = departmentId === 3
     this.isBio = departmentId === 4
     this.isMat = departmentId === 5
-    this.nextHeatSetX = MAT_PHASE_START.heat * STAGE_LENGTH + MAT_SAFE_MARGIN
     if (this.isBio) {
       this.py = CANVAS_H / 2
     }
@@ -181,6 +185,7 @@ export class GameEngine {
 
   jump() {
     if (this.isCleared || this.isPaused || this.missOverlayTimer > 0) return
+    if (this.isMat) { this.strike(); return }
     if (this.jumpCount === 0 || (this.coyoteTime > 0 && this.jumpCount === 1)) {
       if (this.coyoteTime > 0 && this.jumpCount === 1) this.jumpCount = 0
       this.performJump()
@@ -266,7 +271,8 @@ export class GameEngine {
       items: this.items as readonly Item[],
       charge: this.charge,
       debugMode: this.debugMode,
-      matState: this.matState,
+      forgeTier: this.forgeTier,
+      forgeCombo: this.forgeCombo,
       thrustHeld: this.thrustHeld,
       frame: this.frame,
     }
@@ -326,6 +332,12 @@ export class GameEngine {
   private update() {
     this.frame++
 
+    // 材料工学科の演出タイマー（ヒットストップ中も動かして見た目を止めない）
+    if (this.swingTimer > 0) this.swingTimer--
+    if (this.judgeTimer > 0) this.judgeTimer--
+    if (this.tierFlash > 0) this.tierFlash--
+    if (this.shake > 0) this.shake--
+
     // ヒットストップ中はタイマー以外を止める
     if (this.hitStopTimer > 0) { this.hitStopTimer--; return }
 
@@ -337,6 +349,8 @@ export class GameEngine {
 
     // 復活スロー：revivalTimer 中は最低速度に固定
     if (this.revivalTimer > 0) this.revivalTimer--
+    if (this.strikeCooldown > 0) this.strikeCooldown--
+    if (this.isMat) this.updateForgeHold()
     const speed = this.effectiveSpeed
     // 穴落下中・段差壁ブロック中はスクロールを停止
     if (!this.isFallingIntoHole && !this.isBlockedByStep()) {
@@ -360,8 +374,6 @@ export class GameEngine {
         if (this.pState === 'jumping' || this.pState === 'falling') this.pState = 'running'
         this.coyoteTime = COYOTE_FRAMES
         if (this.jumpBuffer > 0) { this.jumpBuffer = 0; this.performJump() }
-        // 溶解（材料工学科）：液滴は着地のたびに小さく自動で弾む。ジャンプ回数は消費しない
-        else if (this.isMat && matPhase(this.stageProgress) === 'melt') this.pvy = MELT_BOUNCE_VY
       } else {
         if (this.coyoteTime > 0) this.coyoteTime--
         if (this.jumpBuffer > 0) this.jumpBuffer--
@@ -404,7 +416,7 @@ export class GameEngine {
       if (this.debugMode > 0) this.debugMode--
     }
 
-    if (this.isMat) this.updateMat()
+    if (this.isMat) this.updateForgeZone()
 
     // ゴール直前スパーク
     if (!this.isCleared && STAGE_LENGTH - this.stageProgress <= 60 && this.frame % 4 === 0) {
@@ -430,15 +442,17 @@ export class GameEngine {
 
     // 障害物スポーン
     const CEIL_GROUND_GAP = 90
-    if (--this.nextObs <= 0) {
+    if (this.isMat) {
+      // 鍛えてカン！：塊は距離でなく時間（フレーム）基準の予定キューで置く。
+      // チュートリアルで世界を遅くして待っている間は、キューの時間を進めない
+      this.spawner.updateForge(
+        this.forgeBaseSpeed, this.obstacles, this.stageProgress,
+        this.getGroundHeightAt(this.stageProgress + CANVAS_W), !this.forgeHolding,
+      )
+    } else if (--this.nextObs <= 0) {
       const nextStageX = this.stageProgress + CANVAS_W
       if (this.isBio) {
         this.spawner.pipePair(nextStageX, this.obstacles, bioZone(this.stageProgress))
-      } else if (this.isMat) {
-        const ph = matPhase(nextStageX)
-        if ((ph === 'melt' || ph === 'roll') && this.isMatSafeToSpawn(nextStageX, 260)) {
-          this.spawner.mat(ph, nextStageX, this.obstacles, this.getGroundHeightAt(nextStageX))
-        }
       } else {
         if (this.hasGroundAt(nextStageX) && this.hasGroundAt(nextStageX + 65) && this.hasGroundAt(nextStageX + 130)
             && this.isFlatAt(nextStageX, 130)) {
@@ -446,9 +460,7 @@ export class GameEngine {
           this.spawner.obstacle(this.departmentId as 1 | 2 | 3, nextStageX, this.obstacles, this.getGroundHeightAt(nextStageX))
         }
       }
-      const [mn, r] = this.isMat
-        ? MAT_SPAWN_GAPS[matPhase(this.stageProgress) === 'roll' ? 'roll' : 'melt']
-        : SPAWN_GAPS[this.departmentId] ?? SPAWN_GAPS[1]
+      const [mn, r] = SPAWN_GAPS[this.departmentId] ?? SPAWN_GAPS[1]
       this.nextObs = mn + this.rng.next() * r
       this.nextCeilingObs = Math.max(this.nextCeilingObs, CEIL_GROUND_GAP)
       if (this.isCode) this.nextBug = Math.max(this.nextBug, 25) // 重ならないようにバグをずらす
@@ -484,6 +496,8 @@ export class GameEngine {
 
     // オブジェクトのCanvas座標を更新・画面外を除去
     for (const o of this.obstacles) {
+      // 叩いた塊（材料工学科）：世界より速く後ろへ飛ぶ。phase は叩いてからの経過フレーム（描画用）
+      if (o.struck) { o.stageX -= 6; o.phase++ }
       o.x = this.toCanvasX(o.stageX)
       if (o.moving) o.y = o.baseY - Math.abs(Math.sin(o.phase += 0.045)) * o.amplitude
     }
@@ -498,10 +512,10 @@ export class GameEngine {
     })
 
     // 衝突判定
-    const ph = this.isMat ? playerHitbox(this.py, MAT_HITBOX_H[matPhase(this.stageProgress)]) : playerHitbox(this.py)
+    const ph = playerHitbox(this.py)
     if (this.invincible === 0 && this.debugMode === 0) {
       for (const o of this.obstacles) {
-        if (o.spent) continue
+        if (o.struck) continue // 叩いた塊（板になって飛んでいる）には当たらない
         if (!overlaps(ph, { x: o.x + 4, y: o.y + 4, w: o.w - 8, h: o.h - 8 })) continue
         // malloc/free 点滅ゲート：free（消滅）期間は当たり判定なし＝すり抜け
         if (o.shape === 'malloc_free' && !mallocSolid(o.phase, this.frame)) continue
@@ -515,19 +529,6 @@ export class GameEngine {
             this.burst(o.x + o.w / 2, o.y + o.h / 2, '#555555', 5)
           }
           break
-        }
-        // しなる（材料工学科）：板バネに当たると曲がって、形が戻る反動で前へ加速する
-        if (this.isMat && o.bendable && this.matState === 'flex') {
-          this.bendSpring(o)
-          continue
-        }
-        // かたい（材料工学科）：もろい結晶壁を砕いて通過する（加速はしない）
-        if (this.isMat && o.breakable && this.matState === 'hard') {
-          this.obstacles = this.obstacles.filter(x => x !== o)
-          this.burst(o.x + o.w / 2, o.y + o.h / 2, '#ff7aff', 16)
-          this.burst(o.x + o.w / 2, o.y + o.h * 0.2, MAT_HARD_COLOR, 8)
-          this.sfx(playKnockback)
-          continue
         }
         // バリア（生物応用化学科）：保持中なら1回だけ被弾を無効化して通過。
         // 消費して無敵フレームを付与し、当たったパイプをそのまま通り抜けられるようにする。
@@ -561,7 +562,7 @@ export class GameEngine {
 
   // ── 内部メソッド ──────────────────────────────────────────────────────────
 
-  // アイテム取得判定：🔋電池（電気電子）／🛡バリア（生物応化）／🔥炉・💧水槽（材料）。看板は判定なし。
+  // アイテム取得判定：🔋電池（電気電子）／🛡バリア（生物応化）。
   private collectItems(ph: Box) {
     if (!this.items.length) return
     this.items = this.items.filter(it => {
@@ -584,16 +585,6 @@ export class GameEngine {
         this.burst(it.x, it.y, SHIELD_COLOR, 12)
         this.sfx(playJump)
         break
-      case 'furnace':
-      case 'quench': {
-        // 熱処理ゲート：🔥炉で「しなる」、💧水槽で「かたい」になる
-        const kind = it.effect === 'furnace' ? 'flex' : 'hard'
-        this.matState = kind
-        this.matStateUntilX = it.stageX - HEAT_GATE_OFFSET + HEAT_STATE_SPAN[kind]
-        this.burst(it.x, it.y, kind === 'flex' ? MAT_FLEX_COLOR : MAT_HARD_COLOR, 16)
-        this.sfx(playJump)
-        break
-      }
     }
   }
 
@@ -631,81 +622,136 @@ export class GameEngine {
     return SPEED_START + (SPEED_END - SPEED_START) * t
   }
 
+  // 材料工学科：速度段階の倍率をかけた速度（チュートリアルの減速をかける前）。
+  // スポーナーが塊を置く位置の計算にも使う。ミス直後の復帰中は他学科と同じ SPEED_START
+  private get forgeBaseSpeed(): number {
+    if (this.revivalTimer > 0) return SPEED_START
+    return this.currentSpeed * (1 + FORGE_TIER_STEP * this.forgeTier)
+  }
+
   private get effectiveSpeed(): number {
     if (this.revivalTimer > 0) return this.isBio ? BIO_SPEED_START : SPEED_START
-    // 材料工学科：板バネで曲がっている間は減速 → 形が戻ると加速。結晶壁の迂回は減速。
-    if (this.isMat) {
-      let s = this.currentSpeed
-      if (this.bendTimer > 0) s *= 0.6
-      else if (this.boostTimer > 0) s *= this.boostMult
-      if (this.matSlowTimer > 0) s *= MAT_SLOW_MULT
-      return s
-    }
+    // 材料工学科：速度段階の倍率。最初の2個を待つあいだだけ世界を遅くする
+    if (this.isMat) return this.forgeBaseSpeed * (this.forgeHolding ? FORGE_TUTORIAL_SLOW : 1)
     // デバッグモード中（電子情報）はスクロール加速＝タイム短縮ボーナス
     return this.debugMode > 0 ? this.currentSpeed * DEBUG_SPEED_MULT : this.currentSpeed
   }
 
-  // 材料工学科：毎フレームの工程・状態・タイマー処理と、熱処理セットのスポーン
-  private updateMat() {
-    const phase = matPhase(this.stageProgress)
-    const idx = MAT_PHASE_ORDER.indexOf(phase)
-    // 工程カットイン：初めてその工程に入ったときだけ（ノックバックで戻って再突入しても出さない）
-    if (idx > this.maxMatPhaseIdx) {
-      this.maxMatPhaseIdx = idx
-      this.cutinPhase = phase
-      this.cutinTimer = MAT_CUTIN_FRAMES
-      if (idx > 0) this.burst(PLAYER_X, this.py - 20, AREAS[5].groundLineColor, 14)
+  // 塊の中心が輪の中心に届くまでの残りフレーム（小数）。正の値は「まだ届いていない＝早い」
+  private forgeIngotT(o: Obstacle, speed: number): number {
+    return (o.x + o.w / 2 - (PLAYER_X + FORGE_RING_OFFSET)) / speed
+  }
+
+  // 3-4 チュートリアル：最初の2個は、輪に近づいたら世界を遅くして待つ（最大 FORGE_TUTORIAL_WAIT フレーム）
+  private updateForgeHold() {
+    const target = this.obstacles.find(o => o.tutorial && !o.struck)
+    if (target && this.forgeWait < FORGE_TUTORIAL_WAIT
+        && this.forgeIngotT(target, this.forgeBaseSpeed) <= FORGE_GOOD_EARLY) {
+      this.forgeHolding = true
+      this.forgeWait++
+      return
+    }
+    this.forgeHolding = false
+    if (target && this.forgeWait >= FORGE_TUTORIAL_WAIT) {
+      // 待っても叩かなかったので通常の速さに戻す（次のチュートリアルの塊のために待ち時間も戻す）
+      target.tutorial = false
+      this.forgeWait = 0
+    }
+  }
+
+  // 3-2 ハンマーで叩く。タップ（スペース・↑・クリック）はすべてここに来る
+  private strike() {
+    // PERFECT のヒットストップ中と、空振り後の硬直中のタップは捨てる（先行入力にしない）
+    if (this.hitStopTimer > 0 || this.strikeCooldown > 0) return
+    this.swingTimer = FORGE_SWING_FRAMES
+
+    // 待機中のチュートリアルは、いつ叩いても PERFECT 扱い
+    if (this.forgeHolding) {
+      const tutorial = this.obstacles.find(o => o.tutorial && !o.struck)
+      if (tutorial) { this.hitIngot(tutorial, 'perfect'); return }
+    }
+
+    // まだ叩いていない塊のうち、判定を過ぎきっていない（t ≥ -GOOD_LATE）一番近いものを選ぶ
+    const speed = this.effectiveSpeed
+    let target: Obstacle | null = null
+    let tNear = Infinity
+    for (const o of this.obstacles) {
+      if (o.struck || o.shape !== 'hot_ingot') continue
+      const t = this.forgeIngotT(o, speed)
+      if (t >= -FORGE_GOOD_LATE && t < tNear) { tNear = t; target = o }
+    }
+
+    // 近くに塊がない：ハンマーを振るだけ。罰はなく、硬直だけ入る
+    if (!target || tNear > FORGE_EARLY_LIMIT) {
+      this.strikeCooldown = FORGE_COOLDOWN
+      return
+    }
+    // はやい：速度段階を0に戻して硬直
+    if (tNear > FORGE_GOOD_EARLY) {
+      this.forgeTier = 0
+      this.strikeCooldown = FORGE_COOLDOWN
+      this.showJudge('early', 30)
+      return
+    }
+    this.hitIngot(target, Math.abs(tNear) <= FORGE_PERFECT ? 'perfect' : 'good')
+  }
+
+  // 塊を叩いて板にする（PERFECT なら段階 +1、GOOD なら段階 -1）
+  private hitIngot(o: Obstacle, kind: 'perfect' | 'good') {
+    o.struck = true
+    o.phase = 0
+    o.tutorial = false
+    this.forgeHits++
+    this.forgeWait = 0
+    this.forgeHolding = false
+    this.forgeCombo++
+    this.forgeMaxCombo = Math.max(this.forgeMaxCombo, this.forgeCombo)
+    const cx = o.x + o.w / 2, cy = o.y + o.h / 2
+    if (kind === 'perfect') {
+      if (this.forgeTier < FORGE_TIER_MAX) { this.forgeTier++; this.tierFlash = 14 }
+      this.hitStopTimer = FORGE_HITSTOP
+      this.shake = 6
+      this.burst(cx, cy, '#ffe9a0', 18)
+      this.burst(cx, cy, '#ff8a2a', 10)
+      this.showJudge('perfect', 36)
+      this.sfx(playJump)
+    } else {
+      this.forgeTier = Math.max(0, this.forgeTier - 1)
+      this.burst(cx, cy, '#ff8a2a', 8)
+      this.showJudge('good', 26)
+      this.sfx(playJump)
+    }
+  }
+
+  private showJudge(kind: ForgeJudge, frames: number) {
+    this.judge = kind
+    this.judgeTimer = frames
+  }
+
+  // 区間（進み具合 25% ごと）の切り替わりカットイン。初めて入ったときだけ（ノックバックで戻っても出さない）
+  private updateForgeZone() {
+    const zone = Math.min(3, Math.floor(Math.min(1, this.stageProgress / STAGE_LENGTH) * 4))
+    if (zone > this.maxForgeZone) {
+      this.maxForgeZone = zone
+      this.cutinZone = zone
+      this.cutinTimer = FORGE_CUTIN_FRAMES
+      this.burst(PLAYER_X, this.py - 20, AREAS[5].groundLineColor, 14)
     }
     if (this.cutinTimer > 0) this.cutinTimer--
+  }
 
-    // 熱処理の状態はセットを抜けたら通常に戻る（stageX 基準なので速度が変わってもずれない）
-    if (this.matState !== 'normal' && this.stageProgress > this.matStateUntilX) this.matState = 'normal'
-
-    if (this.bendTimer > 0 && --this.bendTimer === 0) this.boostTimer = MAT_BOOST_FRAMES
-    else if (this.boostTimer > 0) this.boostTimer--
-    if (this.matSlowTimer > 0) this.matSlowTimer--
-
+  // 次の塊が輪に届くまでの残りフレーム（炉の脈動用）。置いていない塊は予定キューから引く
+  private forgeNextArrival(): number {
+    const speed = this.forgeBaseSpeed
+    let best = Infinity
     for (const o of this.obstacles) {
-      if (o.bend) o.bend = Math.max(0, o.bend - 1 / MAT_BEND_FRAMES)
-      // 結晶壁を砕かずに越えた（迂回した）→ 着地先の減速
-      if (o.breakable && !o.spent && o.x + o.w < PLAYER_X - 12) {
-        o.spent = true
-        this.matSlowTimer = MAT_SLOW_FRAMES
-      }
+      if (o.struck || o.shape !== 'hot_ingot') continue
+      const t = this.forgeIngotT(o, speed)
+      if (t >= 0 && t < best) best = t
     }
-
-    // 熱処理セット：看板 → ゲート → 課題。最初の1回は炉を地上に置いて「しなる」を必ず体験させる
-    const heatEnd = MAT_PHASE_START.inspect * STAGE_LENGTH - MAT_SAFE_MARGIN
-    if (this.stageProgress + CANVAS_W >= this.nextHeatSetX && this.nextHeatSetX + HEAT_STATE_SPAN.flex < heatEnd) {
-      const forced = this.heatSetCount === 0
-      let kind: 'flex' | 'hard' = forced ? 'flex' : this.rng.next() < 0.5 ? 'flex' : 'hard'
-      if (!forced && kind === this.lastHeatKind && this.heatKindStreak >= 2) kind = kind === 'flex' ? 'hard' : 'flex'
-      this.heatKindStreak = kind === this.lastHeatKind ? this.heatKindStreak + 1 : 1
-      this.lastHeatKind = kind
-      this.spawner.heatSet(this.nextHeatSetX, kind, forced, this.obstacles, this.items, this.getGroundHeightAt(this.nextHeatSetX))
-      this.heatSetCount++
-      const [mn, r] = HEAT_SET_GAP
-      this.nextHeatSetX += mn + this.rng.next() * r
-    }
-  }
-
-  // 材料工学科：区間境界の前後（安全区間）にかからないか
-  private isMatSafeToSpawn(stageX: number, width: number): boolean {
-    for (const b of matBoundaries()) {
-      if (stageX + width > b.x - MAT_SAFE_MARGIN && stageX < b.x + MAT_SAFE_MARGIN) return false
-    }
-    return true
-  }
-
-  // しなる（材料工学科）：板バネを曲げる。上から勢いよく当たるほど、形が戻ったときの加速が大きい
-  private bendSpring(o: Obstacle) {
-    o.spent = true
-    o.bend = 1
-    this.bendTimer = MAT_BEND_FRAMES
-    this.boostTimer = 0
-    this.boostMult = Math.min(MAT_BOOST_MAX, 1.15 + Math.abs(this.pvy) * 0.02)
-    this.burst(o.x + o.w / 2, o.y + 10, '#ffd34d', 12)
-    this.sfx(playJump)
+    const queue = this.spawner.getForgeQueue()
+    if (queue.length > 0) best = Math.min(best, Math.max(0, queue[0].remaining))
+    return best
   }
 
   // stageProgress基準のCanvas X座標変換
@@ -780,8 +826,12 @@ export class GameEngine {
     // スイム（生物応用化学）は上下の慣性をリセットして復帰を安定させる
     // （壁ヒットは updateBio 側で既に 0 にしているが、パイプ衝突経路もここで揃える）
     if (this.isBio) this.pvy = 0
-    // 材料工学科：曲げ・加速・減速の途中状態は持ち越さない
-    this.bendTimer = 0; this.boostTimer = 0; this.matSlowTimer = 0
+    // 材料工学科：叩けなかった塊に当たったら、速度段階と連続回数を0に戻す
+    this.forgeTier = 0
+    this.forgeCombo = 0
+    this.forgeHolding = false
+    this.forgeWait = 0
+    if (this.isMat) this.showJudge('late', 50)
     this.missCount++
     this.sfx(playKnockback)
     this.burst(PLAYER_X, this.py - 20, '#ff8800', 10)
@@ -833,9 +883,20 @@ export class GameEngine {
     const ctx = this.ctx
     if (!ctx) return
     const theme = AREAS[this.departmentId as AreaId]
-    const bg: BgContext = { frame: this.frame, bgX: this.bgX, speed: this.missOverlayTimer > 0 ? 0 : this.effectiveSpeed, debug: this.debugMode > 0, stageProgress: this.stageProgress, isBio: this.isBio }
+    const arrival = this.isMat ? this.forgeNextArrival() : Infinity
+    const bg: BgContext = {
+      frame: this.frame, bgX: this.bgX, speed: this.missOverlayTimer > 0 ? 0 : this.effectiveSpeed,
+      debug: this.debugMode > 0, stageProgress: this.stageProgress, isBio: this.isBio,
+      forge: this.isMat
+        ? { tier: this.forgeTier, pulse: Number.isFinite(arrival) ? Math.max(0, 1 - arrival / 30) : 0 }
+        : undefined,
+    }
 
     ctx.save()
+    // 材料工学科：PERFECT で画面を小さく揺らす
+    if (this.isMat && this.shake > 0) {
+      ctx.translate(Math.sin(this.frame * 7) * this.shake * 0.5, Math.cos(this.frame * 5) * this.shake * 0.4)
+    }
 
     drawBg(ctx, this.departmentId as AreaId, theme, bg)
     if (this.isMat) {
@@ -846,11 +907,11 @@ export class GameEngine {
     drawGoal(ctx, this.departmentId as AreaId, theme, this.stageProgress, this.frame)
 
     for (const o of this.obstacles) drawObstacle(ctx, o, theme, this.frame)
+    if (this.isMat) drawForgeRings(ctx, this.obstacles, this.forgeHolding, arrival, this.forgeTier, this.frame)
 
     for (const it of this.items) {
       if (it.effect === 'charge') drawBattery(ctx, it, theme, this.frame)
       else if (it.effect === 'shield') drawShieldItem(ctx, it, this.frame)
-      else drawMatItem(ctx, it, this.frame)
     }
 
     for (const p of this.particles) {
@@ -860,18 +921,27 @@ export class GameEngine {
     }
     ctx.globalAlpha = 1
 
+    const playerOpts = {
+      py: this.py, pState: this.pState, pvy: this.pvy,
+      invincible: this.invincible, legPhase: this.legPhase,
+      shield: this.isBio ? this.bioShield : false, frame: this.frame,
+      bio: this.isBio,
+    }
     if (this.isMat) {
-      drawMatPlayer(ctx, {
-        py: this.py, pvy: this.pvy, phase: matPhase(this.stageProgress), state: this.matState,
-        invincible: this.invincible, bendTimer: this.bendTimer, frame: this.frame,
-      })
+      // 最高速（段階4）は残像を付けて速さを見せる
+      if (this.forgeTier >= FORGE_TIER_MAX) {
+        for (let k = 2; k >= 1; k--) {
+          ctx.save()
+          ctx.globalAlpha = 0.22 / k
+          ctx.translate(-14 * k, 0)
+          drawPlayer(ctx, theme.coinColor, playerOpts)
+          ctx.restore()
+        }
+      }
+      drawPlayer(ctx, theme.coinColor, playerOpts)
+      drawForgeHammer(ctx, { py: this.py, swingTimer: this.swingTimer, tier: this.forgeTier, frame: this.frame })
     } else {
-      drawPlayer(ctx, theme.coinColor, {
-        py: this.py, pState: this.pState, pvy: this.pvy,
-        invincible: this.invincible, legPhase: this.legPhase,
-        shield: this.isBio ? this.bioShield : false, frame: this.frame,
-        bio: this.isBio
-      })
+      drawPlayer(ctx, theme.coinColor, playerOpts)
     }
 
     drawHUD(ctx, theme, {
@@ -887,8 +957,16 @@ export class GameEngine {
     })
 
     if (this.isMat) {
-      drawMatHud(ctx, theme, matPhase(this.stageProgress), this.matSlowTimer > 0)
-      if (this.cutinTimer > 0) drawMatCutin(ctx, theme, this.cutinPhase, this.cutinTimer, MAT_CUTIN_FRAMES)
+      drawForgeHud(ctx, {
+        tier: this.forgeTier, combo: this.forgeCombo, judge: this.judgeTimer > 0 ? this.judge : null,
+        judgeTimer: this.judgeTimer, tierFlash: this.tierFlash, frame: this.frame,
+        hint: this.forgeHits < FORGE_TUTORIAL_HITS, holding: this.forgeHolding,
+      })
+      if (this.cutinTimer > 0) {
+        const [title, sub] = FORGE_ZONE_CUTIN[this.cutinZone]
+        drawMatCutin(ctx, theme, title, sub, this.cutinTimer, FORGE_CUTIN_FRAMES)
+      }
+      if (this.isCleared) drawForgeResult(ctx, theme, this.forgeMaxCombo)
     }
 
     if (this.missOverlayTimer > 0) {

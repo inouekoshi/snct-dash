@@ -1,11 +1,13 @@
-import type { Obstacle, Item } from './engine-types'
+import type { Obstacle } from './engine-types'
 import {
   CANVAS_W, DEFAULT_GROUND_Y, BIO_GAP, BIO_PIPE_W, CANVAS_H,
-  ROLL_GAP, HEAT_GATE_OFFSET, HEAT_CHALLENGE_OFFSET, type MatPhase,
+  PLAYER_X, STAGE_LENGTH, FORGE_RING_OFFSET, FORGE_INGOT_W, FORGE_SPAWN_DIST,
+  FORGE_CHAIN_GAP, FORGE_TUTORIAL_DELAY,
 } from './constants'
 import type { Rand } from './rng'
 
-type ObstacleInit = Pick<Obstacle, 'x' | 'y' | 'w' | 'h' | 'shape'> & Partial<Pick<Obstacle, 'moving' | 'phase' | 'baseY' | 'amplitude' | 'stompable' | 'bendable' | 'breakable'>>
+type ObstacleInit = Pick<Obstacle, 'x' | 'y' | 'w' | 'h' | 'shape'> & Partial<Pick<Obstacle, 'moving' | 'phase' | 'baseY' | 'amplitude' | 'stompable' | 'struck' | 'tutorial'>>
+
 
 // stageX は呼び出し側（engine.ts）が指定する
 function makeObstacle(stageX: number, o: ObstacleInit): Obstacle {
@@ -169,64 +171,7 @@ const dept3RedSpawners: SpawnFn[] = [
   }
 ]
 
-// 材料工学科・溶解区間の地上障害（結晶・インゴット・格子）
-const meltSpawners: SpawnFn[] = [
-  (push, groundY, rand) => {
-    const h = 52 + rand() * 36
-    push({ x: CANVAS_W + 10, y: groundY - h, w: 26 + rand() * 12, h, shape: 'crystal' })
-  },
-  (push, groundY, rand) => {
-    const h1 = 48 + rand() * 26, h2 = 42 + rand() * 26
-    push({ x: CANVAS_W + 10, y: groundY - h1, w: 24, h: h1, shape: 'crystal' })
-    push({ x: CANVAS_W + 58, y: groundY - h2, w: 22, h: h2, shape: 'crystal' })
-  },
-  (push, groundY, rand) => {
-    const h = 22 + rand() * 14
-    push({ x: CANVAS_W + 10, y: groundY - h, w: 46 + rand() * 24, h, shape: 'ingot' })
-  },
-  (push, groundY, rand) => {
-    const h = 40 + rand() * 24
-    push({ x: CANVAS_W + 10, y: groundY - h, w: 40 + rand() * 18, h, shape: 'lattice' })
-  },
-  (push, groundY, rand) => {
-    for (let i = 0; i < 3; i++) {
-      const h = 38 + rand() * 34 * (i + 1) / 3
-      push({ x: CANVAS_W + 10 + i * 36, y: groundY - h, w: 20, h, shape: 'crystal' })
-    }
-  },
-  (push, groundY, rand) => {
-    const h1 = 22 + rand() * 12, h2 = 52 + rand() * 24
-    push({ x: CANVAS_W + 10, y: groundY - h1, w: 46, h: h1, shape: 'ingot' })
-    push({ x: CANVAS_W + 88, y: groundY - h2, w: 22, h: h2, shape: 'crystal' })
-  }
-]
 
-// 材料工学科・圧延区間：ローラー（上ロール）の下は薄板なら潜れる。跳ぶと上ロールにぶつかる。
-// 「跳ばずに潜る」と「地上のインゴットは跳ぶ」の読み分けが課題。
-function pushRoller(push: Push, x: number, groundY: number) {
-  const h = 70
-  push({ x, y: groundY - ROLL_GAP - h, w: 54, h, shape: 'roller' })
-}
-const rollSpawners: SpawnFn[] = [
-  (push, groundY) => pushRoller(push, CANVAS_W + 10, groundY),
-  (push, groundY) => {
-    pushRoller(push, CANVAS_W + 10, groundY)
-    pushRoller(push, CANVAS_W + 130, groundY)
-  },
-  (push, groundY, rand) => {
-    pushRoller(push, CANVAS_W + 10, groundY)
-    const h = 24 + rand() * 10
-    push({ x: CANVAS_W + 220, y: groundY - h, w: 48, h, shape: 'ingot' })
-  },
-  (push, groundY, rand) => {
-    const h = 22 + rand() * 12
-    push({ x: CANVAS_W + 10, y: groundY - h, w: 46 + rand() * 20, h, shape: 'ingot' })
-  },
-  (push, groundY, rand) => {
-    const h = 44 + rand() * 24
-    push({ x: CANVAS_W + 10, y: groundY - h, w: 24, h, shape: 'crystal' })
-  },
-]
 
 const pipeSpawners: ((push: Push, zone: 'chem' | 'bio', rand: Rand) => void)[] = [
   (push, zone, rand) => {
@@ -255,6 +200,13 @@ const pipeSpawners: ((push: Push, zone: 'chem' | 'bio', rand: Rand) => void)[] =
   }
 ]
 
+export type ForgePattern = 'single' | 'double' | 'triple' | 'rest'
+
+export interface ForgeSchedule {
+  remaining: number // 輪に届くまでの残りフレーム
+  tutorial?: boolean
+}
+
 // エンジン1つにつき1つ持つスポーナー。シャッフルバッグの残りと乱数をインスタンスごとに持つので、
 // 複数のエンジン（リトライ・テスト・ボットの先読み）が互いの出現順に影響しない。
 // 複合障害物の o.x は CANVAS_W+10 を基準にした canvas X 座標として設計されているため、
@@ -263,20 +215,49 @@ export class Spawner {
   private dept1: ShuffleBag<SpawnFn>
   private dept2: ShuffleBag<SpawnFn>
   private dept3Red: ShuffleBag<SpawnFn>
-  private melt: ShuffleBag<SpawnFn>
-  private roll: ShuffleBag<SpawnFn>
   private pipe: ShuffleBag<(typeof pipeSpawners)[number]>
+
+  // 材料工学科（鍛えてカン！）専用
+  private forgeQueue: ForgeSchedule[]
+  private forgeZone: number
+  private forgeWaitFrames: number
+  private forgeBag0: ShuffleBag<ForgePattern>
+  private forgeBag1: ShuffleBag<ForgePattern>
+  private forgeBag2: ShuffleBag<ForgePattern>
+  private forgeBag3: ShuffleBag<ForgePattern>
 
   constructor(private readonly rand: Rand, from?: Spawner) {
     this.dept1 = from ? from.dept1.clone() : new ShuffleBag(dept1Spawners)
     this.dept2 = from ? from.dept2.clone() : new ShuffleBag(dept2Spawners)
     this.dept3Red = from ? from.dept3Red.clone() : new ShuffleBag(dept3RedSpawners)
-    this.melt = from ? from.melt.clone() : new ShuffleBag(meltSpawners)
-    this.roll = from ? from.roll.clone() : new ShuffleBag(rollSpawners)
     this.pipe = from ? from.pipe.clone() : new ShuffleBag(pipeSpawners)
+
+    if (from) {
+      this.forgeQueue = from.forgeQueue.map(q => ({ ...q }))
+      this.forgeZone = from.forgeZone
+      this.forgeWaitFrames = from.forgeWaitFrames
+      this.forgeBag0 = from.forgeBag0.clone()
+      this.forgeBag1 = from.forgeBag1.clone()
+      this.forgeBag2 = from.forgeBag2.clone()
+      this.forgeBag3 = from.forgeBag3.clone()
+    } else {
+      this.forgeQueue = [
+        { remaining: FORGE_TUTORIAL_DELAY, tutorial: true },
+        { remaining: FORGE_TUTORIAL_DELAY + 70, tutorial: true },
+        { remaining: FORGE_TUTORIAL_DELAY + 135 },
+        { remaining: FORGE_TUTORIAL_DELAY + 200 },
+        { remaining: FORGE_TUTORIAL_DELAY + 265 },
+      ]
+      this.forgeZone = 0
+      this.forgeWaitFrames = 0
+      this.forgeBag0 = new ShuffleBag<ForgePattern>(['single', 'single', 'single', 'double', 'rest'])
+      this.forgeBag1 = new ShuffleBag<ForgePattern>(['single', 'single', 'double', 'double', 'rest'])
+      this.forgeBag2 = new ShuffleBag<ForgePattern>(['single', 'double', 'double', 'triple', 'rest'])
+      this.forgeBag3 = new ShuffleBag<ForgePattern>(['double', 'triple', 'triple', 'triple', 'rest'])
+    }
   }
 
-  /** 状態（バッグの残り）を引き継いだ複製。乱数は複製先のものを渡す */
+  /** 状態（バッグの残り・予定キュー）を引き継いだ複製。乱数は複製先のものを渡す */
   clone(rand: Rand): Spawner {
     return new Spawner(rand, this)
   }
@@ -335,33 +316,95 @@ export class Spawner {
     this.pipe.next(this.rand)(this.pusher(stageX, obstacles), zone, this.rand)
   }
 
-  // 材料工学科：溶解・圧延区間の通常スポーン（熱処理区間は heatSet、検査区間は出さない）
-  mat(phase: MatPhase, stageX: number, obstacles: Obstacle[], groundY = DEFAULT_GROUND_Y) {
-    const bag = phase === 'melt' ? this.melt : phase === 'roll' ? this.roll : null
-    bag?.next(this.rand)(this.pusher(stageX, obstacles), groundY, this.rand)
-  }
-
-  // 材料工学科・熱処理区間：看板 → ゲート → 課題 を1画面内に固定配置で生成する。
-  // flex: 🔥炉（空中・ジャンプで通過）→ しなる → 金色の板バネに当たってよい（曲がって戻り加速）
-  // hard: 💧水槽（地上・走って通過）→ かたい → 結晶壁を砕ける
-  // forced: 最初の1回だけ、炉を地上に置いて必ず通過させる（しなる体験のチュートリアル）
-  heatSet(
-    stageX: number, kind: 'flex' | 'hard', forced: boolean,
-    obstacles: Obstacle[], items: Item[], groundY = DEFAULT_GROUND_Y,
+  /**
+   * 材料工学科（鍛えてカン！）専用のスポーン更新処理
+   * @param baseSpeed チュートリアルスロー前の実効速度
+   * @param advanceTime 通常物理更新フレーム（キューの時間を進める）か
+   */
+  updateForge(
+    baseSpeed: number,
+    obstacles: Obstacle[],
+    stageProgress: number,
+    groundY = DEFAULT_GROUND_Y,
+    advanceTime = true,
   ) {
-    const item = (dx: number, y: number, effect: Item['effect']) =>
-      items.push({ stageX: stageX + dx, x: CANVAS_W + 10, y, effect, wobble: 0 })
-    item(0, groundY - 46, kind === 'flex' ? 'sign_flex' : 'sign_hard')
-    if (kind === 'flex') {
-      item(HEAT_GATE_OFFSET, forced ? groundY - 60 : groundY - 104, 'furnace')
-      obstacles.push(makeObstacle(stageX + HEAT_CHALLENGE_OFFSET.flex, {
-        x: 0, y: groundY - 72, w: 40, h: 72, shape: 'leaf_spring', bendable: true,
-      }))
-    } else {
-      item(HEAT_GATE_OFFSET, groundY - 10, 'quench')
-      obstacles.push(makeObstacle(stageX + HEAT_CHALLENGE_OFFSET.hard, {
-        x: 0, y: groundY - 146, w: 36, h: 146, shape: 'brittle_crystal', breakable: true,
+    if (advanceTime) {
+      for (const item of this.forgeQueue) {
+        item.remaining--
+      }
+      if (this.forgeWaitFrames > 0) {
+        this.forgeWaitFrames--
+      }
+    }
+
+    // パターンの補充（キュー内の残りが少なくなった場合）
+    if (this.forgeQueue.length <= 4 && this.forgeWaitFrames <= 0) {
+      const ratio = Math.min(1, stageProgress / STAGE_LENGTH)
+      let newZone = 0
+      if (ratio >= 0.75) newZone = 3
+      else if (ratio >= 0.50) newZone = 2
+      else if (ratio >= 0.25) newZone = 1
+
+      // 区間の切り替わりには約1秒（60フレーム）の休みを置く
+      if (newZone !== this.forgeZone) {
+        this.forgeZone = newZone
+        this.forgeWaitFrames = 60
+        return
+      }
+
+      const bag = newZone === 0 ? this.forgeBag0
+        : newZone === 1 ? this.forgeBag1
+        : newZone === 2 ? this.forgeBag2
+        : this.forgeBag3
+
+      const pattern = bag.next(this.rand)
+      let gap = 50 + this.rand() * 20
+      if (newZone === 1) gap = 40 + this.rand() * 20
+      else if (newZone === 2) gap = 34 + this.rand() * 16
+      else if (newZone === 3) gap = ratio > 0.9 ? 22 + this.rand() * 10 : 30 + this.rand() * 14
+
+      const lastRemaining = this.forgeQueue.length > 0
+        ? this.forgeQueue[this.forgeQueue.length - 1].remaining
+        : 0
+      const baseTime = Math.max(0, lastRemaining) + gap
+
+      if (pattern === 'single') {
+        this.forgeQueue.push({ remaining: baseTime })
+      } else if (pattern === 'double') {
+        this.forgeQueue.push({ remaining: baseTime })
+        this.forgeQueue.push({ remaining: baseTime + FORGE_CHAIN_GAP })
+      } else if (pattern === 'triple') {
+        this.forgeQueue.push({ remaining: baseTime })
+        this.forgeQueue.push({ remaining: baseTime + FORGE_CHAIN_GAP })
+        this.forgeQueue.push({ remaining: baseTime + FORGE_CHAIN_GAP * 2 })
+      } else if (pattern === 'rest') {
+        this.forgeWaitFrames = 40 + Math.floor(this.rand() * 21)
+      }
+    }
+
+    // 塊の配置判定
+    // 残りフレーム × baseSpeed <= FORGE_SPAWN_DIST（560）になった時点で配置
+    while (this.forgeQueue.length > 0 && this.forgeQueue[0].remaining * baseSpeed <= FORGE_SPAWN_DIST) {
+      const item = this.forgeQueue.shift()!
+      const ringCenterX = PLAYER_X + FORGE_RING_OFFSET // 110 + 175 = 285
+      const centerSpawnX = Math.max(845, ringCenterX + baseSpeed * item.remaining)
+      const spawnLeftX = centerSpawnX - FORGE_INGOT_W / 2
+      const stageX = stageProgress + (spawnLeftX - PLAYER_X)
+      const y = groundY - 40
+      obstacles.push(makeObstacle(stageX, {
+        x: spawnLeftX,
+        y,
+        w: FORGE_INGOT_W,
+        h: 40,
+        shape: 'hot_ingot',
+        stompable: false,
+        struck: false,
+        tutorial: item.tutorial,
       }))
     }
+  }
+
+  getForgeQueue(): readonly ForgeSchedule[] {
+    return this.forgeQueue
   }
 }

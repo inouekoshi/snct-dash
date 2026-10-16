@@ -1,26 +1,23 @@
-// 材料工学科（製品ができるまでラン）専用の描画。
-// 見た目は分子模型（ボール&スティック）と、学科サイトの世界観「材料の宇宙」
-// （電子顕微鏡で見た金属表面＝星、結晶方位マップ＝オーロラ）を下敷きにしている。
+// 材料工学科（鍛えてカン！）専用の描画。
+// 見た目は学科サイトの世界観「材料の宇宙」（電子顕微鏡で見た金属表面＝星、結晶方位マップ＝オーロラ）を
+// 背景に残し、そこへ炉・赤熱した塊・ハンマーを足している。
+// 塊の粒々は「結晶粒」の絵（粗い粒の塊 → 細かい粒の板）。叩くと粒が細かくなる、とは文章では言い切らない。
 import type { AreaId } from './areas'
 import { AREAS } from './areas'
-import type { Item, Obstacle } from './engine-types'
+import type { Obstacle } from './engine-types'
 import { rrect } from './helpers'
 import {
-  CANVAS_W, CANVAS_H, DEFAULT_GROUND_Y, PLAYER_X,
-  MAT_FLEX_COLOR, MAT_HARD_COLOR, MAT_PHASE_ORDER, matBoundaries, matPhase,
-  type MatPhase,
+  CANVAS_W, CANVAS_H, DEFAULT_GROUND_Y, PLAYER_X, STAGE_LENGTH,
+  FORGE_RING_OFFSET, FORGE_RING_R, FORGE_SPAWN_DIST, FORGE_SWING_FRAMES, FORGE_TIER_COLORS, FORGE_TIER_MAX,
 } from './constants'
 
 type Theme = typeof AREAS[AreaId]
-export type MatState = 'normal' | 'flex' | 'hard'
+export type ForgeJudge = 'perfect' | 'good' | 'early' | 'late'
 
-const PHASE_LABEL: Record<MatPhase, string> = { melt: '溶解', roll: '圧延', heat: '熱処理', inspect: '検査' }
-const PHASE_CUTIN: Record<MatPhase, [string, string]> = {
-  melt:    ['溶解！', 'とけた → ぽよんと弾む'],
-  roll:    ['圧延！', 'うすくなった → 低い所を通れる'],
-  heat:    ['熱処理！', '看板と同じ色を通れ'],
-  inspect: ['検査！', '顕微鏡でチェック…'],
-}
+const RING_X = PLAYER_X + FORGE_RING_OFFSET
+const RING_Y = DEFAULT_GROUND_Y - 20
+// 区間ごとの炉の色（区間の切り替わりが色で分かるようにする）
+const ZONE_FURNACE = ['#ff4a3a', '#ff8a2a', '#ffd23a', '#ffffff']
 
 // 原子1個（分子模型の球）。ハイライト付き。
 function atom(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, color: string) {
@@ -41,11 +38,18 @@ function hash(n: number): number {
   return s - Math.floor(s)
 }
 
-// ── 背景：「材料の宇宙」。進むほど倍率が上がる（星 → オーロラ → 原子格子 → 顕微鏡）──────────
-export function bgMat(ctx: CanvasRenderingContext2D, theme: Theme, bgX: number, frame: number, stageProgress: number) {
-  const phase = matPhase(stageProgress)
+// ── 背景：「材料の宇宙」の星とオーロラに、炉を足す ─────────────────────────────────────
+// 炉の火は、次の塊が輪に届くのに合わせて明るくなる（pulse が 1 になる瞬間に最大）。
+// 最高速（段階4）では背景に流線を入れる。
+export function bgMat(
+  ctx: CanvasRenderingContext2D, theme: Theme, bgX: number, frame: number, stageProgress: number,
+  forge?: { tier: number; pulse: number },
+) {
+  const tier = forge?.tier ?? 0
+  const pulse = forge?.pulse ?? 0
+  const zone = Math.min(3, Math.floor(Math.min(1, stageProgress / STAGE_LENGTH) * 4))
 
-  // 星（電子顕微鏡で見た金属表面）：全区間で奥に流れる
+  // 星（電子顕微鏡で見た金属表面）：奥に流れる
   for (let i = 0; i < 60; i++) {
     const sx = ((hash(i) * CANVAS_W * 2 + bgX * (0.05 + hash(i + 7) * 0.08)) % (CANVAS_W * 2) + CANVAS_W * 2) % (CANVAS_W * 2) - CANVAS_W * 0.5
     const sy = 46 + hash(i + 3) * (DEFAULT_GROUND_Y - 60)
@@ -55,51 +59,65 @@ export function bgMat(ctx: CanvasRenderingContext2D, theme: Theme, bgX: number, 
   }
   ctx.globalAlpha = 1
 
-  // オーロラ（結晶方位マップ）：圧延以降で現れる
-  if (phase !== 'melt') {
-    const colors = ['#ff4fd8', '#4fd1ff', '#7dff6a', '#ffd84f']
-    for (let b = 0; b < 4; b++) {
-      ctx.globalAlpha = phase === 'roll' ? 0.10 : 0.06
-      ctx.strokeStyle = colors[b]; ctx.lineWidth = 14
-      ctx.beginPath()
-      for (let x = 0; x <= CANVAS_W; x += 20) {
-        const y = 70 + b * 26 + Math.sin((x - bgX * 0.15) * 0.012 + b * 1.7 + frame * 0.01) * 14
-        if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y)
-      }
-      ctx.stroke()
+  // オーロラ（結晶方位マップ）：うっすらと
+  const colors = ['#ff4fd8', '#4fd1ff', '#7dff6a', '#ffd84f']
+  for (let b = 0; b < 4; b++) {
+    ctx.globalAlpha = 0.07
+    ctx.strokeStyle = colors[b]; ctx.lineWidth = 14
+    ctx.beginPath()
+    for (let x = 0; x <= CANVAS_W; x += 20) {
+      const y = 70 + b * 26 + Math.sin((x - bgX * 0.15) * 0.012 + b * 1.7 + frame * 0.01) * 14
+      if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y)
+    }
+    ctx.stroke()
+  }
+  ctx.globalAlpha = 1
+
+  // 炉：右奥に置く。火の明るさは pulse で変わる
+  const fc = ZONE_FURNACE[zone]
+  const fx = 610, fy = DEFAULT_GROUND_Y - 96, fw = 150, fh = 96
+  const glow = 0.25 + 0.75 * pulse
+  const g = ctx.createRadialGradient(fx + fw / 2, fy + fh * 0.6, 8, fx + fw / 2, fy + fh * 0.6, 150)
+  g.addColorStop(0, fc); g.addColorStop(1, 'rgba(0,0,0,0)')
+  ctx.globalAlpha = 0.12 + 0.35 * pulse
+  ctx.fillStyle = g
+  ctx.fillRect(fx - 120, fy - 90, fw + 240, fh + 120)
+  ctx.globalAlpha = 1
+  ctx.fillStyle = '#241028'
+  rrect(ctx, fx, fy, fw, fh, 10); ctx.fill()
+  ctx.strokeStyle = '#4a2a52'; ctx.lineWidth = 3
+  rrect(ctx, fx, fy, fw, fh, 10); ctx.stroke()
+  // 炉の口（ここが脈動する）
+  const mx = fx + 24, my = fy + 28, mw = fw - 48, mh = fh - 40
+  ctx.shadowColor = fc; ctx.shadowBlur = 8 + 22 * pulse
+  ctx.globalAlpha = glow
+  ctx.fillStyle = fc
+  rrect(ctx, mx, my, mw, mh, 8); ctx.fill()
+  ctx.shadowBlur = 0
+  ctx.globalAlpha = Math.min(1, glow + 0.2)
+  ctx.fillStyle = '#fff4c8'
+  const flick = Math.sin(frame * 0.35) * 3
+  rrect(ctx, mx + 12, my + 12 - flick * 0.5, mw - 24, mh - 20 + flick, 6); ctx.fill()
+  ctx.globalAlpha = 1
+  // 煙突
+  ctx.fillStyle = '#241028'
+  ctx.fillRect(fx + fw - 38, fy - 30, 22, 32)
+
+  // 最高速：流線
+  if (tier >= FORGE_TIER_MAX) {
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 2
+    for (let i = 0; i < 9; i++) {
+      const y = 40 + hash(i + 11) * (DEFAULT_GROUND_Y - 60)
+      const len = 60 + hash(i + 5) * 90
+      const x = ((hash(i + 2) * CANVAS_W * 1.5 - frame * (22 + hash(i) * 12)) % (CANVAS_W * 1.5) + CANVAS_W * 1.5) % (CANVAS_W * 1.5) - 100
+      ctx.globalAlpha = 0.25 + 0.3 * hash(i + 9)
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + len, y); ctx.stroke()
     }
     ctx.globalAlpha = 1
-  }
-
-  // 原子格子（ボール&スティック）：熱処理以降。整列した結晶。
-  if (phase === 'heat' || phase === 'inspect') {
-    const s = 56, ox = ((bgX * 0.3) % s + s) % s
-    ctx.globalAlpha = phase === 'inspect' ? 0.28 : 0.14
-    for (let x = ox - s; x < CANVAS_W + s; x += s) {
-      for (let y = 60; y < DEFAULT_GROUND_Y - 10; y += s) {
-        bond(ctx, x, y, x + s, y, theme.groundLineColor, 2)
-        bond(ctx, x, y, x, y + s, theme.groundLineColor, 2)
-        bond(ctx, x, y, x + s / 2, y + s / 2, theme.groundLineColor, 1)
-        atom(ctx, x, y, 5, theme.coinColor)
-        atom(ctx, x + s / 2, y + s / 2, 4, '#e0a0ff')
-      }
-    }
-    ctx.globalAlpha = 1
-  }
-
-  // 検査（顕微鏡）：視野の円の外を暗くする
-  if (phase === 'inspect') {
-    const g = ctx.createRadialGradient(CANVAS_W / 2, CANVAS_H / 2, 90, CANVAS_W / 2, CANVAS_H / 2, CANVAS_W * 0.55)
-    g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.75)')
-    ctx.fillStyle = g; ctx.fillRect(0, 0, CANVAS_W, CANVAS_H)
-    ctx.strokeStyle = 'rgba(200,170,255,0.35)'; ctx.lineWidth = 2
-    ctx.beginPath(); ctx.arc(CANVAS_W / 2, CANVAS_H / 2, 150, 0, Math.PI * 2); ctx.stroke()
-    ctx.beginPath(); ctx.moveTo(CANVAS_W / 2 - 160, CANVAS_H / 2); ctx.lineTo(CANVAS_W / 2 + 160, CANVAS_H / 2); ctx.stroke()
-    ctx.beginPath(); ctx.moveTo(CANVAS_W / 2, CANVAS_H / 2 - 160); ctx.lineTo(CANVAS_W / 2, CANVAS_H / 2 + 160); ctx.stroke()
   }
 }
 
-// ── 地面：原子の並びが工程で変わる（溶解＝ランダム → 圧延＝伸びた格子 → 熱処理＝整列）────────
+// ── 地面：整列した結晶格子（ボール＆スティック）。上の線は炉の熱でほんのり赤い ───────────
 export function drawMatGround(ctx: CanvasRenderingContext2D, theme: Theme, stageProgress: number) {
   const gy = DEFAULT_GROUND_Y
   ctx.fillStyle = theme.groundColor
@@ -109,301 +127,232 @@ export function drawMatGround(ctx: CanvasRenderingContext2D, theme: Theme, stage
   const startI = Math.floor((stageProgress - PLAYER_X - 60) / 40)
   const endI = Math.ceil((stageProgress - PLAYER_X + CANVAS_W + 60) / 40)
   for (let i = startI; i <= endI; i++) {
-    const wx = i * 40
-    const ph = matPhase(wx)
     for (let r = 0; r < rows.length; r++) {
-      let x = PLAYER_X + (wx - stageProgress)
-      let y = rows[r]
-      let nx = x + 40, ny = y
-      if (ph === 'melt') {
-        // 液体：原子がばらばら
-        x += (hash(i * 3 + r) - 0.5) * 18; y += (hash(i * 5 + r) - 0.5) * 10
-        nx += (hash((i + 1) * 3 + r) - 0.5) * 18; ny += (hash((i + 1) * 5 + r) - 0.5) * 10
-      } else if (ph === 'roll') {
-        // 圧延：横に引き伸ばされ、縦が詰まった格子
-        y = gy + 6 + r * 13; ny = y
-      } else if (r % 2 === 1) {
-        // 熱処理以降：互い違いに整列した結晶格子
-        x += 20; nx += 20
-      }
-      if (r === 0) bond(ctx, x, y, nx, ny, theme.groundLineColor, 3)
-      else bond(ctx, x, y, nx, ny, theme.groundLineColor + '88', 2)
+      // 互い違いに整列した格子
+      const x = PLAYER_X + (i * 40 - stageProgress) + (r % 2 === 1 ? 20 : 0)
+      const y = rows[r]
+      if (r === 0) bond(ctx, x, y, x + 40, y, theme.groundLineColor, 3)
+      else bond(ctx, x, y, x + 40, y, theme.groundLineColor + '88', 2)
       atom(ctx, x, y, r === 0 ? 6 : 4.5, r === 0 ? theme.coinColor : '#b07ad8')
     }
   }
-
-  // 工程ゲート（区間の入口）：ボール&スティックのアーチ＋工程名
-  for (const b of matBoundaries()) {
-    const x = PLAYER_X + (b.x - stageProgress)
-    if (x < -80 || x > CANVAS_W + 80) continue
-    const top = gy - 150
-    ctx.save()
-    ctx.shadowColor = theme.groundLineColor; ctx.shadowBlur = 10
-    bond(ctx, x - 40, gy, x - 40, top, theme.groundLineColor, 4)
-    bond(ctx, x + 40, gy, x + 40, top, theme.groundLineColor, 4)
-    bond(ctx, x - 40, top, x + 40, top, theme.groundLineColor, 4)
-    for (let k = 0; k <= 4; k++) {
-      atom(ctx, x - 40, gy - k * 37.5, 6, theme.coinColor)
-      atom(ctx, x + 40, gy - k * 37.5, 6, theme.coinColor)
-    }
-    ctx.restore()
-    ctx.fillStyle = '#ffffff'; ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-    ctx.fillText(PHASE_LABEL[b.phase], x, top - 14)
-  }
 }
 
-// ── プレイヤー：工程ごとに形が変わる（液滴 → 薄板 → 金属片）────────────────────────────
-export interface MatPlayerState {
+// ── 塊（hot_ingot）：赤く光る四角い金属塊。表面に大きな粒々の模様 ─────────────────────────
+// 叩いた塊（struck）は薄い板になって後ろへ飛ぶ。o.phase は叩いてからの経過フレーム。
+export function dHotIngot(ctx: CanvasRenderingContext2D, o: Obstacle, _theme: Theme, frame: number) {
+  if (o.struck) { drawPlate(ctx, o); return }
+  const { x, y, w, h } = o
+  const flick = 0.5 + 0.5 * Math.sin(frame * 0.2 + o.stageX * 0.01)
+  const g = ctx.createLinearGradient(0, y, 0, y + h)
+  g.addColorStop(0, '#ffb060'); g.addColorStop(0.5, '#ff5a2a'); g.addColorStop(1, '#a8160e')
+  ctx.shadowColor = '#ff5a2a'; ctx.shadowBlur = 10 + 8 * flick
+  ctx.fillStyle = g
+  rrect(ctx, x, y, w, h, 5); ctx.fill()
+  ctx.shadowBlur = 0
+  ctx.strokeStyle = '#ffd9a0'; ctx.lineWidth = 2
+  rrect(ctx, x, y, w, h, 5); ctx.stroke()
+  // 粗い粒（結晶粒）の境界線：大きめの不規則な区画
+  ctx.save()
+  rrect(ctx, x, y, w, h, 5); ctx.clip()
+  ctx.strokeStyle = 'rgba(80,0,0,0.55)'; ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.moveTo(x + w * 0.35, y); ctx.lineTo(x + w * 0.28, y + h * 0.45); ctx.lineTo(x + w * 0.5, y + h * 0.7); ctx.lineTo(x + w * 0.45, y + h)
+  ctx.moveTo(x + w * 0.28, y + h * 0.45); ctx.lineTo(x, y + h * 0.35)
+  ctx.moveTo(x + w * 0.5, y + h * 0.7); ctx.lineTo(x + w * 0.78, y + h * 0.55); ctx.lineTo(x + w * 0.7, y)
+  ctx.moveTo(x + w * 0.78, y + h * 0.55); ctx.lineTo(x + w, y + h * 0.65)
+  ctx.stroke()
+  ctx.restore()
+}
+
+// 叩いた後の板：薄く、粒の模様が細かい
+function drawPlate(ctx: CanvasRenderingContext2D, o: Obstacle) {
+  const age = o.phase
+  const w = o.w + 6, h = 10
+  const lift = Math.min(age, 18) * 1.4
+  const x = o.x - 3, y = o.y + o.h - h - lift
+  ctx.save()
+  ctx.globalAlpha = Math.max(0, 1 - Math.max(0, age - 24) / 24)
+  const cool = Math.min(1, age / 40) // 時間とともに赤熱から冷めていく
+  const g = ctx.createLinearGradient(0, y, 0, y + h)
+  g.addColorStop(0, cool < 0.5 ? '#fff0c0' : '#e9eef6')
+  g.addColorStop(1, cool < 0.5 ? '#ff9a3a' : '#9aa6b6')
+  ctx.shadowColor = '#ffd27a'; ctx.shadowBlur = 12 * (1 - cool)
+  ctx.fillStyle = g
+  rrect(ctx, x, y, w, h, 3); ctx.fill()
+  ctx.shadowBlur = 0
+  // 細かい粒
+  ctx.strokeStyle = 'rgba(90,40,10,0.5)'; ctx.lineWidth = 1
+  ctx.beginPath()
+  for (let gx = x + 3; gx < x + w - 2; gx += 5) {
+    ctx.moveTo(gx, y + 1); ctx.lineTo(gx + 2, y + h / 2); ctx.lineTo(gx - 1, y + h - 1)
+  }
+  ctx.stroke()
+  ctx.restore()
+}
+
+// ── 判定の輪と、予告の輪 ───────────────────────────────────────────────────────────────
+// 予告の輪は塊の中心のまわりに描き、塊が輪に近づくほど縮む（距離で縮めるので、速度が変わってもずれない）。
+export function drawForgeRings(
+  ctx: CanvasRenderingContext2D, obstacles: readonly Obstacle[], holding: boolean,
+  arrival: number, tier: number, frame: number,
+) {
+  ctx.save()
+  // 予告の輪
+  ctx.lineWidth = 2
+  for (const o of obstacles) {
+    if (o.struck || o.shape !== 'hot_ingot') continue
+    const cx = o.x + o.w / 2, cy = o.y + o.h / 2
+    const dist = cx - RING_X
+    if (dist < -10 || cx > CANVAS_W + 80) continue
+    const r = FORGE_RING_R * (1 + 2 * Math.min(1, Math.max(0, dist) / FORGE_SPAWN_DIST))
+    ctx.globalAlpha = 0.75
+    ctx.strokeStyle = '#ffe2b0'
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke()
+  }
+  // 判定の輪：塊が近いほど濃く。チュートリアルの待ち中は点滅
+  const near = Number.isFinite(arrival) ? Math.max(0, 1 - arrival / 12) : 0
+  const blink = holding ? 0.5 + 0.5 * Math.sin(frame * 0.5) : 0
+  ctx.globalAlpha = Math.min(1, 0.45 + 0.4 * near + 0.4 * blink)
+  ctx.strokeStyle = tier >= 3 ? FORGE_TIER_COLORS[tier] : '#ffffff'
+  ctx.shadowColor = '#ffffff'; ctx.shadowBlur = 6 + 10 * near + 10 * blink
+  ctx.lineWidth = 4
+  ctx.beginPath(); ctx.arc(RING_X, RING_Y, FORGE_RING_R, 0, Math.PI * 2); ctx.stroke()
+  ctx.shadowBlur = 0
+  ctx.lineWidth = 1.5
+  ctx.beginPath()
+  ctx.moveTo(RING_X - 8, RING_Y); ctx.lineTo(RING_X + 8, RING_Y)
+  ctx.moveTo(RING_X, RING_Y - 8); ctx.lineTo(RING_X, RING_Y + 8)
+  ctx.stroke()
+  ctx.restore()
+}
+
+// ── ハンマー：長い柄を担いでいて、振ると柄の先が輪に届く ────────────────────────────────────
+export interface ForgeHammerState {
   py: number
-  pvy: number
-  phase: MatPhase
-  state: MatState
-  invincible: number
-  bendTimer: number
+  swingTimer: number
+  tier: number
   frame: number
 }
 
-function drawEyes(ctx: CanvasRenderingContext2D, x: number, y: number) {
-  ctx.fillStyle = '#fff'
-  ctx.beginPath(); ctx.arc(x - 5, y, 3.5, 0, Math.PI * 2); ctx.arc(x + 5, y, 3.5, 0, Math.PI * 2); ctx.fill()
-  ctx.fillStyle = '#1a0033'
-  ctx.beginPath(); ctx.arc(x - 4, y, 1.8, 0, Math.PI * 2); ctx.arc(x + 6, y, 1.8, 0, Math.PI * 2); ctx.fill()
-}
-
-export function drawMatPlayer(ctx: CanvasRenderingContext2D, p: MatPlayerState) {
-  const x = PLAYER_X, y = p.py
-  const blink = p.invincible > 0 && Math.floor(p.invincible / 4) % 2 === 1
-  ctx.save()
-  if (blink) ctx.globalAlpha = 0.35
-
-  // 影
-  ctx.fillStyle = 'rgba(0,0,0,0.25)'
-  ctx.beginPath(); ctx.ellipse(x, DEFAULT_GROUND_Y + 3, 14, 4, 0, 0, Math.PI * 2); ctx.fill()
-
-  if (p.phase === 'melt') {
-    // 液滴：落下・上昇で縦に伸び、着地でつぶれる
-    const stretch = Math.max(-0.25, Math.min(0.3, -p.pvy * 0.03))
-    const rx = 16 * (1 - stretch * 0.6), ry = 16 * (1 + stretch)
-    const cy = y - ry
-    const g = ctx.createRadialGradient(x - 5, cy - 5, 2, x, cy, ry + 4)
-    g.addColorStop(0, '#fff3c0'); g.addColorStop(0.4, '#ffb030'); g.addColorStop(1, '#ff4a10')
-    ctx.shadowColor = '#ff7a20'; ctx.shadowBlur = 16
-    ctx.fillStyle = g
-    ctx.beginPath(); ctx.ellipse(x, cy, rx, ry, 0, 0, Math.PI * 2); ctx.fill()
-    ctx.shadowBlur = 0
-    drawEyes(ctx, x + 2, cy - 2)
-  } else if (p.phase === 'roll') {
-    // 薄板：銀色のぺたんこな板
-    const w = 46, h = 20
-    const g = ctx.createLinearGradient(0, y - h, 0, y)
-    g.addColorStop(0, '#f4f7fb'); g.addColorStop(0.5, '#a9b4c2'); g.addColorStop(1, '#6d7888')
-    ctx.fillStyle = g
-    rrect(ctx, x - w / 2, y - h, w, h, 4); ctx.fill()
-    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5
-    rrect(ctx, x - w / 2, y - h, w, h, 4); ctx.stroke()
-    ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1
-    for (let i = 0; i < 3; i++) {
-      ctx.beginPath(); ctx.moveTo(x - w / 2 + 6, y - h + 5 + i * 5); ctx.lineTo(x + w / 2 - 6, y - h + 5 + i * 5); ctx.stroke()
-    }
-    drawEyes(ctx, x + 10, y - h / 2)
-  } else {
-    // 金属片：状態で色と内部組織が変わる（通常＝灰／しなる＝橙・丸い結晶粒／かたい＝青銀・針状組織）
-    const w = 28, h = 40
-    const bend = p.bendTimer > 0 ? Math.sin((p.bendTimer / 18) * Math.PI) * 0.5 : 0
-    ctx.translate(x, y); ctx.transform(1, 0, -bend, 1 - bend * 0.4, 0, 0); ctx.translate(-x, -y)
-    const base = p.state === 'flex' ? MAT_FLEX_COLOR : p.state === 'hard' ? MAT_HARD_COLOR : '#9aa4b0'
-    ctx.shadowColor = base; ctx.shadowBlur = p.state === 'normal' ? 0 : 12
-    ctx.fillStyle = base
-    if (p.state === 'hard') {
-      ctx.beginPath()
-      ctx.moveTo(x - w / 2, y); ctx.lineTo(x - w / 2, y - h + 8); ctx.lineTo(x - w / 2 + 8, y - h)
-      ctx.lineTo(x + w / 2, y - h); ctx.lineTo(x + w / 2, y - 8); ctx.lineTo(x + w / 2 - 8, y)
-      ctx.closePath(); ctx.fill()
+export function drawForgeHammer(ctx: CanvasRenderingContext2D, s: ForgeHammerState) {
+  const px = PLAYER_X + 6, pyv = s.py - 30
+  const L = Math.hypot(RING_X - px, RING_Y - pyv)
+  const hit = Math.atan2(RING_Y - pyv, RING_X - px)         // 輪にぴったり届く角度
+  const rest = -115 * Math.PI / 180                          // 肩に担いでいる角度
+  const u = s.swingTimer / FORGE_SWING_FRAMES                // 1 → 0
+  let ang = rest + Math.sin(s.frame * 0.2) * 0.04
+  if (s.swingTimer > 0) {
+    if (u > 0.4) {
+      const q = (1 - u) / 0.6
+      ang = rest + (hit - rest) * q * q
+      // 振りの軌跡
+      ctx.save()
+      ctx.globalAlpha = 0.3 * q
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 6; ctx.lineCap = 'round'
+      ctx.beginPath(); ctx.arc(px, pyv, L, rest, ang); ctx.stroke()
+      ctx.restore()
     } else {
-      rrect(ctx, x - w / 2, y - h, w, h, p.state === 'flex' ? 12 : 5); ctx.fill()
-    }
-    ctx.shadowBlur = 0
-    ctx.save()
-    ctx.beginPath(); rrect(ctx, x - w / 2, y - h, w, h, 5); ctx.clip()
-    if (p.state === 'flex') {
-      ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 1
-      for (const [cx, cy, r] of [[-6, -30, 6], [5, -22, 7], [-4, -11, 5], [7, -8, 4]]) {
-        ctx.beginPath(); ctx.arc(x + cx, y + cy, r, 0, Math.PI * 2); ctx.stroke()
-      }
-    } else if (p.state === 'hard') {
-      ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 1
-      for (let i = 0; i < 6; i++) {
-        ctx.beginPath(); ctx.moveTo(x - 14 + i * 6, y - 4); ctx.lineTo(x - 6 + i * 6, y - 36); ctx.stroke()
-      }
-    }
-    ctx.restore()
-    drawEyes(ctx, x + 3, y - 28)
-
-    // 頭上アイコン
-    if (p.state !== 'normal') {
-      const label = p.state === 'flex' ? '🔥しなる' : '💧かたい'
-      ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-      const tw = ctx.measureText(label).width + 12
-      ctx.fillStyle = 'rgba(0,0,0,0.6)'
-      rrect(ctx, x - tw / 2, y - h - 30, tw, 20, 10); ctx.fill()
-      ctx.fillStyle = base
-      ctx.fillText(label, x, y - h - 20)
+      const q = u / 0.4
+      ang = hit + (rest - hit) * (1 - q) * 0.5
     }
   }
+  ctx.save()
+  ctx.translate(px, pyv)
+  ctx.rotate(ang)
+  ctx.fillStyle = '#8a5a2b'
+  ctx.fillRect(0, -2.5, L, 5)
+  ctx.fillStyle = '#5c3a18'
+  ctx.fillRect(0, -2.5, 28, 5)
+  const hg = ctx.createLinearGradient(0, -17, 0, 17)
+  hg.addColorStop(0, '#e6ebf2'); hg.addColorStop(0.5, '#a0abba'); hg.addColorStop(1, '#5d6573')
+  if (s.tier >= 3) { ctx.shadowColor = FORGE_TIER_COLORS[s.tier]; ctx.shadowBlur = 10 }
+  ctx.fillStyle = hg
+  rrect(ctx, L - 12, -17, 24, 34, 4); ctx.fill()
+  ctx.shadowBlur = 0
+  ctx.strokeStyle = '#3a3f4a'; ctx.lineWidth = 2
+  rrect(ctx, L - 12, -17, 24, 34, 4); ctx.stroke()
   ctx.restore()
-  ctx.globalAlpha = 1
 }
 
-// ── 熱処理のゲート・看板 ─────────────────────────────────────────────────────────────
-export function drawMatItem(ctx: CanvasRenderingContext2D, it: Item, frame: number) {
-  const x = it.x, y = it.y
+// ── HUD：判定の文字・連続回数・速度段階・チュートリアル ───────────────────────────────────
+export interface ForgeHudState {
+  tier: number
+  combo: number
+  judge: ForgeJudge | null
+  judgeTimer: number
+  tierFlash: number
+  frame: number
+  hint: boolean
+  holding: boolean
+}
+
+const JUDGE_TEXT: Record<ForgeJudge, { text: string; size: number; color: string }> = {
+  perfect: { text: 'カン！', size: 44, color: '#ffe04a' },
+  good:    { text: 'コン', size: 20, color: '#ffffff' },
+  early:   { text: 'はやい！', size: 24, color: '#7fd4ff' },
+  late:    { text: 'おそい！', size: 28, color: '#ff6a6a' },
+}
+
+export function drawForgeHud(ctx: CanvasRenderingContext2D, v: ForgeHudState) {
+  const tierColor = FORGE_TIER_COLORS[Math.max(0, Math.min(FORGE_TIER_MAX, v.tier))]
   ctx.save()
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-  if (it.effect === 'sign_flex' || it.effect === 'sign_hard') {
-    // 看板：「同じ色を通れ」。色と絵で次の課題を予告する
-    const flex = it.effect === 'sign_flex'
-    const c = flex ? MAT_FLEX_COLOR : MAT_HARD_COLOR
-    ctx.fillStyle = '#5a4a3a'; ctx.fillRect(x - 3, y, 6, DEFAULT_GROUND_Y - y)
-    ctx.fillStyle = 'rgba(10,0,25,0.88)'; ctx.strokeStyle = c; ctx.lineWidth = 3
-    rrect(ctx, x - 46, y - 58, 92, 58, 8); ctx.fill(); ctx.stroke()
-    // 上段：ゲートの記号 ＋ 次の課題の絵
-    ctx.font = '18px sans-serif'
-    ctx.fillText(flex ? '🔥' : '💧', x - 20, y - 38)
-    ctx.fillStyle = '#ffffff'; ctx.font = 'bold 14px sans-serif'
-    ctx.fillText('→', x + 1, y - 38)
-    if (flex) {
-      ctx.strokeStyle = '#ffd34d'; ctx.lineWidth = 4; ctx.lineCap = 'round'
-      ctx.beginPath(); ctx.moveTo(x + 13, y - 28); ctx.quadraticCurveTo(x + 21, y - 58, x + 29, y - 28); ctx.stroke()
-    } else {
-      ctx.fillStyle = '#c04ad8'
-      ctx.beginPath(); ctx.moveTo(x + 21, y - 52); ctx.lineTo(x + 30, y - 38); ctx.lineTo(x + 21, y - 24); ctx.lineTo(x + 12, y - 38); ctx.closePath(); ctx.fill()
+
+  // 速度段階が上がった瞬間：画面のふちを光らせる
+  if (v.tierFlash > 0) {
+    ctx.globalAlpha = (v.tierFlash / 14) * 0.7
+    ctx.strokeStyle = tierColor; ctx.lineWidth = 12
+    ctx.strokeRect(0, 0, CANVAS_W, CANVAS_H)
+    ctx.globalAlpha = 1
+  }
+
+  // 連続回数（親指で隠れない上部の中央）と、速度段階の目盛り
+  if (v.combo >= 2) {
+    ctx.font = 'bold 34px sans-serif'
+    ctx.fillStyle = tierColor; ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.lineWidth = 5
+    ctx.strokeText(`${v.combo}`, CANVAS_W / 2, 62); ctx.fillText(`${v.combo}`, CANVAS_W / 2, 62)
+    ctx.font = 'bold 12px sans-serif'; ctx.fillStyle = '#ffffff'
+    ctx.fillText('れんぞく', CANVAS_W / 2, 86)
+  }
+  for (let i = 0; i < FORGE_TIER_MAX; i++) {
+    ctx.fillStyle = i < v.tier ? tierColor : 'rgba(255,255,255,0.18)'
+    ctx.beginPath(); ctx.arc(CANVAS_W / 2 + (i - (FORGE_TIER_MAX - 1) / 2) * 16, 102, 5, 0, Math.PI * 2); ctx.fill()
+  }
+
+  // チュートリアル：最初の数個のあいだ「叩くんだ」と伝える
+  if (v.hint) {
+    const pulse = 1 + 0.06 * Math.sin(v.frame * 0.2)
+    ctx.save()
+    ctx.translate(CANVAS_W / 2, 132); ctx.scale(pulse, pulse)
+    ctx.font = 'bold 24px sans-serif'
+    ctx.fillStyle = '#ffffff'; ctx.strokeStyle = 'rgba(0,0,0,0.65)'; ctx.lineWidth = 5
+    const msg = '🔨 タップでたたけ！'
+    ctx.strokeText(msg, 0, 0); ctx.fillText(msg, 0, 0)
+    if (v.holding) {
+      ctx.font = 'bold 14px sans-serif'; ctx.fillStyle = '#ffe04a'
+      ctx.fillText('輪に重なったら！', 0, 26)
     }
-    // 下段：ルール
-    ctx.font = 'bold 12px sans-serif'; ctx.fillStyle = c
-    ctx.fillText(flex ? 'ぶつかってOK' : 'くだける', x, y - 12)
-  } else if (it.effect === 'furnace') {
-    // 🔥炉ゲート：炎の輪。ジャンプで通過すると焼なまし（しなる）
-    const flick = Math.sin(frame * 0.3) * 3
-    ctx.shadowColor = MAT_FLEX_COLOR; ctx.shadowBlur = 18
-    ctx.strokeStyle = MAT_FLEX_COLOR; ctx.lineWidth = 6
-    ctx.beginPath(); ctx.ellipse(x, y, 22, 28 + flick, 0, 0, Math.PI * 2); ctx.stroke()
-    ctx.strokeStyle = '#ffd34d'; ctx.lineWidth = 2
-    ctx.beginPath(); ctx.ellipse(x, y, 15, 21 + flick, 0, 0, Math.PI * 2); ctx.stroke()
-    ctx.shadowBlur = 0
-    ctx.font = '20px sans-serif'; ctx.fillText('🔥', x, y - 40)
-  } else if (it.effect === 'quench') {
-    // 💧水槽：地上。走って通過すると焼入れ（かたい）
-    const w = 84
-    ctx.fillStyle = 'rgba(80,190,255,0.35)'; ctx.strokeStyle = MAT_HARD_COLOR; ctx.lineWidth = 2
-    rrect(ctx, x - w / 2, y - 12, w, 22, 4); ctx.fill(); ctx.stroke()
-    ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 1.5
-    ctx.beginPath()
-    for (let i = 0; i <= w; i += 6) {
-      const wy = y - 10 + Math.sin(frame * 0.2 + i * 0.3) * 2
-      if (i === 0) ctx.moveTo(x - w / 2 + i, wy); else ctx.lineTo(x - w / 2 + i, wy)
-    }
-    ctx.stroke()
-    ctx.font = '18px sans-serif'; ctx.fillText('💧', x, y - 30)
+    ctx.restore()
+  }
+
+  // 判定の文字（輪の上。左下・右下は親指で隠れるので避ける）
+  if (v.judge) {
+    const j = JUDGE_TEXT[v.judge]
+    const total = v.judge === 'perfect' ? 36 : v.judge === 'late' ? 50 : v.judge === 'early' ? 30 : 26
+    const age = 1 - v.judgeTimer / total
+    ctx.globalAlpha = Math.min(1, v.judgeTimer / 10)
+    const pop = v.judge === 'perfect' ? 1 + 0.35 * Math.max(0, 1 - age * 5) : 1
+    ctx.font = `bold ${Math.round(j.size * pop)}px sans-serif`
+    ctx.fillStyle = j.color; ctx.strokeStyle = 'rgba(0,0,0,0.65)'; ctx.lineWidth = 5
+    const y = RING_Y - 70 - age * 16
+    ctx.strokeText(j.text, RING_X, y); ctx.fillText(j.text, RING_X, y)
   }
   ctx.restore()
 }
 
-// ── 材料工学科の障害物 ─────────────────────────────────────────────────────────────
-// 金色のU字の板バネ：「しなる」状態なら当たってよい。bend で曲がる。
-export function dLeafSpring(ctx: CanvasRenderingContext2D, o: Obstacle, _theme: Theme, frame: number) {
-  const sway = Math.sin(frame * 0.12) * 3
-  const bend = o.bend ?? 0
-  const cx = o.x + o.w / 2
-  ctx.shadowColor = '#ffd34d'; ctx.shadowBlur = 10
-  ctx.strokeStyle = '#ffd34d'; ctx.lineWidth = 7; ctx.lineCap = 'round'
-  ctx.beginPath()
-  ctx.moveTo(o.x + 4, o.y + o.h)
-  ctx.quadraticCurveTo(cx + sway - bend * 26, o.y - o.h * 0.2, o.x + o.w - 4, o.y + o.h)
-  ctx.stroke()
-  ctx.shadowBlur = 0
-  ctx.strokeStyle = '#fff6c0'; ctx.lineWidth = 2
-  ctx.beginPath()
-  ctx.moveTo(o.x + 6, o.y + o.h - 4)
-  ctx.quadraticCurveTo(cx + sway - bend * 26, o.y, o.x + o.w - 6, o.y + o.h - 4)
-  ctx.stroke()
-  if (!o.spent) {
-    ctx.fillStyle = '#4dff7a'; ctx.font = 'bold 15px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-    ctx.fillText('◎', cx, o.y - 14 + Math.sin(frame * 0.15) * 2)
-  }
-}
-
-// トゲのある赤紫の結晶壁：「かたい」状態なら砕ける。二段ジャンプでも越えられる高さ。
-export function dBrittleCrystal(ctx: CanvasRenderingContext2D, o: Obstacle, _theme: Theme, frame: number) {
-  const { x, y, w, h } = o
-  ctx.shadowColor = '#e04aff'; ctx.shadowBlur = 8
-  ctx.fillStyle = '#7a1f8f'; ctx.strokeStyle = '#ff7aff'; ctx.lineWidth = 2
-  const n = 4, segH = h / n
-  for (let i = 0; i < n; i++) {
-    const sy = y + i * segH
-    ctx.beginPath()
-    ctx.moveTo(x + w / 2, sy)
-    ctx.lineTo(x + w + 6, sy + segH * 0.5)
-    ctx.lineTo(x + w / 2, sy + segH)
-    ctx.lineTo(x - 6, sy + segH * 0.5)
-    ctx.closePath(); ctx.fill(); ctx.stroke()
-  }
-  ctx.shadowBlur = 0
-  // ひび（もろさの表現）
-  ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1
-  ctx.beginPath(); ctx.moveTo(x + 8, y + 10); ctx.lineTo(x + 18, y + 40); ctx.lineTo(x + 10, y + 70); ctx.lineTo(x + 22, y + 110); ctx.stroke()
-  if (!o.spent) {
-    ctx.fillStyle = '#ff5a5a'; ctx.font = 'bold 15px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-    ctx.fillText('✕', x + w / 2, y - 12 + Math.sin(frame * 0.15) * 2)
-  }
-}
-
-// 圧延ローラー：上ロール（当たり判定あり）と、地面に埋まった下ロール（飾り）
-export function dRoller(ctx: CanvasRenderingContext2D, o: Obstacle, _theme: Theme, frame: number) {
-  const { x, y, w, h } = o
-  const cx = x + w / 2, r = w / 2
-  const rot = frame * 0.15
-  ctx.shadowBlur = 0
-  // 支柱
-  ctx.fillStyle = '#3a3f4a'
-  ctx.fillRect(cx - 3, 42, 6, Math.max(0, y + h / 2 - 42))
-  // 上ロール
-  const g = ctx.createLinearGradient(x, 0, x + w, 0)
-  g.addColorStop(0, '#5d6573'); g.addColorStop(0.5, '#e6ebf2'); g.addColorStop(1, '#5d6573')
-  ctx.fillStyle = g; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2
-  rrect(ctx, x, y, w, h, r); ctx.fill(); ctx.stroke()
-  ctx.strokeStyle = 'rgba(40,40,60,0.5)'; ctx.lineWidth = 2
-  for (let i = 0; i < 3; i++) {
-    const ly = y + r + ((i * (h - 2 * r) / 3 + rot * 6) % Math.max(1, h - 2 * r))
-    ctx.beginPath(); ctx.moveTo(x + 4, ly); ctx.lineTo(x + w - 4, ly); ctx.stroke()
-  }
-  // 下ロール（地面の中・飾り）
-  ctx.fillStyle = g
-  ctx.beginPath(); ctx.arc(cx, DEFAULT_GROUND_Y + r + 4, r, Math.PI, Math.PI * 2); ctx.fill()
-}
-
-// ── HUD：工程の進み具合とカットイン ─────────────────────────────────────────────────
-export function drawMatHud(ctx: CanvasRenderingContext2D, theme: Theme, phase: MatPhase, slow: boolean) {
-  const gx = 110, gy = 21
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = 'bold 11px sans-serif'
-  const idx = MAT_PHASE_ORDER.indexOf(phase)
-  MAT_PHASE_ORDER.forEach((ph, i) => {
-    const x = gx + i * 46
-    const on = i === idx, done = i < idx
-    ctx.fillStyle = on ? theme.groundLineColor : done ? theme.groundLineColor + '55' : 'rgba(255,255,255,0.1)'
-    rrect(ctx, x - 20, gy - 8, 40, 16, 8); ctx.fill()
-    ctx.fillStyle = on ? '#14002a' : '#cccccc'
-    ctx.fillText(PHASE_LABEL[ph], x, gy)
-    if (i < MAT_PHASE_ORDER.length - 1) {
-      ctx.fillStyle = '#777'; ctx.fillText('›', x + 23, gy)
-    }
-  })
-  if (slow) {
-    ctx.fillStyle = '#ff9a9a'; ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center'
-    ctx.fillText('結晶を迂回… スロー', PLAYER_X, 58)
-  }
-}
-
-export function drawMatCutin(ctx: CanvasRenderingContext2D, theme: Theme, phase: MatPhase, timer: number, total: number) {
+// 区間の切り替わりのカットイン
+export function drawMatCutin(ctx: CanvasRenderingContext2D, theme: Theme, title: string, sub: string, timer: number, total: number) {
   const t = 1 - timer / total
   const alpha = t < 0.15 ? t / 0.15 : t > 0.8 ? (1 - t) / 0.2 : 1
   ctx.save()
@@ -413,9 +362,22 @@ export function drawMatCutin(ctx: CanvasRenderingContext2D, theme: Theme, phase:
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
   ctx.fillStyle = theme.groundLineColor; ctx.shadowColor = theme.groundLineColor; ctx.shadowBlur = 12
   ctx.font = 'bold 30px sans-serif'
-  ctx.fillText(PHASE_CUTIN[phase][0], CANVAS_W / 2, CANVAS_H / 2 - 14)
+  ctx.fillText(title, CANVAS_W / 2, CANVAS_H / 2 - 14)
   ctx.shadowBlur = 0
   ctx.fillStyle = '#ffffff'; ctx.font = 'bold 15px sans-serif'
-  ctx.fillText(PHASE_CUTIN[phase][1], CANVAS_W / 2, CANVAS_H / 2 + 17)
+  ctx.fillText(sub, CANVAS_W / 2, CANVAS_H / 2 + 17)
+  ctx.restore()
+}
+
+// ゴールの演出：最大連続回数
+export function drawForgeResult(ctx: CanvasRenderingContext2D, theme: Theme, maxCombo: number) {
+  ctx.save()
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+  ctx.fillStyle = 'rgba(10,0,30,0.7)'
+  rrect(ctx, CANVAS_W / 2 - 150, 78, 300, 80, 14); ctx.fill()
+  ctx.fillStyle = '#ffffff'; ctx.font = 'bold 15px sans-serif'
+  ctx.fillText('さいだい れんぞく', CANVAS_W / 2, 104)
+  ctx.fillStyle = theme.groundLineColor; ctx.font = 'bold 36px sans-serif'
+  ctx.fillText(`${maxCombo}`, CANVAS_W / 2, 136)
   ctx.restore()
 }

@@ -17,6 +17,13 @@ const JUMP_PLANS: number[][] = (() => {
   return plans
 })()
 
+// 材料（鍛えてカン！）の3連（間隔18フレーム）用の候補。2連用の [0, 18] は上の候補に含まれる
+const FORGE_PLANS: number[][] = (() => {
+  const plans: number[][] = [[0, 18, 36]]
+  for (let k = 3; k <= 15; k += 3) plans.push([k, k + 18, k + 36])
+  return plans
+})()
+
 // 生物応化（スイム）の候補：目標とする高さ
 const SWIM_TARGETS = [40, 65, 90, 115, 140, 165, 190, 215, 240]
 
@@ -73,7 +80,8 @@ export class Autopilot {
     })
     let best = current
     let bestScore = evaluate(current) + 1
-    for (const plan of JUMP_PLANS) {
+    const plans = this.engine.snapshot.departmentId === 5 ? [...JUMP_PLANS, ...FORGE_PLANS] : JUMP_PLANS
+    for (const plan of plans) {
       const score = evaluate(plan)
       if (score > bestScore) {
         bestScore = score
@@ -114,6 +122,7 @@ export class Autopilot {
     if (end.cleared) score += 10000
     if (start.departmentId === 2) score += end.charge * 12 // 充電を保つ
     if (start.departmentId === 3 && end.debugMode > 0) score += 200
+    if (start.departmentId === 5) score += end.forgeTier * 40 // PERFECT で速くなるほうを選ぶ
     return score
   }
 }

@@ -15,14 +15,12 @@ export interface Obstacle {
        | 'stalactite'
        // 生物応用化学科（液体スイム）
        | 'reagent_tube' | 'cell_wall'
-       // 材料工学科
-       | 'crystal' | 'ingot' | 'lattice' | 'roller' | 'leaf_spring' | 'brittle_crystal'
+       // 材料工学科（鍛えてカン！）
+       | 'hot_ingot'
   moving: boolean; phase: number; baseY: number; amplitude: number
   stompable?: boolean  // 電子情報工学科：上から踏んで倒せる敵か
-  bendable?: boolean   // 材料工学科：「しなる」状態なら当たってよい板バネ（曲がって戻り加速）
-  breakable?: boolean  // 材料工学科：「かたい」状態なら砕ける結晶壁
-  spent?: boolean      // 材料工学科：判定済み（板バネを曲げた／結晶壁を迂回した）
-  bend?: number        // 材料工学科：板バネのしなり具合（1→0で戻る）
+  struck?: boolean     // 材料工学科：叩いた塊（二重判定防止・板になって飛ぶ）
+  tutorial?: boolean   // 材料工学科：チュートリアルの最初の2個（減速して待つ）
 }
 
 export type TerrainSegment =
@@ -34,8 +32,6 @@ export interface Item {
   x: number; y: number
   effect: 'charge'                    // 電気電子工学科：🔋電池
         | 'shield'                    // 生物応用化学科：バリア
-        | 'furnace' | 'quench'        // 材料工学科：熱処理ゲート（🔥炉／💧水槽）
-        | 'sign_flex' | 'sign_hard'   // 材料工学科：熱処理の看板（判定なし）
   wobble: number
 }
 

@@ -104,7 +104,7 @@ export default function Home() {
       </div>
 
       <div className="text-gray-500 text-xs space-y-1">
-        <p>スペース / タップ：ジャンプ（空中でもう一度で二段ジャンプ）</p>
+        <p>スペース / タップ：ジャンプ（学科によって操作が変わります）</p>
         <p>学科ごとにルールが変わる！ クリアタイムで競おう</p>
       </div>
 

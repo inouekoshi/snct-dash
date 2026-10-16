@@ -13,6 +13,7 @@ export interface BgContext {
   debug?: boolean  // 電子情報：デバッグモード中はコード雨を強化
   stageProgress?: number
   isBio?: boolean
+  forge?: { tier: number; pulse: number }  // 材料：速度段階と、炉の脈動（0〜1。次の塊が届く瞬間に1）
 }
 
 export function drawBg(ctx: CanvasRenderingContext2D, area: AreaId, theme: Theme, bg: BgContext) {
@@ -26,7 +27,7 @@ export function drawBg(ctx: CanvasRenderingContext2D, area: AreaId, theme: Theme
     case 2: bgElec(ctx, theme, bg); break
     case 3: bgCode(ctx, theme, bg); break
     case 4: bgBio(ctx, theme, bg);  break
-    case 5: bgMat(ctx, theme, bg.bgX, bg.frame, bg.stageProgress ?? 0); break
+    case 5: bgMat(ctx, theme, bg.bgX, bg.frame, bg.stageProgress ?? 0, bg.forge); break
   }
   ctx.restore()
 }

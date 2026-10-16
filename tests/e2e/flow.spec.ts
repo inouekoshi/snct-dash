@@ -72,12 +72,12 @@ test.describe('プレイ → クリア → 登録', () => {
     expect(calls.filter(c => c.url === '/api/runs').map(c => (c.body as { department: number }).department)).toEqual([1, 1])
   })
 
-  test('材料工学科はクリア後に眼鏡フレーム完成の演出が出る', async ({ page }) => {
+  test('材料工学科はクリア後に粗い粒の塊と細かい粒の板の演出が出る', async ({ page }) => {
     await mockApi(page)
     await setNickname(page)
     await startDepartment(page, '材料工学科')
     await warpToGoal(page, 80_000)
-    await expect(page.getByText('チタン眼鏡フレーム 完成！')).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText('叩いて板ができた！')).toBeVisible({ timeout: 10_000 })
   })
 
   test('NGワードで弾かれたら理由と「ニックネームを変える」を出す', async ({ page }) => {

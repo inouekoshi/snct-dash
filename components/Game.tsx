@@ -30,8 +30,10 @@ export default function Game({ nickname, departmentId, autoStart = false, onStar
   const [started, setStarted] = useState(autoStart)
   const [isPortrait, setIsPortrait] = useState(false)
   const [paused, setPaused] = useState(false)
-  // 生物応用化学科（液体スイム）だけは長押しで浮上する操作。他学科はタップでジャンプ。
+  // 生物応用化学科（液体スイム）だけは長押しで浮上する操作。材料工学科（鍛えてカン！）はタップでハンマー。
+  // 他学科はタップでジャンプ。
   const isSwim = departmentId === 4
+  const isForge = departmentId === 5
 
   // autoStart のときはマウント時にプレイ開始を通知する
   const startNotified = useRef(false)
@@ -226,7 +228,9 @@ export default function Game({ nickname, departmentId, autoStart = false, onStar
             <p className="text-sm text-gray-100">
               {isSwim
                 ? '⌨ スペース / ↑ 長押し ・ 📱 画面タップ長押し：浮上（離すと沈む）'
-                : '⌨ スペース / ↑ ・ 📱 タップ：ジャンプ（二段ジャンプあり）'}
+                : isForge
+                  ? '⌨ スペース / ↑ ・ 📱 タップ：ハンマーでたたく（ジャンプはしない）'
+                  : '⌨ スペース / ↑ ・ 📱 タップ：ジャンプ（二段ジャンプあり）'}
             </p>
             <p className="text-xs text-gray-400 mt-1">⚠ 障害物はノックバック（後退）だけ。ゲームオーバーなし！</p>
           </div>
@@ -298,10 +302,18 @@ export default function Game({ nickname, departmentId, autoStart = false, onStar
         )}
       </div>
       <p className="text-gray-600 text-xs mt-4 hidden pointer-coarse:block">
-        {isSwim ? 'タップ長押し：浮上（離すと沈む）｜⏸ボタンで一時停止' : 'タップでジャンプ（二段ジャンプあり）｜⏸ボタンで一時停止'}
+        {isSwim
+          ? 'タップ長押し：浮上（離すと沈む）｜⏸ボタンで一時停止'
+          : isForge
+            ? 'タップでたたく（ジャンプはしない）｜⏸ボタンで一時停止'
+            : 'タップでジャンプ（二段ジャンプあり）｜⏸ボタンで一時停止'}
       </p>
       <p className="text-gray-600 text-xs mt-4 pointer-coarse:hidden">
-        {isSwim ? 'スペース / 上キー長押し: 浮上（離すと沈む）｜P / Esc: 一時停止' : 'スペース / クリック: ジャンプ（二段ジャンプあり）｜P / Esc: 一時停止'}
+        {isSwim
+          ? 'スペース / 上キー長押し: 浮上（離すと沈む）｜P / Esc: 一時停止'
+          : isForge
+            ? 'スペース / クリック: たたく（ジャンプはしない）｜P / Esc: 一時停止'
+            : 'スペース / クリック: ジャンプ（二段ジャンプあり）｜P / Esc: 一時停止'}
       </p>
     </main>
   )

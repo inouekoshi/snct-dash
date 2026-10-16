@@ -25,8 +25,6 @@ export function itemHitbox(it: Item): Box | null {
   switch (it.effect) {
     case 'charge':  return { x: it.x - 11, y: it.y - 15, w: 22, h: 30 }
     case 'shield':  return { x: it.x - 14, y: it.y - 14, w: 28, h: 28 }
-    case 'furnace': return { x: it.x - 22, y: it.y - 28, w: 44, h: 56 }
-    case 'quench':  return { x: it.x - 42, y: it.y - 14, w: 84, h: 26 }
     default:        return null
   }
 }
