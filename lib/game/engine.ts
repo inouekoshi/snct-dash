@@ -344,17 +344,18 @@ export class GameEngine {
   private update() {
     this.frame++
 
+    // タイマー加算（ゲーム内時間。ポーズ・処理落ちで捨てたフレームは数えない）
+    // ヒットストップやMISSオーバーレイ中もタイマーを進め、ミスが直接タイムロスになるようにする
+    this.elapsedMs += STEP_MS
+
     // 材料工学科の演出タイマー（ヒットストップ中も動かして見た目を止めない）
     this.forge.tickVisualTimers()
 
-    // ヒットストップ中はタイマー以外を止める
+    // ヒットストップ中は物理などを止める
     if (this.hitStopTimer > 0) { this.hitStopTimer--; return }
 
     // MISS オーバーレイ中は物理を止める（frame は進みアニメ継続）
     if (this.missOverlayTimer > 0) { this.missOverlayTimer--; return }
-
-    // タイマー加算（ゲーム内時間。ポーズ・処理落ちで捨てたフレームは数えない）
-    this.elapsedMs += STEP_MS
 
     // 復活スロー：revivalTimer 中は最低速度に固定
     if (this.revivalTimer > 0) this.revivalTimer--
