@@ -113,11 +113,11 @@
 
 | # | 作業 | 概要 | 状態 |
 |---|------|------|------|
-| **5-1** | 本番負荷試験 | DB関数を2万件のデータで計測（1回 0.35〜7ms）・見積もりは十分余裕。HTTP 越しの試験は未実施（任意） | ✅ 見積もり済み [#6](https://github.com/inouekoshi/snct-dash/issues/6) |
+| **5-1** | 本番負荷試験 | DB関数を2万件のデータで計測（1回 0.35〜7ms）。devプレビューでHTTP負荷・CDNキャッシュ試験（ヒット率98%）を実施済み | ✅ 2026-10-16 [#6](https://github.com/inouekoshi/snct-dash/issues/6) |
 | **5-2** | モニタリング体制 | 監視する場所・SQL・トラブル対応表（[doc/operations.md](operations.md)） | ✅ 資料作成済み [#7](https://github.com/inouekoshi/snct-dash/issues/7) |
-| **5-3** | 運営引き継ぎ | 来場者への案内文・よくある質問・連絡フロー（当番表は要記入） | 🔄 [#7](https://github.com/inouekoshi/snct-dash/issues/7) |
-| **5-4** | 利用規約の確認 | 非商用（課金・広告・報酬なし）なら Hobby の範囲と考えられる。学校運営として出すなら要判断 | 🔄 判断待ち [#5](https://github.com/inouekoshi/snct-dash/issues/5) |
-| **5-5** | 後片付け | 旧 `scores` は archive へ退避済み。Vercel の不要な環境変数は手作業で削除 | 🔄 [#12](https://github.com/inouekoshi/snct-dash/issues/12)（手作業） ✅ [#13](https://github.com/inouekoshi/snct-dash/issues/13) |
+| **5-3** | 運営引き継ぎ | 来場者への案内文・よくある質問・連絡フロー・体制と当番表枠組み（[doc/operations.md](operations.md)） | 🔄 [#7](https://github.com/inouekoshi/snct-dash/issues/7) |
+| **5-4** | 利用規約の確認 | 学生個人の非商用・無料作品として現状維持（Hobbyプラン継続）を決定 | ✅ 2026-10-16 [#5](https://github.com/inouekoshi/snct-dash/issues/5) |
+| **5-5** | 後片付け | 旧 `scores` は archive へ退避済み。Vercel の不要な環境変数は3環境すべてから削除完了 | ✅ 2026-10-16 [#12](https://github.com/inouekoshi/snct-dash/issues/12) ✅ [#13](https://github.com/inouekoshi/snct-dash/issues/13) |
 
 ---
 
@@ -131,16 +131,14 @@
 
 ## 残タスク（2026-10-16 時点）
 
-コードで対応できるものは実装とテストを終えて dev に入れてある。残りは、実機で触る・判断する・ダッシュボードで操作するといった人の作業だけ。全体のまとめは [#14](https://github.com/inouekoshi/snct-dash/issues/14)。
+コードで対応できるものは実装とテストを終えて dev に入れてある。残りは、実機で触る・判断する・リリースするといった人の作業だけ。全体のまとめは [#14](https://github.com/inouekoshi/snct-dash/issues/14)。
 
 | 期限 | 作業 | Issue |
 |------|------|-------|
 | 〜10/20 | iPhone / Android の実機で全5学科をプレイする（手触りと性能） | [#2](https://github.com/inouekoshi/snct-dash/issues/2)・[#4](https://github.com/inouekoshi/snct-dash/issues/4) |
-| 〜10/20 | 生物応化のクリアタイム（約2分半）を短くするか決める | [#16](https://github.com/inouekoshi/snct-dash/issues/16) |
-| 〜10/20 | Vercel Hobby プランのままでよいか判断する | [#5](https://github.com/inouekoshi/snct-dash/issues/5) |
-| 〜10/27 | dev を main へマージし、デプロイ直後に本番DBへ lockdown を適用する | [#1](https://github.com/inouekoshi/snct-dash/issues/1) |
-| 〜11/1 | 当番表と連絡先を決め、当日のリハーサルをする | [#7](https://github.com/inouekoshi/snct-dash/issues/7) |
-| 余裕があれば | 不要な環境変数の削除、HTTP 越しの負荷試験 | [#12](https://github.com/inouekoshi/snct-dash/issues/12)・[#6](https://github.com/inouekoshi/snct-dash/issues/6) |
+| 〜10/20 | 生物応化のクリアタイム（約2分半）を短くするか決める（実機確認時に判断） | [#16](https://github.com/inouekoshi/snct-dash/issues/16) |
+| 〜10/27 | dev を main へマージし、デプロイ直後に本番DBへ lockdown と材料工学科下限タイム更新を適用する | [#1](https://github.com/inouekoshi/snct-dash/issues/1) |
+| 〜11/1 | 当番表の最終確認、当日のリハーサル | [#7](https://github.com/inouekoshi/snct-dash/issues/7) |
 
 ---
 

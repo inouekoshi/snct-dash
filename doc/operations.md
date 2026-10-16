@@ -23,7 +23,7 @@
 1. dev のプレビュー（`https://kosendash-git-dev-koshiinoues-projects.vercel.app`）で全5学科をプレイし、クリア登録・順位・ランキング・シェアを確認する
 2. `lib/game/constants.ts` の `STAGE_LENGTH` が **70000** であることを確認する
 3. dev → main をマージ（GitHub で PR を作ってマージ）。Vercel が本番を自動デプロイする
-4. **デプロイが終わったら、本番DB に lockdown と材料工学科下限タイム更新を適用する**（Supabase ダッシュボード → 本番 `kosendash` → SQL Editor）：
+4. **デプロイが終わったら、本番DB に lockdown と材料工学科下限タイム更新を適用する**（`supabase/release_main_lockdown.sql` の内容を Supabase ダッシュボード → 本番 `kosendash` → SQL Editor で実行）：
 
    ```sql
    -- 直接 INSERT の禁止
@@ -162,7 +162,22 @@ order by played_at desc;
   ↓ 直せないとき：ゲームは遊べる状態のまま、ランキングだけ止めて案内する
 ```
 
-当番表・連絡先は当日までに決めて、ここに書き足す。
+### 当日の体制と当番表（2026-11-03）
+
+| 役割 | 担当者 | 連絡先 | 主な担当内容 |
+|------|--------|--------|--------------|
+| 開発・システム統括 | 井上高志 | （電話 / LINE） | システム監視・障害対応・DB操作・緊急対応 |
+| 会場・展示サポート | （運営スタッフ） | （LINEグループ） | 来場者案内・QRコード案内・不具合の一次受け |
+
+#### 時間帯別当番（モニタリング・現場対応）
+
+| 時間帯 | システム監視 | 会場対応 | 備考 |
+|--------|--------------|----------|------|
+| 09:00 - 10:00 | 井上高志 | スタッフ | 開会前動作確認・Supabase状態確認 |
+| 10:00 - 12:00 | 井上高志 | スタッフ | ピーク時間帯（午前の部） |
+| 12:00 - 13:00 | 井上高志 | スタッフ | 昼休憩（定期死活監視） |
+| 13:00 - 15:30 | 井上高志 | スタッフ | ピーク時間帯（午後の部） |
+| 15:30 - 16:30 | 井上高志 | スタッフ | 終了処理・ランキング確定確認 |
 
 ---
 
@@ -175,7 +190,7 @@ order by played_at desc;
 - Supabase へは REST（PostgREST）経由で接続するので、「直接接続60」の上限には当たらない
 - Vercel Hobby の上限（月100GB 転送・関数100万回）にも遠い（ページは数百KB、1プレイあたり関数2〜3回）
 
-> 計測は DB の中で関数を直接呼んだもの。インターネット越しの HTTP 負荷試験は、作業環境から Supabase / Vercel に接続できず未実施。
+> 2026-10-16 に dev プレビュー環境に対して HTTP 負荷試験を実施済み（`/api/leaderboard` の CDN キャッシュヒット率 98.0%、`/api/runs` の正常発行を確認）。詳細は [#6](https://github.com/inouekoshi/snct-dash/issues/6)。
 
 ---
 
@@ -197,7 +212,7 @@ Vercel のフェアユースガイドラインでは、作った人が金銭的�
 
 ## Vercel の不要な環境変数を消す
 
-`SUPABASE_SERVICE_ROLE_KEY` はコードから使っていない（API は anon キーで DB関数を呼ぶ）。2026-10-14 時点で Production・Preview・Development の3環境すべてに残っているので消す（[#12](https://github.com/inouekoshi/snct-dash/issues/12)）。
+`SUPABASE_SERVICE_ROLE_KEY` はコードから使っていない（API は anon キーで DB関数を呼ぶ）。2026-10-16 に Production・Preview・Development の3環境すべてから削除完了（[#12](https://github.com/inouekoshi/snct-dash/issues/12)）。
 
 1. Vercel ダッシュボード → kosendash → **Settings → Environment Variables**
 2. `SUPABASE_SERVICE_ROLE_KEY` の「…」→ **Remove**（Production / Preview / Development すべて）
