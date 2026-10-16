@@ -1,4 +1,5 @@
 import { PLAYER_X } from './constants'
+import type { Item } from './engine-types'
 
 export interface Box { x: number; y: number; w: number; h: number }
 
@@ -14,12 +15,16 @@ export function overlaps(a: Box, b: Box): boolean {
   return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y
 }
 
-export function hitCircle(box: Box, cx: number, cy: number, r: number): boolean {
-  const nx = Math.max(box.x, Math.min(cx, box.x + box.w))
-  const ny = Math.max(box.y, Math.min(cy, box.y + box.h))
-  return (nx - cx) ** 2 + (ny - cy) ** 2 < r * r
+// h は当たり判定の高さ。材料工学科だけ工程（液滴・薄板など）に応じて変える。
+export function playerHitbox(py: number, h = 46): Box {
+  return { x: PLAYER_X - 12, y: py - h, w: 24, h }
 }
 
-export function playerHitbox(py: number): Box {
-  return { x: PLAYER_X - 12, y: py - 46, w: 24, h: 46 }
+// アイテムの取得判定ボックス（item.x / item.y は Canvas 座標の中心）。null は判定なし（看板）。
+export function itemHitbox(it: Item): Box | null {
+  switch (it.effect) {
+    case 'charge':  return { x: it.x - 11, y: it.y - 15, w: 22, h: 30 }
+    case 'shield':  return { x: it.x - 14, y: it.y - 14, w: 28, h: 28 }
+    default:        return null
+  }
 }

@@ -14,9 +14,10 @@ export const KNOCKBACK_AMOUNT     = 120
 export const HOLE_KNOCKBACK       = 200
 export const KNOCKBACK_INVINCIBLE = 90
 
-// [最小frames, ランダム幅frames]。インデックス0は未使用、1〜5がdepartmentId対応
+// [最小frames, ランダム幅frames]。インデックス0は未使用、1〜4がdepartmentId対応
+// （4=生物応化はパイプの間隔。材料工学科は鍛造専用キューを使う）
 export const SPAWN_GAPS: [number, number][] = [
-  [0, 0], [44, 28], [85, 50], [38, 30], [78, 46], [36, 26],
+  [0, 0], [44, 28], [85, 50], [38, 30], [78, 46],
 ]
 
 export const COYOTE_FRAMES      = 5
@@ -64,3 +65,33 @@ export const BIO_SPEED_END   = 10
 // [最小frames, ランダム幅frames]。約4〜9秒間隔。取り逃しても次が来るので出過ぎてOK。
 export const SHIELD_GAP: [number, number] = [240, 300]
 export const SHIELD_COLOR = '#5ffbf1'
+
+// 材料工学科（鍛えてカン！）専用
+export const FORGE_RING_OFFSET     = 175 // 輪の中心の、自キャラからの距離（px）
+export const FORGE_INGOT_W         = 40  // 塊の幅（px）
+export const FORGE_PERFECT         = 2.5 // PERFECT の幅（±フレーム、t は小数）
+export const FORGE_GOOD_EARLY      = 4.5 // GOOD の早い側の端（フレーム）
+export const FORGE_GOOD_LATE       = 6.5 // GOOD の遅い側の端（フレーム）
+export const FORGE_EARLY_LIMIT     = 20  // これより遠い塊へのタップは罰なしの空振り（フレーム）
+export const FORGE_COOLDOWN        = 12  // 空振り後の硬直（フレーム）
+export const MAT_BOOST_MAX         = 1.0 // 加速倍率（ブーストなし＝1.0）
+export const FORGE_HITSTOP         = 2   // PERFECT のヒットストップ（フレーム）
+export const FORGE_SPAWN_DIST      = 560 // 輪の中心から、塊を置く位置（x=845）までの距離（px）
+export const FORGE_CUTIN_FRAMES    = 48  // 区間の切り替わりのカットイン表示時間
+export const FORGE_CHAIN_GAP       = 18  // 2連・3連の間隔（フレーム）
+export const FORGE_TUTORIAL_DELAY  = 90  // 開始から最初の塊までのフレーム数（1.5秒）
+export const FORGE_TUTORIAL_SLOW   = 0.2 // 最初の2個の、輪に入ったときの世界の速さ
+export const FORGE_TUTORIAL_WAIT   = 120 // 最初の2個で待つ最大フレーム数（2秒）
+export const FORGE_RING_R          = 26  // 判定の輪の半径（px）
+export const FORGE_SWING_FRAMES    = 8   // ハンマーを振る動きのフレーム数
+export const FORGE_TUTORIAL_HITS   = 2   // 「タップでたたけ！」を出し続ける、叩いた数の上限
+// 区間の切り替わりのカットイン文言（0〜25%は出さない）
+export const FORGE_ZONE_CUTIN: readonly (readonly [string, string])[] = [
+  ['', ''],
+  ['熱気あふれる鍛造ライン！', 'ぴったり叩いて板に仕上げろ'],
+  ['熱処理で鍛え上げろ！', '2連・3連のリズムに乗れ'],
+  ['白熱の最終区間！', '最後まで叩ききれ'],
+]
+export const FORGE_COMBO_BONUS_MS  = 140 // 1コンボあたりのクリアタイム短縮ボーナス（ms）
+export const FORGE_MAX_COMBO_ESTIMATE = 122 // 理論最短タイム計算用の最大コンボ推定値
+

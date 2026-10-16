@@ -3,6 +3,7 @@ export type AreaId = 1 | 2 | 3 | 4 | 5
 export interface AreaTheme {
   id: AreaId
   name: string
+  short: string   // 狭い場所に出す短い名前（タイトル・ランキングのタブ）
   emoji: string
   bgTop: string
   bgBottom: string
@@ -11,13 +12,13 @@ export interface AreaTheme {
   obstacleColor: string
   obstacleStroke: string
   coinColor: string
-  decorations: string[]
 }
 
 export const AREAS: Record<AreaId, AreaTheme> = {
   1: {
     id: 1,
     name: '機械工学科',
+    short: '機械',
     emoji: '⚙',
     bgTop: '#0d0500',
     bgBottom: '#1a0a00',
@@ -26,11 +27,11 @@ export const AREAS: Record<AreaId, AreaTheme> = {
     obstacleColor: '#cc6600',
     obstacleStroke: '#ff9933',
     coinColor: '#ff8c00',
-    decorations: ['gear', 'bolt'],
   },
   2: {
     id: 2,
     name: '電気電子工学科',
+    short: '電気電子',
     emoji: '⚡',
     bgTop: '#0d0d00',
     bgBottom: '#1a1a00',
@@ -39,11 +40,11 @@ export const AREAS: Record<AreaId, AreaTheme> = {
     obstacleColor: '#cccc00',
     obstacleStroke: '#ffff44',
     coinColor: '#ffff00',
-    decorations: ['spark', 'wire'],
   },
   3: {
     id: 3,
     name: '電子情報工学科',
+    short: '電子情報',
     emoji: '💻',
     bgTop: '#000d1a',
     bgBottom: '#001133',
@@ -52,11 +53,11 @@ export const AREAS: Record<AreaId, AreaTheme> = {
     obstacleColor: '#005599',
     obstacleStroke: '#33aaff',
     coinColor: '#00aaff',
-    decorations: ['bug', 'bit'],
   },
   4: {
     id: 4,
     name: '生物応用化学科',
+    short: '生物応化',
     emoji: '🧬',
     bgTop: '#021a14',
     bgBottom: '#002b1f',
@@ -65,11 +66,11 @@ export const AREAS: Record<AreaId, AreaTheme> = {
     obstacleColor: '#006622',
     obstacleStroke: '#00ee55',
     coinColor: '#00dd44',
-    decorations: ['dna', 'bubble'],
   },
   5: {
     id: 5,
     name: '材料工学科',
+    short: '材料',
     emoji: '💎',
     bgTop: '#0a0015',
     bgBottom: '#150033',
@@ -78,11 +79,9 @@ export const AREAS: Record<AreaId, AreaTheme> = {
     obstacleColor: '#660099',
     obstacleStroke: '#cc44ff',
     coinColor: '#aa44ff',
-    decorations: ['crystal', 'atom'],
   },
 }
 
-export const AREA_DISTANCE = 2000
 
 export function bioZone(p: number): 'chem' | 'bio' {
   return Math.floor(p / 2200) % 2 === 0 ? 'chem' : 'bio'

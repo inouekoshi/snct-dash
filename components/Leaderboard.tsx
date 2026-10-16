@@ -5,20 +5,8 @@ import { useSearchParams } from 'next/navigation'
 import type { StageClearEntry } from '@/lib/types'
 import { AREAS } from '@/lib/game/areas'
 import type { AreaId } from '@/lib/game/areas'
-
-function formatTime(ms: number): string {
-  const m = Math.floor(ms / 60000)
-  const s = Math.floor((ms % 60000) / 1000)
-  const cs = Math.floor((ms % 1000) / 10)
-  return `${m}:${String(s).padStart(2, '0')}.${String(cs).padStart(2, '0')}`
-}
-
-async function fetchEntries(department: number): Promise<StageClearEntry[]> {
-  const res = await fetch(`/api/leaderboard?department=${department}`, { cache: 'no-store' })
-  if (!res.ok) return []
-  const { entries } = await res.json()
-  return entries
-}
+import { fetchLeaderboard } from '@/lib/client/game-api'
+import { formatTime } from '@/lib/format'
 
 const DEPARTMENTS = [1, 2, 3, 4, 5] as const
 
@@ -28,14 +16,15 @@ export default function Leaderboard() {
   const [department, setDepartment] = useState<number>(
     initialDept >= 1 && initialDept <= 5 ? initialDept : 1,
   )
-  const [entries, setEntries] = useState<StageClearEntry[]>([])
+  // null = 読み込み失敗
+  const [entries, setEntries] = useState<StageClearEntry[] | null>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     let ignore = false
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true)
-    fetchEntries(department).then((data) => {
+    fetchLeaderboard(department).then((data) => {
       if (!ignore) { setEntries(data); setLoading(false) }
     })
     return () => { ignore = true }
@@ -59,7 +48,7 @@ export default function Leaderboard() {
             >
               <span className="text-lg">{theme.emoji}</span>
               <span className="leading-tight text-center" style={{ fontSize: '10px' }}>
-                {theme.name.replace('工学科', '')}
+                {theme.short}
               </span>
             </button>
           )
@@ -68,6 +57,11 @@ export default function Leaderboard() {
 
       {loading ? (
         <div className="text-center text-gray-500 py-12">読み込み中...</div>
+      ) : entries === null ? (
+        <div className="text-center text-gray-500 py-12" role="alert">
+          <p>ランキングを読み込めませんでした</p>
+          <p className="text-sm mt-1">少し待ってから開き直してね</p>
+        </div>
       ) : entries.length === 0 ? (
         <div className="text-center text-gray-500 py-12">
           <p className="text-4xl mb-2">🎮</p>

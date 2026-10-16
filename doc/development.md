@@ -8,9 +8,10 @@
 - [地形システム](#地形システム)
 - [ノックバック・MISSシステム](#ノックバックmissシステム)
 - [ゴールレンダラー](#ゴールレンダラー)
-- [新しいアイテムを追加する](#新しいアイテムを追加する)
+- [アイテムシステム](#アイテムシステム)
 - [障害物の種類を追加する](#障害物の種類を追加する)
 - [ゲームバランスの調整](#ゲームバランスの調整)
+- [自動プレイで確かめる](#自動プレイで確かめる)
 - [よくあるトラブル](#よくあるトラブル)
 
 ---
@@ -23,22 +24,29 @@
 
 ```typescript
 const engine = new GameEngine(
-  canvasElement,
-  departmentId,                       // 1〜5 の学科ID
-  (result: GameClearResult) => { ... } // クリア時コールバック（{ timeMs, departmentId }）
+  canvasElement,                        // null ならロジックだけ（テスト・ボット用）
+  departmentId,                         // 1〜5 の学科ID
+  (result: GameClearResult) => { ... }, // クリア時コールバック（{ timeMs, departmentId, misses }）
+  { seed, silent },                     // 省略可：乱数シード／効果音・パーティクルなし
 )
 ```
 
-### ゲームループ
+### ゲームループ（固定タイムステップ）
 
 ```
 start() → requestAnimationFrame
-  └── loop()
-        ├── update()  物理演算・衝突判定・スポーン処理・進捗更新
-        └── render()  Canvas への描画
+  └── loop(now)
+        ├── 経過時間を STEP_MS（1/60秒）刻みに区切って update() を0〜5回
+        │     update()  物理演算・衝突判定・スポーン処理・進捗更新（1回 = 1/60秒）
+        ├── render()    Canvas への描画（1回）
+        └── フレーム間隔を見て、重ければ光彩（shadowBlur）を自動で切る
 ```
 
-`update()` と `render()` は 60fps を目標に呼ばれます。
+- **「1フレーム」＝ `update()` 1回＝1/60秒**。定数の「〜frames」はすべてこの単位
+- 120Hz の端末でも2倍速にならない。重い端末では1フレームで最大5回 `update()` して追いつく
+- クリアタイムは `update()` の回数 × 1/60秒（ゲーム内時間）
+- ゲームロジックの乱数は `this.rng.next()`（シード付き）を使う。`Math.random()` は描画だけのゆらぎ（パーティクル等）に限る。
+  こうしておくと同じシードで同じステージが再現でき、`clone()` で先読みできる
 
 ### 座標系
 
@@ -69,8 +77,8 @@ y (280)
 overlaps(ph, { x: o.x + 4, y: o.y + 4, w: o.w - 8, h: o.h - 8 })
 ```
 
-アイテム（電気電子の🔋電池）との衝突も AABB（`overlaps()`）で判定します。
-円形判定の `hitCircle()` も `helpers.ts` に用意されています（現在は未使用）。
+プレイヤーの判定ボックスは `playerHitbox(py, h = 46)` です。
+アイテムとの判定も AABB で、ボックスは `itemHitbox(item)`（`helpers.ts`）が種類ごとに返します。
 
 ---
 
@@ -113,16 +121,16 @@ Canvas上のX座標 = PLAYER_X + (stageX - stageProgress)
 学科ごとの地形パターンはこのファイルで定義します。`buildStage()` が `departmentId` で分岐します。
 
 ```typescript
-export function buildStage(departmentId: number): TerrainSegment[] {
-  if (departmentId === 1) return buildStageMech()  // 機械：穴なし・山登り階段
-  if (departmentId === 2) return buildStageElec()  // 電気電子：完全な平坦（充電サバイバル）
-  return buildStageDefault()                       // その他：標準の穴配置
+export function buildStage(departmentId: number, rand: Rand): TerrainSegment[] {
+  if (departmentId === 1) return buildStageMech(rand)  // 機械：穴なし・山登り階段
+  if (departmentId === 4) return []                // 生物応化：地面なし（液体スイム）
+  return buildStageFlat()                          // 電気電子・電子情報・材料：完全な平坦
 }
 ```
 
 - `buildStageMech()`：落とし穴を使わず、2〜4段の「山型階段」を積み上げる（`STEP_H = 40`）
-- `buildStageElec()`：穴も段差も無い1本の平坦地面。プレイヤーは充電維持＋障害物回避に集中する
-- `buildStageDefault()`：平坦な地面と穴（幅110px以上）を交互に配置
+- `buildStageFlat()`：穴も段差も無い1本の平坦地面。各学科の固有ギミックに集中させる
+- 穴（`type: 'hole'`）の落下フローは engine に残しているが、現在どの学科も使っていない
 
 ---
 
@@ -182,16 +190,21 @@ if (isFallingIntoHole && py > CANVAS_H + 60) {
 
 ### 段差壁ブロック（`isBlockedByStep()`）
 
-上り段差に対してジャンプなしで接近した場合、スクロールを止めて壁として機能させる。
+上り段差に対してジャンプなしで接近した場合、スクロールを止めて壁として機能させる（`lib/game/terrain.ts`）。
 
 ```typescript
-private isBlockedByStep(): boolean {
+export function isBlockedByStep(
+  terrain: readonly TerrainSegment[],
+  stageProgress: number,
+  speed: number,
+  py: number,
+): boolean {
   // 上り段差（20px以上）の境界に speed+3px 以内まで近づいており
   // プレイヤーが段差の上面より低い位置（py > curr.groundY + 5）にいるとき true を返す
 }
 ```
 
-`stageProgress` の更新条件: `!isFallingIntoHole && !isBlockedByStep()`
+`stageProgress` の更新条件: `!isFallingIntoHole && !isBlockedByStep(...)`
 
 **「世界が前に流れる = プレイヤーが後退した見た目」** になります。
 ノックバック量は `constants.ts` の `KNOCKBACK_AMOUNT` / `HOLE_KNOCKBACK` で調整できます。
@@ -206,7 +219,7 @@ private isBlockedByStep(): boolean {
 drawGoal(ctx, areaId, theme, stageProgress, frame)
 ```
 
-- `stageX = STAGE_LENGTH` の位置に台座・ポール・学科emoji入りの旗を描画
+- `stageX = STAGE_LENGTH` の位置に台座・ポール・学科emoji入りの旗を描画（台座は通常ステージでは `DEFAULT_GROUND_Y`、地面がない生物応用化学科ではタンク底面 `CANVAS_H - 4` に接地）
 - 750px 以内に近づくとグロー強度が増しパルスアニメーション
 - 450px 以内で「GOAL」テキストがフェードイン
 - 旗は `Math.sin(frame * 0.12 + t * 3.5)` の波打ちアニメーション
@@ -214,67 +227,31 @@ drawGoal(ctx, areaId, theme, stageProgress, frame)
 
 ---
 
-## アイテムシステム（電気電子=充電サバイバルの実装）
+## アイテムシステム
 
-アイテムは `Item` 型（`engine-types.ts`）で定義され、`engine.ts` の `items: Item[]` で管理されます。
-電気電子工学科の🔋電池（`effect: 'charge'`）が実装の参照例です。新しいアイテムも同じ流れで追加します。
+アイテムは `Item` 型（`engine-types.ts`）で定義し、`engine.ts` の `items: Item[]` で管理します。
 
-### 1. `Item.effect` に種別を追加（`engine-types.ts`）
+| effect | 学科 | 内容 |
+|--------|------|------|
+| `charge` | 電気電子 | 🔋電池。充電ゲージを回復 |
+| `shield` | 生物応化 | バリア。1回だけ被弾を無効化 |
 
-```typescript
-export interface Item {
-  stageX: number
-  x: number; y: number
-  effect: 'time_stop' | 'invincible' | 'charge'  // ← ここに追加
-  wobble: number
-}
-```
+※ 材料工学科は赤熱塊（`hot_ingot`）をハンマーで叩くギミックのため、固有アイテムはありません（障害物としてスポーンします）。
 
-### 2. スポーンする（`engine.ts` の `update()`）
+新しいアイテムは次の4か所に追加します。
 
-スポーンタイマーをカウントダウンし、`stageX`（画面右端＝`stageProgress + CANVAS_W`）に push します。
-電池は学科限定（`departmentId === 2`）でスポーンします。
-
-```typescript
-if (this.isElec && --this.nextBattery <= 0) {
-  const nextStageX = this.stageProgress + CANVAS_W
-  // 必ずジャンプしないと届かない高さ（74〜120px）に置く。走行中の判定上端は groundY-46 付近
-  const y = this.getGroundHeightAt(nextStageX) - (74 + Math.random() * 46)
-  this.items.push({ stageX: nextStageX, x: CANVAS_W + 10, y, effect: 'charge', wobble: Math.random() * Math.PI * 2 })
-  const [mn, r] = BATTERY_GAP
-  this.nextBattery = mn + Math.random() * r
-}
-```
-
-### 3. 取得判定と効果（`engine.ts` の衝突判定ブロック）
-
-毎フレーム `playerHitbox` と AABB（`overlaps()`）で重なりを判定し、効果を適用して配列から除去します。
-
-```typescript
-this.items = this.items.filter(it => {
-  if (it.effect === 'charge' && overlaps(ph, { x: it.x - 11, y: it.y - 15, w: 22, h: 30 })) {
-    this.charge = Math.min(CHARGE_MAX, this.charge + BATTERY_REFILL)
-    this.burst(it.x, it.y, AREAS[2].coinColor, 8)  // 取得エフェクト
-    return false
-  }
-  return true
-})
-```
-
-`time_stop` / `invincible` のような時間効果型は `itemEffect` / `itemEffectTimer` を使う
-（`time_stop` 中は `elapsedMs` を加算しない仕組みが既にある）。
-
-### 4. 描画する（`item-renderer.ts` + `engine.ts` の `render()`）
-
-`item-renderer.ts` に描画関数を追加し、`render()` の `items` ループから呼びます。
-
-```typescript
-for (const it of this.items) {
-  if (it.effect === 'charge') drawBattery(ctx, it, theme, this.frame)
-}
-```
-
-`it.x` / `it.y` は毎フレーム `toCanvasX()` で Canvas 座標に更新済み。`wobble` で上下のふわふわ揺れを付けます。
+1. **種類を追加する**：`Item.effect` に追加する（`engine-types.ts`）
+2. **スポーンする**：`engine.ts` の `spawnEntities()` でタイマーをカウントダウンし、画面右端（`stageProgress + CANVAS_W`）の `stageX` で `items` に push する。学科限定のものはフラグ（`isElec` など）で囲む
+   ```typescript
+   if (this.isElec && --this.nextBattery <= 0) {
+     const nextStageX = this.stageProgress + CANVAS_W
+     const y = getGroundHeightAt(this.terrain, nextStageX) - (74 + this.rng.next() * 46)
+     this.items.push({ stageX: nextStageX, x: CANVAS_W + 10, y, effect: 'charge', wobble: this.rng.next() * Math.PI * 2 })
+     ...
+   }
+   ```
+3. **取得判定と効果**：判定ボックスを `helpers.ts` の `itemHitbox()` に、効果を `engine.ts` の `applyItem()` に追加する。毎フレーム `collectItems()` が判定し、取得したものを配列から除く
+4. **描画する**：描画関数（`item-renderer.ts` など）を作り、`render()` の `items` ループから呼ぶ。`it.x` / `it.y` は毎フレーム Canvas 座標に更新済み。`wobble` で上下のふわふわ揺れを付けられる
 
 ---
 
@@ -284,31 +261,41 @@ for (const it of this.items) {
 
 ```typescript
 interface Obstacle {
-  shape: 'gear' | 'bolt' | /* ... */ | 'new_shape'
+  shape:
+       // 機械工学科
+       | 'wrench' | 'spring' | /* ... */ | 'new_shape'
 }
 ```
 
 ### 2. `drawObstacle()` に描画処理を追加（`obstacle-drawers.ts`）
 
 ```typescript
-const drawFns: Record<Shape, DrawFn> = {
+export const OBSTACLE_DRAWERS: Record<Obstacle['shape'], ObstacleDrawFn> = {
   // ...既存...
-  new_shape: (ctx, o, theme) => {
-    // Canvas API で描画
-  },
+  new_shape: dNewShape,  // (ctx, o, theme, frame) => void
 }
 ```
 
+`Record` なので、`shape` に追加して描画関数を登録し忘れると型エラーになります。
+
 ### 3. スポーン関数で使用（`spawner.ts`）
+
+学科ごとのパターンは `SpawnFn` の配列にまとめ、`ShuffleBag` で偏りなく順番に出します（機械＝`dept1Spawners`、電気電子＝`dept2Spawners`、電子情報＝`dept3RedSpawners`。材料工学科は時間キュー基準で `hot_ingot` をスポーン）。
+バッグの残りと乱数は `Spawner` クラス（エンジンごとに1つ）が持ちます。乱数は引数の `rand()` を使い、`Math.random()` は使いません。
 
 ```typescript
 // push(o) は o.x の Canvas オフセット（CANVAS_W+10 基準）を stageX に変換して登録する
 // groundY は地形の高さ（段差上なら DEFAULT_GROUND_Y より小さい値が渡る）
-function spawnDept1(push: (o: ObstacleInit) => void, groundY: number) {
-  const h = 50
-  push({ x: CANVAS_W + 10, y: groundY - h, w: 35, h, shape: 'new_shape' })
-}
+const dept1Spawners: SpawnFn[] = [
+  // ...既存...
+  (push, groundY, rand) => {
+    const h = 44 + rand() * 12
+    push({ x: CANVAS_W + 10, y: groundY - h, w: 35, h, shape: 'new_shape' })
+  },
+]
 ```
+
+追加したら `npm run test:autoplay` で全学科が最後まで走り切れる（詰まない）ことを確かめる。
 
 複合障害物の場合は `x` に異なる offset を渡すことで正しい間隔に配置される：
 
@@ -363,6 +350,24 @@ export const BATTERY_GAP: [number, number] = [110, 80]  // 電池スポーン間
 > **バランス調整の指針**: 「電池をほぼ全部拾えばギリギリ完走できる」密度を狙う。
 > `STAGE_LENGTH` を本番（70000）に戻した際は `BATTERY_GAP` / `CHARGE_DRAIN` の再調整が必要。
 
+### 電子情報・生物応化・材料
+
+- 電子情報（dept 3）：`COMBO_NEEDED` / `DEBUG_FRAMES` / `DEBUG_SPEED_MULT` / `STOMP_*` / `MALLOC_*`
+- 生物応化（dept 4）：`SWIM_*` / `BIO_GAP` / `BIO_SPEED_*` / `SHIELD_GAP`（[doc/design_bio.md](design_bio.md)）
+- 材料（dept 5）：`FORGE_*` / `MAT_*`（調整のポイントは [doc/design_mat.md](design_mat.md)）
+
+### テスト用に STAGE_LENGTH を縮める
+
+動作確認では `STAGE_LENGTH` を一時的に `15000`（約30秒）にしてよい。**`6000` は12秒でクリアになるので使わない。** コミット・マージ前に必ず `70000` に戻す。材料工学科の区間も比率で決まるので、縮めても全区間を確認できる。
+
+> 縮めたままだとクリアタイムがサーバーの下限（`lib/game/limits.ts` の `MIN_CLEAR_TIME_MS`）を下回るので、**登録は「クリアタイムが正しくありません」で失敗する**（正常な動作）。
+> 70000 のまま画面だけ確かめたいときは、E2E 用ビルド（`NEXT_PUBLIC_E2E=1`）で `window.__kosendash.engine` の `stageProgress` を書き換えてワープできる。
+
+### 速度・ステージ長・加速倍率を変えたら
+
+学科ごとの最短タイム（不正判定の下限）が変わる。`npm test` の `limits.test.ts` が落ちたら、
+`lib/game/limits.ts` の `MIN_CLEAR_TIME_MS` と、DB関数 `min_clear_time_ms()`（新しいマイグレーションを作って両方のDBに適用）を直す。
+
 ### 穴落下・段差の閾値（`engine.ts` 内）
 
 ```typescript
@@ -382,6 +387,19 @@ CANVAS_H + 60          // = 340px
 
 ---
 
+## 自動プレイで確かめる
+
+`lib/game/autopilot.ts` のボットで、ステージを最後まで走らせてクリアタイムを測れる（[doc/testing.md](testing.md)）。
+
+```bash
+npm run autoplay:report -- 5 4      # 生物応化を5回（シード違い）自動プレイ
+npm run test:autoplay               # 全学科を各2回。詰んだら失敗する
+```
+
+ボットは人間より上手いとは限らないので、絶対値ではなく「変更前後の差」「学科どうしの差」を見る目安にする。
+
+---
+
 ## よくあるトラブル
 
 ### ゲームが重い（フレームレートが低い）
@@ -393,26 +411,28 @@ CANVAS_H + 60          // = 340px
 
 ### クリアタイムが登録されない
 
-1. ブラウザの DevTools → **Network タブ**で `POST /api/stage-clears` のレスポンスを確認
-2. **HTTP 500 "missing Supabase env vars"** の場合:
+1. ブラウザの DevTools → **Network タブ**で `POST /api/runs`（スタート時）と `POST /api/stage-clears`（クリア時）のレスポンスを確認。
+   `code` で原因がわかる（`invalid_time`＝タイムが学科の下限未満、`time_mismatch`＝開始からの経過時間と合わない、
+   `nickname_rejected`＝NGワード、`run_not_found`＝スタート時の通信に失敗していた など。一覧は [doc/database.md](database.md)）
+2. **HTTP 500 "Missing Supabase server env vars"** の場合:
    - Vercel ダッシュボード → Settings → Environment Variables を開く
-   - `NEXT_PUBLIC_SUPABASE_URL` と `NEXT_PUBLIC_SUPABASE_ANON_KEY` が **All Environments** になっているか確認
-   - Production のみだと Preview（dev ブランチ）では動かない
+   - `NEXT_PUBLIC_SUPABASE_URL` と `NEXT_PUBLIC_SUPABASE_ANON_KEY` が、エラーの出た環境（Production / Preview / Development）に設定されているか確認
+   - Production にしかないと Preview（dev ブランチ）では動かない。Preview と Development には開発DB（`kosendash-dev`）の値を入れる（本番DBの値は入れない）
    - 変更後は必ず**再デプロイ**が必要（`NEXT_PUBLIC_*` はビルド時に埋め込まれるため）
-3. **HTTP 500 その他** の場合: Supabase ダッシュボードの **Logs** でエラーを確認
-4. RLS ポリシーの確認:
+3. **HTTP 500 その他** の場合:
+   - まず Supabase プロジェクトが一時停止（INACTIVE）していないか確認する。Free プランは約7日アクセスがないと止まる（Cron ウォームアップで防いでいるが、止まったらダッシュボードの Restore で復旧）
+   - Vercel のランタイムログに `Invalid API key` が出ていたら、その環境の `NEXT_PUBLIC_SUPABASE_ANON_KEY` が正しいか確認する
+   - それ以外は Supabase ダッシュボードの **Logs** でエラーを確認
+4. DB にマイグレーションが当たっているかの確認:
    ```sql
-   SELECT policyname, cmd FROM pg_policies WHERE tablename = 'stage_clears';
-   -- SELECT と INSERT の両方のポリシーが存在すること
+   select to_regclass('public.runs');                     -- runs テーブルがあること
+   select proname from pg_proc where proname in ('start_run', 'submit_clear', 'get_leaderboard');
    ```
 
 ### ランキングが表示されない
 
 1. `GET /api/leaderboard?department=N` のレスポンスを確認
-2. Supabase の RLS ポリシーが正しく設定されているか確認:
-   ```sql
-   SELECT * FROM pg_policies WHERE tablename = 'stage_clears';
-   ```
+2. DB関数 `get_leaderboard()` があるか確認（上と同じ SQL）
 3. `NEXT_PUBLIC_SUPABASE_URL` と `NEXT_PUBLIC_SUPABASE_ANON_KEY` が正しいか確認
 
 ### Vercel Preview デプロイの注意事項

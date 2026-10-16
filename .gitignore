@@ -25,4 +25,8 @@ Thumbs.db
 # Editor
 .vscode/
 .idea/
-.vercel
+
+# Tests
+/test-results/
+/playwright-report/
+/blob-report/

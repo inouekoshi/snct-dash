@@ -1,6 +1,6 @@
 import type { AreaId } from './areas'
 import { AREAS } from './areas'
-import { DEFAULT_GROUND_Y, PLAYER_X, STAGE_LENGTH } from './constants'
+import { DEFAULT_GROUND_Y, CANVAS_H, PLAYER_X, STAGE_LENGTH } from './constants'
 
 type Theme = typeof AREAS[AreaId]
 
@@ -14,10 +14,12 @@ export function drawGoal(
   const canvasX = PLAYER_X + (STAGE_LENGTH - stageProgress)
   if (canvasX > 900 || canvasX < -100) return
 
+  // 生物応用化学科（液体スイム）は地面がなくタンク底面（CANVAS_H - 4）が足場となる
+  const groundY = areaId === 4 ? CANVAS_H - 4 : DEFAULT_GROUND_Y
   const poleTop = 15
   const baseH = 12, baseW = 28
   const poleW = 7
-  const poleH = DEFAULT_GROUND_Y - baseH - poleTop
+  const poleH = groundY - baseH - poleTop
 
   const dist = Math.max(0, STAGE_LENGTH - stageProgress)
   const proximity = Math.max(0, 1 - dist / 750)
@@ -32,8 +34,8 @@ export function drawGoal(
   ctx.fillStyle = theme.obstacleStroke
   ctx.strokeStyle = theme.groundLineColor
   ctx.lineWidth = 1.5
-  ctx.fillRect(canvasX - baseW / 2, DEFAULT_GROUND_Y - baseH, baseW, baseH)
-  ctx.strokeRect(canvasX - baseW / 2, DEFAULT_GROUND_Y - baseH, baseW, baseH)
+  ctx.fillRect(canvasX - baseW / 2, groundY - baseH, baseW, baseH)
+  ctx.strokeRect(canvasX - baseW / 2, groundY - baseH, baseW, baseH)
 
   // ポール
   ctx.lineWidth = 1
