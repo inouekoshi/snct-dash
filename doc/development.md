@@ -77,7 +77,7 @@ y (280)
 overlaps(ph, { x: o.x + 4, y: o.y + 4, w: o.w - 8, h: o.h - 8 })
 ```
 
-プレイヤーの判定ボックスは `playerHitbox(py, h = 46)` です。材料工学科だけ、工程に応じて高さ `h` を変えます（液滴34／薄板22／金属片40、`MAT_HITBOX_H`）。
+プレイヤーの判定ボックスは `playerHitbox(py, h = 46)` です。
 アイテムとの判定も AABB で、ボックスは `itemHitbox(item)`（`helpers.ts`）が種類ごとに返します。
 
 ---
@@ -349,11 +349,11 @@ export const BATTERY_GAP: [number, number] = [110, 80]  // 電池スポーン間
 
 - 電子情報（dept 3）：`COMBO_NEEDED` / `DEBUG_FRAMES` / `DEBUG_SPEED_MULT` / `STOMP_*` / `MALLOC_*`
 - 生物応化（dept 4）：`SWIM_*` / `BIO_GAP` / `BIO_SPEED_*` / `SHIELD_GAP`（[doc/design_bio.md](design_bio.md)）
-- 材料（dept 5）：`MAT_*` / `HEAT_*` / `MELT_BOUNCE_VY` / `ROLL_GAP`（調整のポイントは [doc/design_mat.md](design_mat.md)）
+- 材料（dept 5）：`FORGE_*` / `MAT_*`（調整のポイントは [doc/design_mat.md](design_mat.md)）
 
 ### テスト用に STAGE_LENGTH を縮める
 
-動作確認では `STAGE_LENGTH` を一時的に `15000`（約30秒）にしてよい。**`6000` は12秒でクリアになるので使わない。** コミット・マージ前に必ず `70000` に戻す。材料工学科の工程の区間は比率で決まるので、縮めても4工程すべて確認できる。
+動作確認では `STAGE_LENGTH` を一時的に `15000`（約30秒）にしてよい。**`6000` は12秒でクリアになるので使わない。** コミット・マージ前に必ず `70000` に戻す。材料工学科の区間も比率で決まるので、縮めても全区間を確認できる。
 
 > 縮めたままだとクリアタイムがサーバーの下限（`lib/game/limits.ts` の `MIN_CLEAR_TIME_MS`）を下回るので、**登録は「クリアタイムが正しくありません」で失敗する**（正常な動作）。
 > 70000 のまま画面だけ確かめたいときは、E2E 用ビルド（`NEXT_PUBLIC_E2E=1`）で `window.__kosendash.engine` の `stageProgress` を書き換えてワープできる。
