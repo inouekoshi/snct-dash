@@ -6,12 +6,11 @@
 |---------|------|-------|-------|
 | `20260511000000_init_schema.sql` | `stage_clears` テーブル（初期） | ✅ | ✅ |
 | `20261013000100_runs_anticheat_leaderboard.sql` | `runs`・NGワード・DB関数・analytics ビュー | ✅ 2026-10-13 | ✅ 2026-10-13 |
-| `20261013000200_lockdown_direct_insert.sql` | `stage_clears` への直接 INSERT を禁止 | ✅ 2026-10-13 | ⏳ **main に新コードをデプロイした直後に適用** |
+| `20261013000200_lockdown_direct_insert.sql` | `stage_clears` への直接 INSERT を禁止 | ✅ 2026-10-13 | ✅ 2026-10-16（本番リリース時に適用完了） |
 | `20261013000300_archive_legacy_scores.sql` | 旧 `scores` テーブルを `archive` スキーマへ退避 | ✅ 2026-10-13 | ✅ 2026-10-13 |
 | `20261013000400_review_fixes.sql` | 順位の数え方の統一・隠した名前の再登録・通信遅れの補正・直接呼び出しの制限 | ✅ 2026-10-13 | ✅ 2026-10-13 |
 
-> ⚠ `..._200_lockdown` を本番に先に当てると、旧コード（直接 INSERT する API）の本番でクリア登録が失敗する。
-> 手順は [doc/operations.md の「本番リリース手順」](operations.md#本番リリース手順dev--main)。
+> 本番への新コードデプロイに伴い、`..._200_lockdown`（および材料工学科の最短下限タイム更新）は 2026-10-16 に本番DBへ適用済み。手順の履歴は [doc/operations.md の「本番リリース手順」](operations.md#本番リリース手順dev--main)。
 
 ## テーブル
 

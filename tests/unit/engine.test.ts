@@ -39,6 +39,8 @@ describe('GameEngine（ロジック）', () => {
     const e = new GameEngine(null, 2, noop, { seed: 1, silent: true })
     for (let i = 0; i < 60 * 12; i++) e.step()
     expect(e.snapshot.missCount).toBeGreaterThan(0)
+    // ミス中（ヒットストップ・MISSオーバーレイ）もタイマーが進むため、総ステップ数 × STEP_MS と一致する
+    expect(e.snapshot.elapsedMs).toBeCloseTo(60 * 12 * STEP_MS, 4)
   })
 
   it('生物応化：浮上し続けると天井にぶつかってミスになる', () => {

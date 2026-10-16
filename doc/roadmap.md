@@ -118,6 +118,7 @@
 | **5-3** | 運営引き継ぎ | 来場者への案内文・よくある質問・連絡フロー・体制と当番表枠組み（[doc/operations.md](operations.md)） | 🔄 [#7](https://github.com/inouekoshi/snct-dash/issues/7) |
 | **5-4** | 利用規約の確認 | 学生個人の非商用・無料作品として現状維持（Hobbyプラン継続）を決定 | ✅ 2026-10-16 [#5](https://github.com/inouekoshi/snct-dash/issues/5) |
 | **5-5** | 後片付け | 旧 `scores` は archive へ退避済み。Vercel の不要な環境変数は3環境すべてから削除完了 | ✅ 2026-10-16 [#12](https://github.com/inouekoshi/snct-dash/issues/12) ✅ [#13](https://github.com/inouekoshi/snct-dash/issues/13) |
+| **5-6** | 本番リリース | PR #17 を main へマージ・Vercel 本番デプロイ・本番DBへ lockdown と材料工学科下限タイム（80秒）を適用完了 | ✅ 2026-10-16 [#1](https://github.com/inouekoshi/snct-dash/issues/1) |
 
 ---
 
@@ -131,13 +132,12 @@
 
 ## 残タスク（2026-10-16 時点）
 
-コードで対応できるものは実装とテストを終えて dev に入れてある。残りは、実機で触る・判断する・リリースするといった人の作業だけ。全体のまとめは [#14](https://github.com/inouekoshi/snct-dash/issues/14)。
+コードの実装・テスト・本番デプロイ（main マージおよび本番DB lockdown）は完了した。残りは、実機で触る・判断する・当日の運用準備を行う人の作業だけ。全体のまとめは [#14](https://github.com/inouekoshi/snct-dash/issues/14)。
 
 | 期限 | 作業 | Issue |
 |------|------|-------|
 | 〜10/20 | iPhone / Android の実機で全5学科をプレイする（手触りと性能） | [#2](https://github.com/inouekoshi/snct-dash/issues/2)・[#4](https://github.com/inouekoshi/snct-dash/issues/4) |
 | 〜10/20 | 生物応化のクリアタイム（約2分半）を短くするか決める（実機確認時に判断） | [#16](https://github.com/inouekoshi/snct-dash/issues/16) |
-| 〜10/27 | dev を main へマージし、デプロイ直後に本番DBへ lockdown と材料工学科下限タイム更新を適用する | [#1](https://github.com/inouekoshi/snct-dash/issues/1) |
 | 〜11/1 | 当番表の最終確認、当日のリハーサル | [#7](https://github.com/inouekoshi/snct-dash/issues/7) |
 
 ---
