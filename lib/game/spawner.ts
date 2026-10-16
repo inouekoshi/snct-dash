@@ -243,17 +243,16 @@ export class Spawner {
     } else {
       this.forgeQueue = [
         { remaining: FORGE_TUTORIAL_DELAY, tutorial: true },
-        { remaining: FORGE_TUTORIAL_DELAY + 70, tutorial: true },
-        { remaining: FORGE_TUTORIAL_DELAY + 135 },
-        { remaining: FORGE_TUTORIAL_DELAY + 200 },
-        { remaining: FORGE_TUTORIAL_DELAY + 265 },
+        { remaining: FORGE_TUTORIAL_DELAY + 90, tutorial: true },
+        { remaining: FORGE_TUTORIAL_DELAY + 180 },
+        { remaining: FORGE_TUTORIAL_DELAY + 260 },
       ]
       this.forgeZone = 0
       this.forgeWaitFrames = 0
-      this.forgeBag0 = new ShuffleBag<ForgePattern>(['single', 'single', 'single', 'double', 'rest'])
-      this.forgeBag1 = new ShuffleBag<ForgePattern>(['single', 'single', 'double', 'double', 'rest'])
-      this.forgeBag2 = new ShuffleBag<ForgePattern>(['single', 'double', 'double', 'triple', 'rest'])
-      this.forgeBag3 = new ShuffleBag<ForgePattern>(['double', 'triple', 'triple', 'triple', 'rest'])
+      this.forgeBag0 = new ShuffleBag<ForgePattern>(['single', 'single', 'rest', 'rest'])
+      this.forgeBag1 = new ShuffleBag<ForgePattern>(['single', 'single', 'double', 'rest', 'rest'])
+      this.forgeBag2 = new ShuffleBag<ForgePattern>(['single', 'double', 'double', 'triple', 'rest', 'rest'])
+      this.forgeBag3 = new ShuffleBag<ForgePattern>(['single', 'double', 'double', 'triple', 'rest', 'rest'])
     }
   }
 
@@ -358,10 +357,10 @@ export class Spawner {
         : this.forgeBag3
 
       const pattern = bag.next(this.rand)
-      let gap = 50 + this.rand() * 20
-      if (newZone === 1) gap = 40 + this.rand() * 20
-      else if (newZone === 2) gap = 34 + this.rand() * 16
-      else if (newZone === 3) gap = ratio > 0.9 ? 22 + this.rand() * 10 : 30 + this.rand() * 14
+      let gap = 75 + this.rand() * 30
+      if (newZone === 1) gap = 60 + this.rand() * 25
+      else if (newZone === 2) gap = 50 + this.rand() * 20
+      else if (newZone === 3) gap = ratio > 0.9 ? 34 + this.rand() * 14 : 45 + this.rand() * 18
 
       const lastRemaining = this.forgeQueue.length > 0
         ? this.forgeQueue[this.forgeQueue.length - 1].remaining
@@ -378,7 +377,7 @@ export class Spawner {
         this.forgeQueue.push({ remaining: baseTime + FORGE_CHAIN_GAP })
         this.forgeQueue.push({ remaining: baseTime + FORGE_CHAIN_GAP * 2 })
       } else if (pattern === 'rest') {
-        this.forgeWaitFrames = 40 + Math.floor(this.rand() * 21)
+        this.forgeWaitFrames = 55 + Math.floor(this.rand() * 25)
       }
     }
 

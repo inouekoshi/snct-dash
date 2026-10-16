@@ -3,7 +3,7 @@ import { GameEngine } from '@/lib/game/engine'
 import { Autopilot } from '@/lib/game/autopilot'
 import {
   STAGE_LENGTH, SPEED_START, SPEED_END, PLAYER_X, FORGE_RING_OFFSET,
-  FORGE_COOLDOWN, MAT_BOOST_MAX, FORGE_GOOD_EARLY,
+  FORGE_COOLDOWN, MAT_BOOST_MAX, FORGE_GOOD_EARLY, FORGE_COMBO_BONUS_MS,
 } from '@/lib/game/constants'
 
 const noop = () => {}
@@ -121,7 +121,7 @@ describe('鍛えてカン！（学科5）', () => {
     expect(spam.snapshot.stageProgress).toBeLessThan(normal.snapshot.stageProgress)
   }, 120_000)
 
-  it('クリア時に最大コンボ数に応じたボーナス（1コンボあたり100ms）が差し引かれる', async () => {
+  it('クリア時に最大コンボ数に応じたボーナス（1コンボあたり FORGE_COMBO_BONUS_MS ms）が差し引かれる', async () => {
     let result: import('@/lib/types').GameClearResult | null = null
     const engine = new GameEngine(null, 5, (r) => { result = r }, { seed: 5, silent: true })
     // チュートリアル2回叩く
@@ -142,8 +142,9 @@ describe('鍛えてカン！（学科5）', () => {
     await new Promise(r => setTimeout(r, 900))
     expect(result).not.toBeNull()
     expect(result!.maxCombo).toBe(2)
-    expect(result!.bonusMs).toBe(200)
+    const expectedBonus = 2 * FORGE_COMBO_BONUS_MS
+    expect(result!.bonusMs).toBe(expectedBonus)
     expect(result!.rawTimeMs).toBeGreaterThan(0)
-    expect(result!.timeMs).toBe(result!.rawTimeMs! - 200)
+    expect(result!.timeMs).toBe(result!.rawTimeMs! - expectedBonus)
   })
 })

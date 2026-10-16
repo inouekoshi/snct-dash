@@ -92,6 +92,6 @@ export const FORGE_ZONE_CUTIN: readonly (readonly [string, string])[] = [
   ['熱処理で鍛え上げろ！', '2連・3連のリズムに乗れ'],
   ['白熱の最終区間！', '最後まで叩ききれ'],
 ]
-export const FORGE_COMBO_BONUS_MS  = 100 // 1コンボあたりのクリアタイム短縮ボーナス（ms）
-export const FORGE_MAX_COMBO_ESTIMATE = 173 // 理論最短タイム計算用の最大コンボ推定値
+export const FORGE_COMBO_BONUS_MS  = 140 // 1コンボあたりのクリアタイム短縮ボーナス（ms）
+export const FORGE_MAX_COMBO_ESTIMATE = 122 // 理論最短タイム計算用の最大コンボ推定値
 
