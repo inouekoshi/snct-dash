@@ -23,11 +23,29 @@
 1. dev のプレビュー（`https://kosendash-git-dev-koshiinoues-projects.vercel.app`）で全5学科をプレイし、クリア登録・順位・ランキング・シェアを確認する
 2. `lib/game/constants.ts` の `STAGE_LENGTH` が **70000** であることを確認する
 3. dev → main をマージ（GitHub で PR を作ってマージ）。Vercel が本番を自動デプロイする
-4. **デプロイが終わったら、本番DB に lockdown を適用する**（Supabase ダッシュボード → 本番 `kosendash` → SQL Editor）：
+4. **デプロイが終わったら、本番DB に lockdown と材料工学科下限タイム更新を適用する**（Supabase ダッシュボード → 本番 `kosendash` → SQL Editor）：
 
    ```sql
+   -- 直接 INSERT の禁止
    alter policy "API can insert stage_clears" on public.stage_clears with check (false);
    alter policy "API can insert stage_clears" on public.stage_clears rename to "No direct insert (use submit_clear)";
+
+   -- 材料工学科の最短下限タイム更新（80秒）
+   create or replace function public.min_clear_time_ms(p_department int)
+   returns int
+   language sql
+   immutable
+   parallel safe
+   as $$
+     select case p_department
+       when 1 then 100000
+       when 2 then 100000
+       when 3 then 59000
+       when 4 then 144000
+       when 5 then 80000
+       else 60000
+     end;
+   $$;
    ```
 
 5. 本番で1回クリアして、登録・順位・ランキングが出ることを確認する
