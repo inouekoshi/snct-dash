@@ -122,7 +122,7 @@ export class Autopilot {
     if (end.cleared) score += 10000
     if (start.departmentId === 2) score += end.charge * 12 // 充電を保つ
     if (start.departmentId === 3 && end.debugMode > 0) score += 200
-    if (start.departmentId === 5) score += end.forgeTier * 40 // PERFECT で速くなるほうを選ぶ
+    if (start.departmentId === 5) score += end.forgeCombo * 20 // 叩いてコンボをつなぐほうを選ぶ
     return score
   }
 }

@@ -7,8 +7,8 @@ import { AREAS } from './areas'
 import type { Obstacle } from './engine-types'
 import { rrect } from './helpers'
 import {
-  CANVAS_W, CANVAS_H, DEFAULT_GROUND_Y, PLAYER_X, STAGE_LENGTH,
-  FORGE_RING_OFFSET, FORGE_RING_R, FORGE_SPAWN_DIST, FORGE_SWING_FRAMES, FORGE_TIER_COLORS, FORGE_TIER_MAX,
+  CANVAS_W, CANVAS_H, DEFAULT_GROUND_Y, PLAYER_X,
+  FORGE_RING_OFFSET, FORGE_RING_R, FORGE_SPAWN_DIST, FORGE_SWING_FRAMES,
 } from './constants'
 
 type Theme = typeof AREAS[AreaId]
@@ -16,8 +16,6 @@ export type ForgeJudge = 'perfect' | 'good' | 'early' | 'late'
 
 const RING_X = PLAYER_X + FORGE_RING_OFFSET
 const RING_Y = DEFAULT_GROUND_Y - 20
-// 区間ごとの炉の色（区間の切り替わりが色で分かるようにする）
-const ZONE_FURNACE = ['#ff4a3a', '#ff8a2a', '#ffd23a', '#ffffff']
 
 // 原子1個（分子模型の球）。ハイライト付き。
 function atom(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, color: string) {
@@ -38,17 +36,8 @@ function hash(n: number): number {
   return s - Math.floor(s)
 }
 
-// ── 背景：「材料の宇宙」の星とオーロラに、炉を足す ─────────────────────────────────────
-// 炉の火は、次の塊が輪に届くのに合わせて明るくなる（pulse が 1 になる瞬間に最大）。
-// 最高速（段階4）では背景に流線を入れる。
-export function bgMat(
-  ctx: CanvasRenderingContext2D, theme: Theme, bgX: number, frame: number, stageProgress: number,
-  forge?: { tier: number; pulse: number },
-) {
-  const tier = forge?.tier ?? 0
-  const pulse = forge?.pulse ?? 0
-  const zone = Math.min(3, Math.floor(Math.min(1, stageProgress / STAGE_LENGTH) * 4))
-
+// ── 背景：「材料の宇宙」の星とオーロラ ──────────────────────────────────────────
+export function bgMat(ctx: CanvasRenderingContext2D, bgX: number, frame: number) {
   // 星（電子顕微鏡で見た金属表面）：奥に流れる
   for (let i = 0; i < 60; i++) {
     const sx = ((hash(i) * CANVAS_W * 2 + bgX * (0.05 + hash(i + 7) * 0.08)) % (CANVAS_W * 2) + CANVAS_W * 2) % (CANVAS_W * 2) - CANVAS_W * 0.5
@@ -72,49 +61,6 @@ export function bgMat(
     ctx.stroke()
   }
   ctx.globalAlpha = 1
-
-  // 炉：右奥に置く。火の明るさは pulse で変わる
-  const fc = ZONE_FURNACE[zone]
-  const fx = 610, fy = DEFAULT_GROUND_Y - 96, fw = 150, fh = 96
-  const glow = 0.25 + 0.75 * pulse
-  const g = ctx.createRadialGradient(fx + fw / 2, fy + fh * 0.6, 8, fx + fw / 2, fy + fh * 0.6, 150)
-  g.addColorStop(0, fc); g.addColorStop(1, 'rgba(0,0,0,0)')
-  ctx.globalAlpha = 0.12 + 0.35 * pulse
-  ctx.fillStyle = g
-  ctx.fillRect(fx - 120, fy - 90, fw + 240, fh + 120)
-  ctx.globalAlpha = 1
-  ctx.fillStyle = '#241028'
-  rrect(ctx, fx, fy, fw, fh, 10); ctx.fill()
-  ctx.strokeStyle = '#4a2a52'; ctx.lineWidth = 3
-  rrect(ctx, fx, fy, fw, fh, 10); ctx.stroke()
-  // 炉の口（ここが脈動する）
-  const mx = fx + 24, my = fy + 28, mw = fw - 48, mh = fh - 40
-  ctx.shadowColor = fc; ctx.shadowBlur = 8 + 22 * pulse
-  ctx.globalAlpha = glow
-  ctx.fillStyle = fc
-  rrect(ctx, mx, my, mw, mh, 8); ctx.fill()
-  ctx.shadowBlur = 0
-  ctx.globalAlpha = Math.min(1, glow + 0.2)
-  ctx.fillStyle = '#fff4c8'
-  const flick = Math.sin(frame * 0.35) * 3
-  rrect(ctx, mx + 12, my + 12 - flick * 0.5, mw - 24, mh - 20 + flick, 6); ctx.fill()
-  ctx.globalAlpha = 1
-  // 煙突
-  ctx.fillStyle = '#241028'
-  ctx.fillRect(fx + fw - 38, fy - 30, 22, 32)
-
-  // 最高速：流線
-  if (tier >= FORGE_TIER_MAX) {
-    ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 2
-    for (let i = 0; i < 9; i++) {
-      const y = 40 + hash(i + 11) * (DEFAULT_GROUND_Y - 60)
-      const len = 60 + hash(i + 5) * 90
-      const x = ((hash(i + 2) * CANVAS_W * 1.5 - frame * (22 + hash(i) * 12)) % (CANVAS_W * 1.5) + CANVAS_W * 1.5) % (CANVAS_W * 1.5) - 100
-      ctx.globalAlpha = 0.25 + 0.3 * hash(i + 9)
-      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + len, y); ctx.stroke()
-    }
-    ctx.globalAlpha = 1
-  }
 }
 
 // ── 地面：整列した結晶格子（ボール＆スティック）。上の線は炉の熱でほんのり赤い ───────────
@@ -195,7 +141,7 @@ function drawPlate(ctx: CanvasRenderingContext2D, o: Obstacle) {
 // 予告の輪は塊の中心のまわりに描き、塊が輪に近づくほど縮む（距離で縮めるので、速度が変わってもずれない）。
 export function drawForgeRings(
   ctx: CanvasRenderingContext2D, obstacles: readonly Obstacle[], holding: boolean,
-  arrival: number, tier: number, frame: number,
+  arrival: number, frame: number,
 ) {
   ctx.save()
   // 予告の輪
@@ -214,7 +160,7 @@ export function drawForgeRings(
   const near = Number.isFinite(arrival) ? Math.max(0, 1 - arrival / 12) : 0
   const blink = holding ? 0.5 + 0.5 * Math.sin(frame * 0.5) : 0
   ctx.globalAlpha = Math.min(1, 0.45 + 0.4 * near + 0.4 * blink)
-  ctx.strokeStyle = tier >= 3 ? FORGE_TIER_COLORS[tier] : '#ffffff'
+  ctx.strokeStyle = '#ffffff'
   ctx.shadowColor = '#ffffff'; ctx.shadowBlur = 6 + 10 * near + 10 * blink
   ctx.lineWidth = 4
   ctx.beginPath(); ctx.arc(RING_X, RING_Y, FORGE_RING_R, 0, Math.PI * 2); ctx.stroke()
@@ -231,7 +177,6 @@ export function drawForgeRings(
 export interface ForgeHammerState {
   py: number
   swingTimer: number
-  tier: number
   frame: number
 }
 
@@ -266,7 +211,6 @@ export function drawForgeHammer(ctx: CanvasRenderingContext2D, s: ForgeHammerSta
   ctx.fillRect(0, -2.5, 28, 5)
   const hg = ctx.createLinearGradient(0, -17, 0, 17)
   hg.addColorStop(0, '#e6ebf2'); hg.addColorStop(0.5, '#a0abba'); hg.addColorStop(1, '#5d6573')
-  if (s.tier >= 3) { ctx.shadowColor = FORGE_TIER_COLORS[s.tier]; ctx.shadowBlur = 10 }
   ctx.fillStyle = hg
   rrect(ctx, L - 12, -17, 24, 34, 4); ctx.fill()
   ctx.shadowBlur = 0
@@ -275,13 +219,11 @@ export function drawForgeHammer(ctx: CanvasRenderingContext2D, s: ForgeHammerSta
   ctx.restore()
 }
 
-// ── HUD：判定の文字・連続回数・速度段階・チュートリアル ───────────────────────────────────
+// ── HUD：判定の文字・連続回数・チュートリアル ──────────────────────────────────────────
 export interface ForgeHudState {
-  tier: number
   combo: number
   judge: ForgeJudge | null
   judgeTimer: number
-  tierFlash: number
   frame: number
   hint: boolean
   holding: boolean
@@ -295,29 +237,16 @@ const JUDGE_TEXT: Record<ForgeJudge, { text: string; size: number; color: string
 }
 
 export function drawForgeHud(ctx: CanvasRenderingContext2D, v: ForgeHudState) {
-  const tierColor = FORGE_TIER_COLORS[Math.max(0, Math.min(FORGE_TIER_MAX, v.tier))]
   ctx.save()
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
 
-  // 速度段階が上がった瞬間：画面のふちを光らせる
-  if (v.tierFlash > 0) {
-    ctx.globalAlpha = (v.tierFlash / 14) * 0.7
-    ctx.strokeStyle = tierColor; ctx.lineWidth = 12
-    ctx.strokeRect(0, 0, CANVAS_W, CANVAS_H)
-    ctx.globalAlpha = 1
-  }
-
-  // 連続回数（親指で隠れない上部の中央）と、速度段階の目盛り
+  // 連続回数（親指で隠れない上部の中央）
   if (v.combo >= 2) {
     ctx.font = 'bold 34px sans-serif'
-    ctx.fillStyle = tierColor; ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.lineWidth = 5
+    ctx.fillStyle = '#ffe04a'; ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.lineWidth = 5
     ctx.strokeText(`${v.combo}`, CANVAS_W / 2, 62); ctx.fillText(`${v.combo}`, CANVAS_W / 2, 62)
     ctx.font = 'bold 12px sans-serif'; ctx.fillStyle = '#ffffff'
     ctx.fillText('れんぞく', CANVAS_W / 2, 86)
-  }
-  for (let i = 0; i < FORGE_TIER_MAX; i++) {
-    ctx.fillStyle = i < v.tier ? tierColor : 'rgba(255,255,255,0.18)'
-    ctx.beginPath(); ctx.arc(CANVAS_W / 2 + (i - (FORGE_TIER_MAX - 1) / 2) * 16, 102, 5, 0, Math.PI * 2); ctx.fill()
   }
 
   // チュートリアル：最初の数個のあいだ「叩くんだ」と伝える

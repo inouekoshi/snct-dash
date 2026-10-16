@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { GameEngine } from '@/lib/game/engine'
 import { Autopilot } from '@/lib/game/autopilot'
 import {
-  STAGE_LENGTH, SPEED_START, SPEED_END, PLAYER_X, FORGE_RING_OFFSET, FORGE_TIER_STEP, FORGE_TIER_MAX,
+  STAGE_LENGTH, SPEED_START, SPEED_END, PLAYER_X, FORGE_RING_OFFSET,
   FORGE_COOLDOWN, MAT_BOOST_MAX, FORGE_GOOD_EARLY,
 } from '@/lib/game/constants'
 
@@ -15,8 +15,7 @@ const firstIngot = (e: GameEngine) => e.snapshot.obstacles.find(o => o.shape ===
 
 function speedOf(e: GameEngine): number {
   const s = e.snapshot
-  const base = SPEED_START + (SPEED_END - SPEED_START) * (s.stageProgress / STAGE_LENGTH)
-  return base * (1 + FORGE_TIER_STEP * s.forgeTier)
+  return SPEED_START + (SPEED_END - SPEED_START) * (s.stageProgress / STAGE_LENGTH)
 }
 
 function tOf(e: GameEngine): number {
@@ -29,14 +28,13 @@ function stepUntil(e: GameEngine, cond: () => boolean, limit = 3000) {
   if (!cond()) throw new Error('条件に届かなかった')
 }
 
-// 最初の2個（チュートリアル）を叩いて、速度段階2・連続2の状態にする
+// 最初の2個（チュートリアル）を叩いて、連続2の状態にする
 function afterTutorial(seed = 5): GameEngine {
   const e = new GameEngine(null, 5, noop, { seed, silent: true })
   for (let n = 1; n <= 2; n++) {
     stepUntil(e, () => tOf(e) <= FORGE_GOOD_EARLY)
     e.step() // 世界を遅くして待つ状態に入る
     e.jump()
-    expect(e.snapshot.forgeTier).toBe(n)
     expect(e.snapshot.forgeCombo).toBe(n)
     // PERFECT のヒットストップと、叩いた塊が離れるのを待つ
     for (let i = 0; i < 4; i++) e.step()
@@ -45,38 +43,36 @@ function afterTutorial(seed = 5): GameEngine {
 }
 
 describe('鍛えてカン！（学科5）', () => {
-  it('速度の上限が MAT_BOOST_MAX と一致する（limits.ts の前提）', () => {
-    expect(1 + FORGE_TIER_STEP * FORGE_TIER_MAX).toBeCloseTo(MAT_BOOST_MAX, 10)
+  it('ブーストなし（MAT_BOOST_MAX = 1.0）であること', () => {
+    expect(MAT_BOOST_MAX).toBe(1.0)
   })
 
-  it('チュートリアルは待って叩けば PERFECT になり、速度段階が上がる', () => {
+  it('チュートリアルは待って叩けば PERFECT になり、塊が板になって連続回数が進む', () => {
     const e = afterTutorial()
-    expect(e.snapshot.forgeTier).toBe(2)
+    expect(e.snapshot.forgeCombo).toBe(2)
   })
 
-  it('GOOD（輪から少しずれた叩き）で速度段階が1つ下がる。連続回数は続く', () => {
+  it('GOOD（輪から少しずれた叩き）でも塊が板になり、連続回数は続く', () => {
     const e = afterTutorial()
     stepUntil(e, () => tOf(e) <= 4.4)
     const t = tOf(e)
     expect(t).toBeGreaterThan(2.5)
     e.jump()
-    expect(e.snapshot.forgeTier).toBe(1)
     expect(e.snapshot.forgeCombo).toBe(3)
   })
 
-  it('PERFECT でさらに段階が上がる', () => {
+  it('PERFECT で叩くと塊が板になり、連続回数が進む', () => {
     const e = afterTutorial()
     stepUntil(e, () => Math.abs(tOf(e)) <= 2)
     e.jump()
-    expect(e.snapshot.forgeTier).toBe(3)
+    expect(e.snapshot.forgeCombo).toBe(3)
   })
 
-  it('「はやい」で速度段階が0に戻り、硬直中のタップは捨てられる', () => {
+  it('「はやい」で硬直が入り、硬直中のタップは捨てられる', () => {
     const e = afterTutorial()
     stepUntil(e, () => tOf(e) <= 12)
     expect(tOf(e)).toBeGreaterThan(FORGE_GOOD_EARLY)
     e.jump()
-    expect(e.snapshot.forgeTier).toBe(0)
     for (let i = 0; i < 3; i++) e.step()
     e.jump() // 硬直中
     expect(firstIngot(e)).toBeDefined()
@@ -86,19 +82,17 @@ describe('鍛えてカン！（学科5）', () => {
     e.jump()
   })
 
-  it('近くに塊がないときのタップは罰なし（速度段階はそのまま）', () => {
+  it('近くに塊がないときのタップは空振り硬直のみでミスにはならない', () => {
     const e = afterTutorial()
     stepUntil(e, () => tOf(e) > 60 && e.snapshot.obstacles.every(o => o.struck || o.x > 700))
     e.jump()
-    expect(e.snapshot.forgeTier).toBe(2)
     expect(e.snapshot.missCount).toBe(0)
   })
 
-  it('叩けなかった塊にぶつかるとノックバックして速度段階0・連続0になる', () => {
+  it('叩けなかった塊にぶつかるとノックバックして連続0になる', () => {
     const e = new GameEngine(null, 5, noop, { seed: 3, silent: true })
     for (let i = 0; i < 600; i++) e.step()
     expect(e.snapshot.missCount).toBeGreaterThan(0)
-    expect(e.snapshot.forgeTier).toBe(0)
     expect(e.snapshot.forgeCombo).toBe(0)
   })
 

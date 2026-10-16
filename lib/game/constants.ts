@@ -74,9 +74,7 @@ export const FORGE_GOOD_EARLY      = 4.5 // GOOD の早い側の端（フレー�
 export const FORGE_GOOD_LATE       = 6.5 // GOOD の遅い側の端（フレーム）
 export const FORGE_EARLY_LIMIT     = 20  // これより遠い塊へのタップは罰なしの空振り（フレーム）
 export const FORGE_COOLDOWN        = 12  // 空振り後の硬直（フレーム）
-export const FORGE_TIER_MAX        = 4   // 速度段階の最大
-export const MAT_BOOST_MAX         = 1.4 // 加速倍率の上限（limits.ts が使用）
-export const FORGE_TIER_STEP       = (MAT_BOOST_MAX - 1) / FORGE_TIER_MAX // 1段あたりの速度倍率の増分（0.1）
+export const MAT_BOOST_MAX         = 1.0 // 加速倍率（ブーストなし＝1.0）
 export const FORGE_HITSTOP         = 2   // PERFECT のヒットストップ（フレーム）
 export const FORGE_SPAWN_DIST      = 560 // 輪の中心から、塊を置く位置（x=845）までの距離（px）
 export const FORGE_CUTIN_FRAMES    = 48  // 区間の切り替わりのカットイン表示時間
@@ -87,13 +85,11 @@ export const FORGE_TUTORIAL_WAIT   = 120 // 最初の2個で待つ最大フレ�
 export const FORGE_RING_R          = 26  // 判定の輪の半径（px）
 export const FORGE_SWING_FRAMES    = 8   // ハンマーを振る動きのフレーム数
 export const FORGE_TUTORIAL_HITS   = 2   // 「タップでたたけ！」を出し続ける、叩いた数の上限
-// 速度段階ごとの見た目の色（0＝赤、1〜2＝オレンジ、3＝黄色、4＝白熱）
-export const FORGE_TIER_COLORS = ['#ff4a3a', '#ff8a2a', '#ff8a2a', '#ffe04a', '#ffffff'] as const
 // 区間の切り替わりのカットイン文言（0〜25%は出さない）
 export const FORGE_ZONE_CUTIN: readonly (readonly [string, string])[] = [
   ['', ''],
-  ['火が入ってきた！', 'ぴったり叩くほど速く走れる'],
-  ['炉が燃えさかる！', '2連・3連のリズムに乗れ'],
+  ['熱気あふれる鍛造ライン！', 'ぴったり叩いて板に仕上げろ'],
+  ['熱処理で鍛え上げろ！', '2連・3連のリズムに乗れ'],
   ['白熱の最終区間！', '最後まで叩ききれ'],
 ]
 

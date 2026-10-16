@@ -15,7 +15,7 @@ import {
   SWIM_THRUST, SWIM_DRAG, SWIM_MAX_VY, BIO_WALL_KNOCKBACK, BIO_SPEED_START, BIO_SPEED_END,
   SHIELD_GAP, SHIELD_COLOR,
   FORGE_RING_OFFSET, FORGE_PERFECT, FORGE_GOOD_EARLY, FORGE_GOOD_LATE, FORGE_SWING_FRAMES,
-  FORGE_EARLY_LIMIT, FORGE_COOLDOWN, FORGE_TIER_MAX, FORGE_TIER_STEP, FORGE_HITSTOP,
+  FORGE_EARLY_LIMIT, FORGE_COOLDOWN, FORGE_HITSTOP,
   FORGE_CUTIN_FRAMES, FORGE_TUTORIAL_SLOW, FORGE_TUTORIAL_WAIT, FORGE_ZONE_CUTIN,
   FORGE_TUTORIAL_HITS,
 } from './constants'
@@ -124,7 +124,6 @@ export class GameEngine {
 
   // 鍛えてカン！（材料工学科 = departmentId 5 のみ稼働）
   private isMat = false
-  private forgeTier = 0              // 速度段階（0〜FORGE_TIER_MAX）
   private forgeCombo = 0             // PERFECT/GOOD の連続回数
   private forgeMaxCombo = 0
   private forgeHits = 0              // 叩いた塊の数（チュートリアルの文字を消す判断に使う）
@@ -132,7 +131,6 @@ export class GameEngine {
   private swingTimer = 0             // ハンマーを振っている残りフレーム
   private judge: ForgeJudge | null = null
   private judgeTimer = 0
-  private tierFlash = 0              // 速度段階が上がった瞬間の縁の光
   private forgeHolding = false       // チュートリアルで世界を遅くして待っているか
   private forgeWait = 0              // 待っているフレーム数
   private shake = 0                  // PERFECT の画面の揺れ
@@ -271,7 +269,6 @@ export class GameEngine {
       items: this.items as readonly Item[],
       charge: this.charge,
       debugMode: this.debugMode,
-      forgeTier: this.forgeTier,
       forgeCombo: this.forgeCombo,
       thrustHeld: this.thrustHeld,
       frame: this.frame,
@@ -335,7 +332,6 @@ export class GameEngine {
     // 材料工学科の演出タイマー（ヒットストップ中も動かして見た目を止めない）
     if (this.swingTimer > 0) this.swingTimer--
     if (this.judgeTimer > 0) this.judgeTimer--
-    if (this.tierFlash > 0) this.tierFlash--
     if (this.shake > 0) this.shake--
 
     // ヒットストップ中はタイマー以外を止める
@@ -622,16 +618,15 @@ export class GameEngine {
     return SPEED_START + (SPEED_END - SPEED_START) * t
   }
 
-  // 材料工学科：速度段階の倍率をかけた速度（チュートリアルの減速をかける前）。
-  // スポーナーが塊を置く位置の計算にも使う。ミス直後の復帰中は他学科と同じ SPEED_START
+  // 材料工学科：速度（チュートリアルの減速をかける前）。ミス直後の復帰中は他学科と同じ SPEED_START
   private get forgeBaseSpeed(): number {
     if (this.revivalTimer > 0) return SPEED_START
-    return this.currentSpeed * (1 + FORGE_TIER_STEP * this.forgeTier)
+    return this.currentSpeed
   }
 
   private get effectiveSpeed(): number {
     if (this.revivalTimer > 0) return this.isBio ? BIO_SPEED_START : SPEED_START
-    // 材料工学科：速度段階の倍率。最初の2個を待つあいだだけ世界を遅くする
+    // 材料工学科：最初の2個を待つあいだだけ世界を遅くする
     if (this.isMat) return this.forgeBaseSpeed * (this.forgeHolding ? FORGE_TUTORIAL_SLOW : 1)
     // デバッグモード中（電子情報）はスクロール加速＝タイム短縮ボーナス
     return this.debugMode > 0 ? this.currentSpeed * DEBUG_SPEED_MULT : this.currentSpeed
@@ -686,9 +681,8 @@ export class GameEngine {
       this.strikeCooldown = FORGE_COOLDOWN
       return
     }
-    // はやい：速度段階を0に戻して硬直
+    // はやい：硬直
     if (tNear > FORGE_GOOD_EARLY) {
-      this.forgeTier = 0
       this.strikeCooldown = FORGE_COOLDOWN
       this.showJudge('early', 30)
       return
@@ -696,7 +690,7 @@ export class GameEngine {
     this.hitIngot(target, Math.abs(tNear) <= FORGE_PERFECT ? 'perfect' : 'good')
   }
 
-  // 塊を叩いて板にする（PERFECT なら段階 +1、GOOD なら段階 -1）
+  // 塊を叩いて板にする
   private hitIngot(o: Obstacle, kind: 'perfect' | 'good') {
     o.struck = true
     o.phase = 0
@@ -708,7 +702,6 @@ export class GameEngine {
     this.forgeMaxCombo = Math.max(this.forgeMaxCombo, this.forgeCombo)
     const cx = o.x + o.w / 2, cy = o.y + o.h / 2
     if (kind === 'perfect') {
-      if (this.forgeTier < FORGE_TIER_MAX) { this.forgeTier++; this.tierFlash = 14 }
       this.hitStopTimer = FORGE_HITSTOP
       this.shake = 6
       this.burst(cx, cy, '#ffe9a0', 18)
@@ -716,7 +709,6 @@ export class GameEngine {
       this.showJudge('perfect', 36)
       this.sfx(playJump)
     } else {
-      this.forgeTier = Math.max(0, this.forgeTier - 1)
       this.burst(cx, cy, '#ff8a2a', 8)
       this.showJudge('good', 26)
       this.sfx(playJump)
@@ -826,8 +818,7 @@ export class GameEngine {
     // スイム（生物応用化学）は上下の慣性をリセットして復帰を安定させる
     // （壁ヒットは updateBio 側で既に 0 にしているが、パイプ衝突経路もここで揃える）
     if (this.isBio) this.pvy = 0
-    // 材料工学科：叩けなかった塊に当たったら、速度段階と連続回数を0に戻す
-    this.forgeTier = 0
+    // 材料工学科：叩けなかった塊に当たったら、連続回数を0に戻す
     this.forgeCombo = 0
     this.forgeHolding = false
     this.forgeWait = 0
@@ -887,9 +878,6 @@ export class GameEngine {
     const bg: BgContext = {
       frame: this.frame, bgX: this.bgX, speed: this.missOverlayTimer > 0 ? 0 : this.effectiveSpeed,
       debug: this.debugMode > 0, stageProgress: this.stageProgress, isBio: this.isBio,
-      forge: this.isMat
-        ? { tier: this.forgeTier, pulse: Number.isFinite(arrival) ? Math.max(0, 1 - arrival / 30) : 0 }
-        : undefined,
     }
 
     ctx.save()
@@ -907,7 +895,7 @@ export class GameEngine {
     drawGoal(ctx, this.departmentId as AreaId, theme, this.stageProgress, this.frame)
 
     for (const o of this.obstacles) drawObstacle(ctx, o, theme, this.frame)
-    if (this.isMat) drawForgeRings(ctx, this.obstacles, this.forgeHolding, arrival, this.forgeTier, this.frame)
+    if (this.isMat) drawForgeRings(ctx, this.obstacles, this.forgeHolding, arrival, this.frame)
 
     for (const it of this.items) {
       if (it.effect === 'charge') drawBattery(ctx, it, theme, this.frame)
@@ -927,21 +915,9 @@ export class GameEngine {
       shield: this.isBio ? this.bioShield : false, frame: this.frame,
       bio: this.isBio,
     }
+    drawPlayer(ctx, theme.coinColor, playerOpts)
     if (this.isMat) {
-      // 最高速（段階4）は残像を付けて速さを見せる
-      if (this.forgeTier >= FORGE_TIER_MAX) {
-        for (let k = 2; k >= 1; k--) {
-          ctx.save()
-          ctx.globalAlpha = 0.22 / k
-          ctx.translate(-14 * k, 0)
-          drawPlayer(ctx, theme.coinColor, playerOpts)
-          ctx.restore()
-        }
-      }
-      drawPlayer(ctx, theme.coinColor, playerOpts)
-      drawForgeHammer(ctx, { py: this.py, swingTimer: this.swingTimer, tier: this.forgeTier, frame: this.frame })
-    } else {
-      drawPlayer(ctx, theme.coinColor, playerOpts)
+      drawForgeHammer(ctx, { py: this.py, swingTimer: this.swingTimer, frame: this.frame })
     }
 
     drawHUD(ctx, theme, {
@@ -958,8 +934,8 @@ export class GameEngine {
 
     if (this.isMat) {
       drawForgeHud(ctx, {
-        tier: this.forgeTier, combo: this.forgeCombo, judge: this.judgeTimer > 0 ? this.judge : null,
-        judgeTimer: this.judgeTimer, tierFlash: this.tierFlash, frame: this.frame,
+        combo: this.forgeCombo, judge: this.judgeTimer > 0 ? this.judge : null,
+        judgeTimer: this.judgeTimer, frame: this.frame,
         hint: this.forgeHits < FORGE_TUTORIAL_HITS, holding: this.forgeHolding,
       })
       if (this.cutinTimer > 0) {
