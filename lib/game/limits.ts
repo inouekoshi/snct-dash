@@ -1,6 +1,7 @@
 import type { AreaId } from './areas'
 import {
   STAGE_LENGTH, SPEED_START, SPEED_END, BIO_SPEED_START, BIO_SPEED_END, DEBUG_SPEED_MULT, MAT_BOOST_MAX,
+  FORGE_COMBO_BONUS_MS, FORGE_MAX_COMBO_ESTIMATE,
 } from './constants'
 
 // クリアタイムの受付範囲。サーバー（API・DB関数）で不正タイムを弾くのに使う。
@@ -14,7 +15,7 @@ export const MIN_CLEAR_TIME_MS: Record<AreaId, number> = {
   2: 100_000, // 電気電子（理論値 約104.8秒）
   3: 59_000,  // 電子情報：ずっとデバッグモード（×1.7）でも約61.7秒
   4: 144_000, // 生物応化：スイムは遅い（理論値 約149.0秒）
-  5: 100_000, // 材料：ブーストなし（理論値 約104.8秒）
+  5: 80_000,  // 材料：等速＋フルコンボボーナス（理論値 約87.5秒）
 }
 
 export const MAX_CLEAR_TIME_MS = 600_000 // 10分
@@ -31,7 +32,11 @@ export function theoreticalMinClearMs(departmentId: AreaId): number {
     progress += (s0 + (s1 - s0) * Math.min(progress / STAGE_LENGTH, 1)) * mult
     frames++
   }
-  return (frames * 1000) / 60
+  const baseMs = (frames * 1000) / 60
+  if (departmentId === 5) {
+    return baseMs - FORGE_MAX_COMBO_ESTIMATE * FORGE_COMBO_BONUS_MS
+  }
+  return baseMs
 }
 
 export function isValidClearTime(departmentId: AreaId, ms: number): boolean {

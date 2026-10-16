@@ -95,7 +95,7 @@
 | # | 施策 | 概要 | 状態 |
 |---|------|------|------|
 | **4-0** | 本番公開 | dev を main へマージし、本番DBに lockdown を適用（[手順](operations.md#本番リリース手順dev--main)） | 🔲 [#1](https://github.com/inouekoshi/snct-dash/issues/1)（実機確認後） |
-| **4-0** | 材料工学科の実機調整 | 等速リズムアクション「鍛えてカン！」仕様へ刷新完了（単体・E2E・自動プレイ約105s確認済み）。手触りは実機で | 🔄 [#2](https://github.com/inouekoshi/snct-dash/issues/2)（実機チェックリスト） |
+| **4-0** | 材料工学科の実機調整 | 等速リズムアクション＋最大コンボボーナス仕様へ刷新完了（単体・E2E・自動プレイ約87s確認済み）。手触りは実機で | 🔄 [#2](https://github.com/inouekoshi/snct-dash/issues/2)（実機チェックリスト） |
 | **4-1** | スパム対策・不正タイム対策 | プレイID（runs）・DB関数での検証（学科ごとの最短タイム・経過時間・1プレイ1登録）・直接INSERT禁止・レート制限・NGワード | ✅ 2026-10-13 [#3](https://github.com/inouekoshi/snct-dash/issues/3) |
 | **4-2** | PWA化 | アイコン・Service Worker（オフラインでも画面を開ける）・マニフェスト | ✅ 2026-10-13 [#9](https://github.com/inouekoshi/snct-dash/issues/9) |
 | **4-3** | リザルト画像シェア | `/r/[id]` ページと OGP 画像（`next/og`）、X / LINE / 端末の共有 | ✅ 2026-10-13 [#10](https://github.com/inouekoshi/snct-dash/issues/10) |

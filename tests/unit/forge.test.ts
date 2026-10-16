@@ -120,4 +120,30 @@ describe('鍛えてカン！（学科5）', () => {
     for (let i = 0; i < frames; i++) { pilot.act(); normal.step() }
     expect(spam.snapshot.stageProgress).toBeLessThan(normal.snapshot.stageProgress)
   }, 120_000)
+
+  it('クリア時に最大コンボ数に応じたボーナス（1コンボあたり100ms）が差し引かれる', async () => {
+    let result: import('@/lib/types').GameClearResult | null = null
+    const engine = new GameEngine(null, 5, (r) => { result = r }, { seed: 5, silent: true })
+    // チュートリアル2回叩く
+    for (let n = 1; n <= 2; n++) {
+      stepUntil(engine, () => tOf(engine) <= FORGE_GOOD_EARLY)
+      engine.step()
+      engine.jump()
+      for (let i = 0; i < 4; i++) engine.step()
+    }
+    expect(engine.snapshot.forgeMaxCombo).toBe(2)
+    // STAGE_LENGTH 手前まで進めてクリアさせる
+    // @ts-expect-error テスト用プロパティ操作
+    engine.stageProgress = STAGE_LENGTH
+    engine.step()
+    expect(engine.snapshot.cleared).toBe(true)
+    // @ts-expect-error finish の直接呼び出し
+    engine.finish()
+    await new Promise(r => setTimeout(r, 900))
+    expect(result).not.toBeNull()
+    expect(result!.maxCombo).toBe(2)
+    expect(result!.bonusMs).toBe(200)
+    expect(result!.rawTimeMs).toBeGreaterThan(0)
+    expect(result!.timeMs).toBe(result!.rawTimeMs! - 200)
+  })
 })

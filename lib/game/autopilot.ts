@@ -1,5 +1,5 @@
 import type { GameEngine } from './engine'
-import { CANVAS_H } from './constants'
+import { CANVAS_H, FORGE_COMBO_BONUS_MS } from './constants'
 
 // 自動プレイ（テスト・バランス調整用のボット）。
 // 毎フレーム、エンジンを複製して「この先どう操作するか」の候補をいくつか先読みし、
@@ -149,5 +149,9 @@ export function autoplay(engine: GameEngine, maxFrames = 60 * 60 * 6): RunResult
     frames++
   }
   const s = engine.snapshot
-  return { cleared: s.cleared, timeMs: Math.round(s.elapsedMs), misses: s.missCount, frames }
+  let timeMs = Math.round(s.elapsedMs)
+  if (s.departmentId === 5) {
+    timeMs = Math.max(1, timeMs - s.forgeMaxCombo * FORGE_COMBO_BONUS_MS)
+  }
+  return { cleared: s.cleared, timeMs, misses: s.missCount, frames }
 }

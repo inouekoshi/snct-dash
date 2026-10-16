@@ -17,7 +17,7 @@ import {
   FORGE_RING_OFFSET, FORGE_PERFECT, FORGE_GOOD_EARLY, FORGE_GOOD_LATE, FORGE_SWING_FRAMES,
   FORGE_EARLY_LIMIT, FORGE_COOLDOWN, FORGE_HITSTOP,
   FORGE_CUTIN_FRAMES, FORGE_TUTORIAL_SLOW, FORGE_TUTORIAL_WAIT, FORGE_ZONE_CUTIN,
-  FORGE_TUTORIAL_HITS,
+  FORGE_TUTORIAL_HITS, FORGE_COMBO_BONUS_MS,
 } from './constants'
 import type { PlayerState, Obstacle, TerrainSegment, Item, Particle } from './engine-types'
 import { overlaps, playerHitbox, itemHitbox, type Box } from './helpers'
@@ -270,6 +270,7 @@ export class GameEngine {
       charge: this.charge,
       debugMode: this.debugMode,
       forgeCombo: this.forgeCombo,
+      forgeMaxCombo: this.forgeMaxCombo,
       thrustHeld: this.thrustHeld,
       frame: this.frame,
     }
@@ -322,7 +323,23 @@ export class GameEngine {
 
   private finish() {
     if (!this.silent) playClear()
-    const result = { timeMs: Math.round(this.elapsedMs), departmentId: this.departmentId, misses: this.missCount }
+    const rawTimeMs = Math.round(this.elapsedMs)
+    let timeMs = rawTimeMs
+    let bonusMs: number | undefined
+    let maxCombo: number | undefined
+
+    if (this.isMat) {
+      maxCombo = this.forgeMaxCombo
+      bonusMs = maxCombo * FORGE_COMBO_BONUS_MS
+      timeMs = Math.max(1, rawTimeMs - bonusMs)
+    }
+
+    const result: GameClearResult = {
+      timeMs,
+      departmentId: this.departmentId,
+      misses: this.missCount,
+      ...(this.isMat ? { rawTimeMs, bonusMs, maxCombo } : {}),
+    }
     this.clearTimer = setTimeout(() => this.onClear(result), CLEAR_CALLBACK_DELAY_MS)
   }
 

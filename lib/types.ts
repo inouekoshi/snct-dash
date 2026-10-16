@@ -1,7 +1,10 @@
 export interface GameClearResult {
-  timeMs: number       // クリアタイム（ゲーム内時間・ミリ秒）
+  timeMs: number       // クリアタイム（最終記録・ゲーム内時間・ミリ秒）
   departmentId: number // 学科ID（1〜5）
   misses: number       // ミス（ノックバック）の回数
+  rawTimeMs?: number   // ボーナス適用前の走行タイム（材料工学科など）
+  bonusMs?: number     // タイムボーナス（材料工学科のコンボボーナスなど）
+  maxCombo?: number    // 最大連続回数
 }
 
 export interface StageClearEntry {

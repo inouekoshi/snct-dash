@@ -64,6 +64,18 @@ export default function ResultModal({ nickname, result, runId, onRetry, onSelect
           <p className="text-5xl font-black text-yellow-400 mt-1 tabular-nums" data-testid="clear-time">
             {formatTime(result.timeMs)}
           </p>
+          {result.bonusMs && result.bonusMs > 0 && result.rawTimeMs && (
+            <div className="mt-2 text-xs bg-gray-900/80 rounded-lg p-2.5 text-gray-300 space-y-1 border border-gray-700/50">
+              <div className="flex justify-between items-center text-gray-400">
+                <span>走行タイム</span>
+                <span className="font-mono">{formatTime(result.rawTimeMs)}</span>
+              </div>
+              <div className="flex justify-between items-center text-yellow-400 font-bold">
+                <span>最大連続 {result.maxCombo} 回ボーナス</span>
+                <span className="font-mono">-{(result.bonusMs / 1000).toFixed(1)}s</span>
+              </div>
+            </div>
+          )}
           <p className="text-gray-500 text-xs mt-1">ミス {result.misses} 回</p>
         </div>
 
