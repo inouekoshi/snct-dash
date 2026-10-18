@@ -9,6 +9,7 @@
 | `20261013000200_lockdown_direct_insert.sql` | `stage_clears` への直接 INSERT を禁止 | ✅ 2026-10-13 | ✅ 2026-10-16（本番リリース時に適用完了） |
 | `20261013000300_archive_legacy_scores.sql` | 旧 `scores` テーブルを `archive` スキーマへ退避 | ✅ 2026-10-13 | ✅ 2026-10-13 |
 | `20261013000400_review_fixes.sql` | 順位の数え方の統一・隠した名前の再登録・通信遅れの補正・直接呼び出しの制限 | ✅ 2026-10-13 | ✅ 2026-10-13 |
+| `20261018000100_increase_rate_limit.sql` | 当日同時100人アクセス対策：start_run のレート制限を緩和（同一IP 300回/分、全体 1200回/分） | ✅ 2026-10-18 | ✅ 2026-10-18 |
 
 > 本番への新コードデプロイに伴い、`..._200_lockdown`（および材料工学科の最短下限タイム更新）は 2026-10-16 に本番DBへ適用済み。手順の履歴は [doc/operations.md の「本番リリース手順」](operations.md#本番リリース手順dev--main)。
 
@@ -56,7 +57,7 @@ RLS 有効・ポリシーなし、anon / authenticated の権限も剥奪（DB�
 
 | 関数 | 呼べる人 | 内容 |
 |------|---------|------|
-| `start_run(p_department, p_client_key, p_device, p_started_ago_ms) → uuid` | anon | プレイ開始。同じ `client_key` は1分に120回まで、同じ接続元（`source_key`）は1分に600回まで（`rate_limited` / 429）。`p_client_key` を渡さない直接呼び出しは接続元IPで数える |
+| `start_run(p_department, p_client_key, p_device, p_started_ago_ms) → uuid` | anon | プレイ開始。同じ `client_key` は1分に300回まで、同じ接続元（`source_key`）は1分に1200回まで（`rate_limited` / 429）。`p_client_key` を渡さない直接呼び出しは接続元IPで数える |
 | `submit_clear(p_run_id, p_nickname, p_clear_time_ms, p_misses)` | anon | クリア登録。下の検証をすべて通ったら `stage_clears` に追加し、`clear_id, rank, best_ms, is_personal_best, total_players` を返す。`rank` は「今回のタイムなら何位か」（自分以外のプレイヤーの自己ベストと比べる）。自己ベスト更新なら ランキングの順位と同じ |
 | `get_leaderboard(p_department, p_limit = 10)` | anon | ランキング。同じニックネームは最速1件（`distinct on`）。`hidden` を除く |
 | `get_clear(p_id)` | anon | 1件＋順位（シェアページ用。`submit_clear` の `rank` と同じ数え方） |

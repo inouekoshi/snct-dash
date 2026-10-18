@@ -109,7 +109,7 @@ select played_at, department, nickname, clear_time_ms, misses, hidden from publi
 | ゲームは動くが「登録されませんでした」「ランキングを読み込めませんでした」 | Supabase が止まっている／障害。Supabase の Project Status を確認し、Paused なら **Restore**（数分）。ゲーム自体は遊べるので、来場者には「ランキングは後で復旧します」と案内 |
 | 全員「このプレイはすでに登録済み」「プレイ情報が見つかりません」 | 本番DBに `..._100` マイグレーションが当たっていない。`select to_regclass('public.runs');` が null なら `supabase/migrations/20261013000100_*.sql` を SQL Editor で実行 |
 | 「クリアタイムが正しくありません」が多発 | ステージの長さや速度を変えたのに最短タイムを直していない。`lib/game/limits.ts` と `min_clear_time_ms()` を確認 |
-| 「短時間に何度も始めすぎです」 | 同じ回線（IP）から1分に120回以上、または全員の合計で1分に600回以上スタートした。会場の Wi-Fi で非常に大勢が同時に遊ぶと起きうる。起きたら `start_run()` の `120` / `600` を増やす（`supabase/migrations/20261013000400_review_fixes.sql` の関数定義を書き換えて SQL Editor で実行） |
+| 「短時間に何度も始めすぎです」 | 同じ回線（IP）から1分に300回以上、または全員の合計で1分に1200回以上スタートした。会場の Wi-Fi で非常に大勢が同時に遊ぶと起きうる。起きたら `start_run()` の `300` / `1200` を増やす（`supabase/migrations/20261018000100_increase_rate_limit.sql` の関数定義を書き換えて SQL Editor で実行） |
 | ページが開かない | Vercel の障害・デプロイ失敗。Deployments で直前の Ready なデプロイを **Promote to Production**（ロールバック） |
 | 古い画面のまま | Service Worker のキャッシュ。ページを再読み込み（2回）すれば最新になる（画面はネット優先で取りに行く設定） |
 
@@ -189,7 +189,7 @@ order by played_at desc;
 - Supabase へは REST（PostgREST）経由で接続するので、「直接接続60」の上限には当たらない
 - Vercel Hobby の上限（月100GB 転送・関数100万回）にも遠い（ページは数百KB、1プレイあたり関数2〜3回）
 
-> 2026-10-16 に dev プレビュー環境に対して HTTP 負荷試験を実施済み（`/api/leaderboard` の CDN キャッシュヒット率 98.0%、`/api/runs` の正常発行を確認）。詳細は [#6](https://github.com/inouekoshi/snct-dash/issues/6)。
+> 2026-10-16 に dev プレビュー環境に対して HTTP 負荷試験を実施済み（`/api/leaderboard` の CDN キャッシュヒット率 98.0%、`/api/runs` の正常発行を確認。詳細は [#6](https://github.com/inouekoshi/snct-dash/issues/6)）。2026-10-18 に高専祭当日の同時100人アクセスを想定した負荷試験（秒間20 req/s耐性確認）を実施し、会場 Wi-Fi 経由での同一IP集中対策として `start_run()` のレート制限を 300回/分（全体1200回/分）へ緩和。
 
 ---
 

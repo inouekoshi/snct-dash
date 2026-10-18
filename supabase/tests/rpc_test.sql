@@ -75,19 +75,19 @@ begin
   -- 存在しない run
   begin perform public.submit_clear(gen_random_uuid(), 'a', 105000, 0); insert into t_results values ('unknown run rejected', false, '');
   exception when others then insert into t_results values ('unknown run rejected', sqlerrm = 'run_not_found', sqlerrm); end;
-  -- レート制限：同じクライアントは1分に120回まで
+  -- レート制限：同じクライアントは1分に300回まで
   begin
-    for i in 1..130 loop perform public.start_run(3, 'flood-key', null, 0); end loop;
+    for i in 1..310 loop perform public.start_run(3, 'flood-key', null, 0); end loop;
     insert into t_results values ('rate limit (client key)', false, '');
   exception when others then insert into t_results values ('rate limit (client key)', sqlerrm = 'rate_limited', sqlerrm); end;
   -- 直接呼び出し（client_key なし・毎回違う key）でも接続元IPで制限する
   perform set_config('request.headers', '{"x-real-ip":"203.0.113.77"}', true);
   begin
-    for i in 1..130 loop perform public.start_run(3, null, null, 0); end loop;
+    for i in 1..310 loop perform public.start_run(3, null, null, 0); end loop;
     insert into t_results values ('rate limit (no key → source ip)', false, '');
   exception when others then insert into t_results values ('rate limit (no key → source ip)', sqlerrm = 'rate_limited', sqlerrm); end;
   begin
-    for i in 1..610 loop perform public.start_run(3, 'random-' || i, null, 0); end loop;
+    for i in 1..1210 loop perform public.start_run(3, 'random-' || i, null, 0); end loop;
     insert into t_results values ('rate limit (random keys → source ip)', false, '');
   exception when others then insert into t_results values ('rate limit (random keys → source ip)', sqlerrm = 'rate_limited', sqlerrm); end;
   perform set_config('request.headers', '', true);
