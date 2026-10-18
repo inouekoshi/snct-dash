@@ -42,6 +42,7 @@ function parseArgs() {
     target: options.target || DEFAULT_TARGET,
     mode: (options.mode || 'steady') as 'steady' | 'burst' | 'concurrency' | 'leaderboard',
     durationSec: Number(options.duration || 30),
+    count: Number(options.count || 160),
     allowProd: options.allowProd === 'true',
   }
 }
@@ -244,7 +245,7 @@ async function runLeaderboardMode(baseUrl: string, totalRequests: number) {
 }
 
 async function main() {
-  const { target, mode, durationSec, allowProd } = parseArgs()
+  const { target, mode, durationSec, count, allowProd } = parseArgs()
 
   if (target.includes('kosendash.vercel.app') && !allowProd) {
     console.error('❌ 本番環境（kosendash.vercel.app）への負荷テストは禁止されています。--target でプレビュー環境を指定するか、--allowProd=true を明示してください。')
@@ -256,7 +257,7 @@ async function main() {
       await runSteadyMode(target, durationSec)
       break
     case 'burst':
-      await runBurstMode(target, 130) // 120回制限を超えるか確認するため130回
+      await runBurstMode(target, count)
       break
     case 'concurrency':
       await runConcurrencyMode(target, [5, 10, 20], 5)
