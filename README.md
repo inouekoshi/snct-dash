@@ -31,7 +31,8 @@
 - **Phase 5**（直前準備・本番リリース）✅ 本番デプロイ完了・運用準備中
   - 全5学科完成版を `main` へマージし、本番環境（[kosendash.vercel.app](https://kosendash.vercel.app)）へデプロイ完了
   - 本番DBへ直接 INSERT 禁止（lockdown）および材料工学科の最短下限タイム更新（80秒）を適用完了
-  - 残りは実機での最終通し確認、生物応化のタイム調整要否判断、当番表の決定
+  - 実機での通し確認を終え、残りは当番表の最終確認とリハーサル
+  - Next.js 16.4.3 への更新（10/22 公表の脆弱性3件の修正版）
 
 残タスクは GitHub の [Issues](https://github.com/inouekoshi/snct-dash/issues) で管理しています（ラベル `P1: 高専祭までに必須` が最優先）。まとめは [#14](https://github.com/inouekoshi/snct-dash/issues/14)、期限つきの一覧は [doc/roadmap.md](doc/roadmap.md#残タスク2026-10-16-時点)。
 
