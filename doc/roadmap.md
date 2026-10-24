@@ -106,6 +106,7 @@
 | — | テスト | 単体（Vitest）・全学科の自動プレイ・E2E（Playwright）・DB関数のテスト | ✅ 2026-10-13（[doc/testing.md](testing.md)） |
 | — | Supabase 自動停止対策 | Vercel Cron で1日1回ウォームアップ | ✅ 実装済み |
 | — | 依存パッケージの脆弱性対応 | Next.js を 16.4.0 に更新（`next/og` の脆弱性などの修正版）、`npm audit fix` を適用。残りは lint 用の `braces` だけ（修正版が未公開） | ✅ 2026-10-14 |
+| — | 依存パッケージの脆弱性対応（2回目） | 10/22 公表の3件（画像最適化と `use cache` の RCE、Server Actions の DoS）に対応して Next.js を 16.4.3 に更新。どれもこのアプリは攻撃の条件を満たさないが、念のため上げた。lint 用の `zod` も `npm audit fix` で更新し、audit の指摘は0件 | ✅ 2026-10-24 |
 
 ---
 
