@@ -110,20 +110,20 @@
 
 ---
 
-### Phase 5: 高専祭直前準備（〜2026-11-01）
+### Phase 5: 高専祭直前準備（〜2026-10-30）
 
 | # | 作業 | 概要 | 状態 |
 |---|------|------|------|
 | **5-1** | 本番負荷試験 | DB関数を2万件のデータで計測（1回 0.35〜7ms）。devプレビューでHTTP負荷・CDNキャッシュ試験（ヒット率98%）を実施済み | ✅ 2026-10-16 [#6](https://github.com/inouekoshi/snct-dash/issues/6) |
 | **5-2** | モニタリング体制 | 監視する場所・SQL・トラブル対応表（[doc/operations.md](operations.md)） | ✅ 資料作成済み [#7](https://github.com/inouekoshi/snct-dash/issues/7) |
-| **5-3** | 運営引き継ぎ | 来場者への案内文・よくある質問・連絡フロー・体制と当番表枠組み（[doc/operations.md](operations.md)） | 🔄 [#7](https://github.com/inouekoshi/snct-dash/issues/7) |
+| **5-3** | 運営引き継ぎ | 来場者への案内文・よくある質問・連絡フロー・当日の体制（両日とも井上が担当）（[doc/operations.md](operations.md)）。残りはリハーサル | 🔄 [#7](https://github.com/inouekoshi/snct-dash/issues/7) |
 | **5-4** | 利用規約の確認 | 学生個人の非商用・無料作品として現状維持（Hobbyプラン継続）を決定 | ✅ 2026-10-16 [#5](https://github.com/inouekoshi/snct-dash/issues/5) |
 | **5-5** | 後片付け | 旧 `scores` は archive へ退避済み。Vercel の不要な環境変数は3環境すべてから削除完了 | ✅ 2026-10-16 [#12](https://github.com/inouekoshi/snct-dash/issues/12) ✅ [#13](https://github.com/inouekoshi/snct-dash/issues/13) |
 | **5-6** | 本番リリース | PR #17 を main へマージ・Vercel 本番デプロイ・本番DBへ lockdown と材料工学科下限タイム（80秒）を適用完了 | ✅ 2026-10-16 [#1](https://github.com/inouekoshi/snct-dash/issues/1) |
 
 ---
 
-### Phase 6: 高専祭運用（2026-11-03）
+### Phase 6: 高専祭運用（2026-10-31・11-01）
 
 - リアルタイムモニタリング
 - 不具合即応体制
@@ -131,15 +131,13 @@
 
 ---
 
-## 残タスク（2026-10-16 時点）
+## 残タスク（2026-10-24 時点）
 
-コードの実装・テスト・本番デプロイ（main マージおよび本番DB lockdown）は完了した。残りは、実機で触る・判断する・当日の運用準備を行う人の作業だけ。全体のまとめは [#14](https://github.com/inouekoshi/snct-dash/issues/14)。
+コードの実装・テスト・本番デプロイ（main マージおよび本番DB lockdown）は完了した。実機確認（#2 #4 #16）と当日の体制決めも済み、残りはリハーサルだけ。全体のまとめは [#14](https://github.com/inouekoshi/snct-dash/issues/14)。
 
 | 期限 | 作業 | Issue |
 |------|------|-------|
-| 〜10/20 | iPhone / Android の実機で全5学科をプレイする（手触りと性能） | [#2](https://github.com/inouekoshi/snct-dash/issues/2)・[#4](https://github.com/inouekoshi/snct-dash/issues/4) |
-| 〜10/20 | 生物応化のクリアタイム（約2分半）を短くするか決める（実機確認時に判断） | [#16](https://github.com/inouekoshi/snct-dash/issues/16) |
-| 〜11/1 | 当番表の最終確認、当日のリハーサル | [#7](https://github.com/inouekoshi/snct-dash/issues/7) |
+| 〜10/30 | 本番でのリハーサル（記録は初日の朝に消す） | [#7](https://github.com/inouekoshi/snct-dash/issues/7) |
 
 ---
 
@@ -150,8 +148,8 @@
 | Phase 2 | ✅ 2026-05 完了 | 1学科でタイムアタックが成立する状態 |
 | Phase 3 | ✅ 2026-10 完了 | 5学科全て遊べる状態 |
 | Phase 4 | 〜2026-10（実装は 2026-10-13 完了・実機確認待ち） | 高専祭運用に耐える品質 |
-| Phase 5 | 〜2026-11-01 | 本番準備完了 |
-| Phase 6 | 2026-11-03 | 高専祭当日 |
+| Phase 5 | 〜2026-10-30 | 本番準備完了 |
+| Phase 6 | 2026-10-31・11-01 | 高専祭当日 |
 
 ---
 
