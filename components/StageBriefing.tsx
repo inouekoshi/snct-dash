@@ -44,7 +44,7 @@ export default function StageBriefing({
         </p>
       </div>
 
-      <p className="text-gray-500 text-xs">
+      <p className="text-gray-500 text-xs wrap-anywhere">
         プレイヤー：<span className="text-white font-bold">{nickname}</span>
       </p>
 

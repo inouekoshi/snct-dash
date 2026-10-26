@@ -49,12 +49,16 @@ export function submitClear(params: {
   })
 }
 
+/** 学科別ランキングを読む。失敗・時間切れ（電波が悪くて返ってこない）・想定外の形は null */
 export async function fetchLeaderboard(department: number): Promise<StageClearEntry[] | null> {
   try {
-    const res = await fetch(`/api/leaderboard?department=${department}`, { cache: 'no-store' })
+    const res = await fetch(`/api/leaderboard?department=${department}`, {
+      cache: 'no-store',
+      signal: AbortSignal.timeout(8_000),
+    })
     if (!res.ok) return null
-    const { entries } = await res.json()
-    return entries as StageClearEntry[]
+    const json = await res.json()
+    return Array.isArray(json?.entries) ? (json.entries as StageClearEntry[]) : null
   } catch {
     return null
   }

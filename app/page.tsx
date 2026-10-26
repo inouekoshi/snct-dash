@@ -3,10 +3,26 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { AREAS, type AreaId } from '@/lib/game/areas'
-import { NICKNAME_MAX, NICKNAME_STORAGE_KEY, normalizeNickname } from '@/lib/nickname'
+import { NICKNAME_MAX, normalizeNickname } from '@/lib/nickname'
+import { clearNickname, loadNickname, saveNickname } from '@/lib/client/nickname-store'
 import SponsorCredit from '@/components/SponsorCredit'
 
 const DEPARTMENTS: AreaId[] = [1, 2, 3, 4, 5]
+
+function TitleHeading() {
+  return (
+    <div className="space-y-2">
+      <p className="text-blue-400 text-sm tracking-widest uppercase">鈴鹿高専祭</p>
+      {/* スマホ幅でも1行に収まるよう、画面幅に合わせて文字を縮める */}
+      <h1 className="text-[clamp(2.5rem,12vw,3.75rem)] leading-tight font-black tracking-tight whitespace-nowrap">
+        高専ダッシュ<span className="text-yellow-400">！</span>
+      </h1>
+      <p className="text-gray-400 text-lg mt-2">
+        5学科のステージを走り抜けろ！
+      </p>
+    </div>
+  )
+}
 
 export default function Home() {
   const [isMounted, setIsMounted] = useState(false)
@@ -14,7 +30,7 @@ export default function Home() {
   const [inputName, setInputName] = useState('')
 
   useEffect(() => {
-    const saved = localStorage.getItem(NICKNAME_STORAGE_KEY)
+    const saved = loadNickname()
     if (saved) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setNickname(saved)
@@ -27,11 +43,19 @@ export default function Home() {
   function handleNameSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!normalized) return
-    localStorage.setItem(NICKNAME_STORAGE_KEY, normalized)
+    saveNickname(normalized)
     setNickname(normalized)
   }
 
-  if (!isMounted) return null
+  if (!isMounted) {
+    // 保存したニックネームを読めるのは JS が動き出してから。それまで（回線が遅いと数秒）も
+    // 真っ黒にならないよう、どちらの画面になるか分からなくても出せるタイトルだけ先に描く
+    return (
+      <main className="flex flex-col items-center justify-center min-h-svh px-4 py-8 text-center">
+        <TitleHeading />
+      </main>
+    )
+  }
 
   if (!nickname) {
     return (
@@ -64,16 +88,7 @@ export default function Home() {
 
   return (
     <main className="relative flex flex-col items-center justify-center min-h-svh gap-6 sm:gap-8 px-4 py-8 text-center">
-      <div className="space-y-2">
-        <p className="text-blue-400 text-sm tracking-widest uppercase">鈴鹿高専祭</p>
-        {/* スマホ幅でも1行に収まるよう、画面幅に合わせて文字を縮める */}
-        <h1 className="text-[clamp(2.5rem,12vw,3.75rem)] leading-tight font-black tracking-tight whitespace-nowrap">
-          高専ダッシュ<span className="text-yellow-400">！</span>
-        </h1>
-        <p className="text-gray-400 text-lg mt-2">
-          5学科のステージを走り抜けろ！
-        </p>
-      </div>
+      <TitleHeading />
 
       <div className="grid grid-cols-5 gap-1.5 sm:gap-3 w-full max-w-sm text-[11px] max-[359px]:text-[10px] sm:text-xs">
         {DEPARTMENTS.map((id) => {
@@ -115,9 +130,9 @@ export default function Home() {
           onClick={() => {
             setNickname('')
             setInputName('')
-            localStorage.removeItem(NICKNAME_STORAGE_KEY)
+            clearNickname()
           }}
-          className="text-gray-500 hover:text-gray-300 text-xs transition-colors underline"
+          className="text-gray-500 hover:text-gray-300 text-xs transition-colors underline wrap-anywhere"
         >
           名前を変更する ({nickname})
         </button>

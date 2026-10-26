@@ -35,7 +35,7 @@ export default async function SharedResultPage({ params }: Props) {
       <div className="bg-gray-800 rounded-2xl p-6 w-full max-w-xs space-y-2">
         <p className="text-gray-400 text-sm">{dept.emoji} {dept.name}</p>
         <p className="text-5xl font-black text-yellow-400 tabular-nums">{formatTime(clear.clear_time_ms)}</p>
-        <p className="font-bold">{clear.nickname} さん</p>
+        <p className="font-bold wrap-anywhere">{clear.nickname} さん</p>
         <p className="text-2xl font-black text-blue-400">{clear.rank} 位</p>
       </div>
       <Link

@@ -7,7 +7,7 @@ import DepartmentSelect from '@/components/DepartmentSelect'
 import ResultModal from '@/components/ResultModal'
 import { startRun } from '@/lib/client/game-api'
 import { isUnderMaintenance } from '@/lib/maintenance'
-import { NICKNAME_STORAGE_KEY } from '@/lib/nickname'
+import { loadNickname } from '@/lib/client/nickname-store'
 import type { GameClearResult } from '@/lib/types'
 
 type Phase = 'department' | 'playing' | 'result'
@@ -26,7 +26,7 @@ export default function GamePage() {
   const [runId, setRunId] = useState<Promise<string | null> | null>(null)
 
   useEffect(() => {
-    const saved = localStorage.getItem(NICKNAME_STORAGE_KEY)
+    const saved = loadNickname()
     if (!saved) {
       router.replace('/')
     } else {
