@@ -9,7 +9,7 @@ interface Props {
 export default function SponsorCredit({ inFlow = false }: Props) {
   return (
     <p
-      className={`${inFlow ? '' : 'absolute bottom-3 inset-x-0 '}flex items-center justify-center gap-1.5 text-[10px] text-gray-600 pointer-events-none select-none`}
+      className={`${inFlow ? '' : 'absolute bottom-3 inset-x-0 '}flex items-center justify-center gap-2 text-xs text-gray-500 pointer-events-none select-none`}
     >
       <span>supported by</span>
       {/* 暗い背景用に白抜きにしたロゴ。小さい画像なので最適化は通さない（SW のキャッシュにも乗る） */}
@@ -19,7 +19,7 @@ export default function SponsorCredit({ inFlow = false }: Props) {
         width={600}
         height={83}
         unoptimized
-        className="h-3 w-auto opacity-60"
+        className="h-4 w-auto opacity-70"
       />
     </p>
   )
