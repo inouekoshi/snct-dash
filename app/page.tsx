@@ -35,7 +35,7 @@ export default function Home() {
 
   if (!nickname) {
     return (
-      <main className="relative flex flex-col items-center justify-center min-h-screen gap-6 px-4 pb-12">
+      <main className="relative flex flex-col items-center justify-center min-h-svh gap-6 px-4 pt-8 pb-14">
         <h2 className="text-3xl font-black">ニックネームを入力</h2>
         <p className="text-gray-400 text-sm">ランキングに表示される名前（最大{NICKNAME_MAX}文字）</p>
         <form onSubmit={handleNameSubmit} className="flex flex-col gap-4 w-full max-w-xs">
@@ -63,10 +63,11 @@ export default function Home() {
   }
 
   return (
-    <main className="relative flex flex-col items-center justify-center min-h-screen gap-8 px-4 pt-8 pb-14 text-center">
+    <main className="relative flex flex-col items-center justify-center min-h-svh gap-6 sm:gap-8 px-4 pt-8 pb-14 text-center">
       <div className="space-y-2">
         <p className="text-blue-400 text-sm tracking-widest uppercase">鈴鹿高専祭</p>
-        <h1 className="text-6xl font-black tracking-tight">
+        {/* スマホ幅でも1行に収まるよう、画面幅に合わせて文字を縮める */}
+        <h1 className="text-[clamp(2.5rem,12vw,3.75rem)] leading-tight font-black tracking-tight whitespace-nowrap">
           高専ダッシュ<span className="text-yellow-400">！</span>
         </h1>
         <p className="text-gray-400 text-lg mt-2">
@@ -74,17 +75,17 @@ export default function Home() {
         </p>
       </div>
 
-      <div className="grid grid-cols-5 gap-3 text-xs">
+      <div className="grid grid-cols-5 gap-1.5 sm:gap-3 w-full max-w-sm text-[11px] max-[359px]:text-[10px] sm:text-xs">
         {DEPARTMENTS.map((id) => {
           const dept = AREAS[id]
           return (
             <div
               key={id}
-              className="flex flex-col items-center gap-1 p-2 rounded-lg border"
+              className="flex flex-col items-center gap-1 px-1 py-2 rounded-lg border"
               style={{ borderColor: `${dept.groundLineColor}88`, backgroundColor: `${dept.groundLineColor}1a` }}
             >
               <span className="text-2xl">{dept.emoji}</span>
-              <span className="text-gray-300">{dept.short}</span>
+              <span className="text-gray-300 whitespace-nowrap">{dept.short}</span>
             </div>
           )
         })}

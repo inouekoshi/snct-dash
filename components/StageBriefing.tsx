@@ -24,7 +24,7 @@ export default function StageBriefing({
   const isForge = departmentId === 5
 
   return (
-    <main className="relative flex flex-col items-center justify-center min-h-screen gap-4 px-4 pt-8 pb-14 text-center overflow-y-auto">
+    <main className="relative flex flex-col items-center justify-center min-h-svh gap-4 px-4 pt-8 pb-14 text-center overflow-y-auto">
       {/* 学科ヘッダー */}
       <div className="flex flex-col items-center gap-1">
         <span

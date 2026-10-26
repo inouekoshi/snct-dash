@@ -15,7 +15,7 @@ interface Props {
 
 export default function DepartmentSelect({ onSelect, onBack }: Props) {
   return (
-    <main className="relative flex flex-col items-center justify-center min-h-screen gap-8 px-4 pb-12 text-center">
+    <main className="relative flex flex-col items-center justify-center min-h-svh gap-6 sm:gap-8 px-4 pt-8 pb-14 text-center">
       <div className="space-y-2">
         <h2 className="text-3xl font-black">学科を選択</h2>
         <p className="text-gray-400 text-sm">選んだ学科のステージをクリアタイムで競う！</p>

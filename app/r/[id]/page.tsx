@@ -27,7 +27,7 @@ export default async function SharedResultPage({ params }: Props) {
   const dept = AREAS[clear.department as AreaId]
 
   return (
-    <main className="relative flex flex-col items-center justify-center min-h-screen gap-6 px-4 pt-8 pb-14 text-center">
+    <main className="relative flex flex-col items-center justify-center min-h-svh gap-6 px-4 pt-8 pb-14 text-center">
       <p className="text-blue-400 text-sm tracking-widest">鈴鹿高専祭</p>
       <h1 className="text-4xl font-black">
         高専ダッシュ<span className="text-yellow-400">！</span>

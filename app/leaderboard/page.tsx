@@ -5,7 +5,7 @@ import SponsorCredit from '@/components/SponsorCredit'
 
 export default function LeaderboardPage() {
   return (
-    <main className="flex flex-col items-center min-h-screen gap-6 px-4 pt-8 pb-28">
+    <main className="flex flex-col items-center min-h-svh gap-6 px-4 pt-8 pb-28">
       <div className="flex items-center gap-4 w-full max-w-md">
         <Link href="/" className="text-gray-400 hover:text-white transition-colors">
           ← ホーム

@@ -53,7 +53,7 @@ export default function ResultModal({ nickname, result, runId, onRetry, onSelect
   }
 
   return (
-    <main className="relative flex flex-col items-center justify-center min-h-screen gap-5 px-4 pt-8 pb-14 text-center">
+    <main className="relative flex flex-col items-center justify-center min-h-svh gap-5 px-4 pt-8 pb-14 text-center">
       <div className="space-y-1">
         <p className="text-yellow-400 font-bold tracking-widest text-lg">STAGE CLEAR!</p>
         <h2 className="text-2xl font-black">{nickname} さんのタイム</h2>
