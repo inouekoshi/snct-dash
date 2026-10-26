@@ -31,7 +31,7 @@ export default function Leaderboard() {
   }, [department])
 
   return (
-    <div className="w-full max-w-md space-y-4 pb-24">
+    <div className="w-full max-w-md space-y-4">
       {/* 学科タブ */}
       <div className="grid grid-cols-5 gap-1">
         {DEPARTMENTS.map((id) => {
