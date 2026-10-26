@@ -9,6 +9,7 @@ import { formatTime } from '@/lib/format'
 import { NICKNAME_STORAGE_KEY } from '@/lib/nickname'
 import MatProductReveal from './MatProductReveal'
 import ShareButtons from './ShareButtons'
+import SponsorCredit from './SponsorCredit'
 
 interface Props {
   nickname: string
@@ -52,7 +53,7 @@ export default function ResultModal({ nickname, result, runId, onRetry, onSelect
   }
 
   return (
-    <main className="flex flex-col items-center justify-center min-h-screen gap-5 px-4 py-8 text-center">
+    <main className="relative flex flex-col items-center justify-center min-h-screen gap-5 px-4 pt-8 pb-14 text-center">
       <div className="space-y-1">
         <p className="text-yellow-400 font-bold tracking-widest text-lg">STAGE CLEAR!</p>
         <h2 className="text-2xl font-black">{nickname} さんのタイム</h2>
@@ -146,6 +147,7 @@ export default function ResultModal({ nickname, result, runId, onRetry, onSelect
           タイトルに戻る
         </button>
       </div>
+      <SponsorCredit />
     </main>
   )
 }

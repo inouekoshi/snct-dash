@@ -4,6 +4,7 @@ import { AREAS } from '@/lib/game/areas'
 import type { AreaId } from '@/lib/game/areas'
 import { STAGE_INFO } from '@/lib/game/stage-info'
 import { isUnderMaintenance } from '@/lib/maintenance'
+import SponsorCredit from './SponsorCredit'
 
 const DEPARTMENTS = [1, 2, 3, 4, 5] as const
 
@@ -14,7 +15,7 @@ interface Props {
 
 export default function DepartmentSelect({ onSelect, onBack }: Props) {
   return (
-    <main className="flex flex-col items-center justify-center min-h-screen gap-8 px-4 text-center">
+    <main className="relative flex flex-col items-center justify-center min-h-screen gap-8 px-4 pb-12 text-center">
       <div className="space-y-2">
         <h2 className="text-3xl font-black">学科を選択</h2>
         <p className="text-gray-400 text-sm">選んだ学科のステージをクリアタイムで競う！</p>
@@ -52,6 +53,7 @@ export default function DepartmentSelect({ onSelect, onBack }: Props) {
       >
         ← タイトルに戻る
       </button>
+      <SponsorCredit />
     </main>
   )
 }

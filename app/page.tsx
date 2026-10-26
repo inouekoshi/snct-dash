@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { AREAS, type AreaId } from '@/lib/game/areas'
 import { NICKNAME_MAX, NICKNAME_STORAGE_KEY, normalizeNickname } from '@/lib/nickname'
+import SponsorCredit from '@/components/SponsorCredit'
 
 const DEPARTMENTS: AreaId[] = [1, 2, 3, 4, 5]
 
@@ -34,7 +35,7 @@ export default function Home() {
 
   if (!nickname) {
     return (
-      <main className="flex flex-col items-center justify-center min-h-screen gap-6 px-4">
+      <main className="relative flex flex-col items-center justify-center min-h-screen gap-6 px-4 pb-12">
         <h2 className="text-3xl font-black">ニックネームを入力</h2>
         <p className="text-gray-400 text-sm">ランキングに表示される名前（最大{NICKNAME_MAX}文字）</p>
         <form onSubmit={handleNameSubmit} className="flex flex-col gap-4 w-full max-w-xs">
@@ -56,12 +57,13 @@ export default function Home() {
             次へ →
           </button>
         </form>
+        <SponsorCredit />
       </main>
     )
   }
 
   return (
-    <main className="flex flex-col items-center justify-center min-h-screen gap-8 px-4 py-8 text-center">
+    <main className="relative flex flex-col items-center justify-center min-h-screen gap-8 px-4 pt-8 pb-14 text-center">
       <div className="space-y-2">
         <p className="text-blue-400 text-sm tracking-widest uppercase">鈴鹿高専祭</p>
         <h1 className="text-6xl font-black tracking-tight">
@@ -118,6 +120,7 @@ export default function Home() {
       >
         名前を変更する ({nickname})
       </button>
+      <SponsorCredit />
     </main>
   )
 }

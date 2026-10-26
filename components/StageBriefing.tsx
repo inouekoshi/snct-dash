@@ -2,6 +2,7 @@
 
 import { AREAS, type AreaId } from '@/lib/game/areas'
 import { STAGE_INFO } from '@/lib/game/stage-info'
+import SponsorCredit from './SponsorCredit'
 
 interface StageBriefingProps {
   nickname: string
@@ -23,7 +24,7 @@ export default function StageBriefing({
   const isForge = departmentId === 5
 
   return (
-    <main className="flex flex-col items-center justify-center min-h-screen gap-4 px-4 py-8 text-center overflow-y-auto">
+    <main className="relative flex flex-col items-center justify-center min-h-screen gap-4 px-4 pt-8 pb-14 text-center overflow-y-auto">
       {/* 学科ヘッダー */}
       <div className="flex flex-col items-center gap-1">
         <span
@@ -97,6 +98,7 @@ export default function StageBriefing({
       <button onClick={onQuit} className="text-gray-500 hover:text-gray-300 text-sm transition-colors">
         ← 学科選択に戻る
       </button>
+      <SponsorCredit />
     </main>
   )
 }
