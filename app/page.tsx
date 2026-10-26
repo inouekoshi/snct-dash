@@ -110,7 +110,7 @@ export default function Home() {
         <p>スペース / タップ：ジャンプ（学科によって操作が変わります）</p>
       </div>
 
-      <div className="flex flex-col items-center gap-4 mt-2">
+      <div className="flex flex-col items-center gap-[21px] mt-2">
         <button
           onClick={() => {
             setNickname('')
