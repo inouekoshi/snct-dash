@@ -1,14 +1,15 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { GameClearResult, SubmitClearResponse, ApiErrorCode } from '@/lib/types'
 import { AREAS } from '@/lib/game/areas'
 import type { AreaId } from '@/lib/game/areas'
 import { submitClear } from '@/lib/client/game-api'
 import { formatTime } from '@/lib/format'
-import { NICKNAME_STORAGE_KEY } from '@/lib/nickname'
+import { clearNickname } from '@/lib/client/nickname-store'
 import MatProductReveal from './MatProductReveal'
 import ShareButtons from './ShareButtons'
+import SponsorCredit from './SponsorCredit'
 
 interface Props {
   nickname: string
@@ -24,38 +25,49 @@ interface Props {
 type SubmitState =
   | { status: 'submitting' }
   | { status: 'done'; data: SubmitClearResponse }
-  | { status: 'error'; code: ApiErrorCode; message: string }
+  // retryable: 通信エラーで、送り直せば登録できる見込みがあるとき
+  | { status: 'error'; code: ApiErrorCode; message: string; retryable: boolean }
 
 export default function ResultModal({ nickname, result, runId, onRetry, onSelectDepartment, onHome, onLeaderboard }: Props) {
   const [state, setState] = useState<SubmitState>({ status: 'submitting' })
   const submitted = useRef(false)
   const theme = AREAS[result.departmentId as AreaId]
 
+  const submit = useCallback(async () => {
+    const id = await runId
+    if (!id) {
+      // プレイ開始の登録ができていないので、送り直しても受け付けられない
+      setState({ status: 'error', code: 'server_error', message: '通信できなかったため、今回の記録は登録されませんでした', retryable: false })
+      return
+    }
+    const r = await submitClear({ runId: id, nickname, clearTimeMs: result.timeMs, misses: result.misses })
+    setState(r.ok
+      ? { status: 'done', data: r.data }
+      : { status: 'error', code: r.code, message: r.message, retryable: r.code === 'server_error' })
+  }, [nickname, result, runId])
+
   useEffect(() => {
     // 開発時の StrictMode（effect の二重実行）でも1回しか登録しない
     if (submitted.current) return
     submitted.current = true
-    ;(async () => {
-      const id = await runId
-      if (!id) {
-        setState({ status: 'error', code: 'server_error', message: '通信できなかったため、今回の記録は登録されませんでした' })
-        return
-      }
-      const r = await submitClear({ runId: id, nickname, clearTimeMs: result.timeMs, misses: result.misses })
-      setState(r.ok ? { status: 'done', data: r.data } : { status: 'error', code: r.code, message: r.message })
-    })()
-  }, [nickname, result, runId])
+    submit()
+  }, [submit])
+
+  function retrySubmit() {
+    setState({ status: 'submitting' })
+    submit()
+  }
 
   function changeName() {
-    localStorage.removeItem(NICKNAME_STORAGE_KEY)
+    clearNickname()
     onHome()
   }
 
   return (
-    <main className="flex flex-col items-center justify-center min-h-screen gap-5 px-4 py-8 text-center">
+    <main className="relative flex flex-col items-center justify-center min-h-svh gap-5 px-4 pt-8 pb-14 text-center">
       <div className="space-y-1">
         <p className="text-yellow-400 font-bold tracking-widest text-lg">STAGE CLEAR!</p>
-        <h2 className="text-2xl font-black">{nickname} さんのタイム</h2>
+        <h2 className="text-2xl font-black wrap-anywhere">{nickname} さんのタイム</h2>
       </div>
 
       <div className="bg-gray-800 rounded-2xl p-6 w-full max-w-xs space-y-4" data-testid="result-card">
@@ -98,6 +110,14 @@ export default function ResultModal({ nickname, result, runId, onRetry, onSelect
         {state.status === 'error' && (
           <div className="border-t border-gray-700 pt-4 space-y-2" role="alert">
             <p className="text-red-400 text-sm">{state.message}</p>
+            {state.retryable && (
+              <button
+                onClick={retrySubmit}
+                className="px-5 py-2 bg-gray-700 hover:bg-gray-600 text-white font-bold text-sm rounded-xl transition-colors"
+              >
+                もう一度送る
+              </button>
+            )}
             {state.code === 'nickname_rejected' && (
               <button onClick={changeName} className="text-sm underline text-gray-300">
                 ニックネームを変える
@@ -146,6 +166,7 @@ export default function ResultModal({ nickname, result, runId, onRetry, onSelect
           タイトルに戻る
         </button>
       </div>
+      <SponsorCredit />
     </main>
   )
 }

@@ -19,6 +19,8 @@ export default function Leaderboard() {
   // null = 読み込み失敗
   const [entries, setEntries] = useState<StageClearEntry[] | null>([])
   const [loading, setLoading] = useState(true)
+  // 「もう一度読み込む」で増やすと、同じ学科をもう一度取りに行く
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     let ignore = false
@@ -28,10 +30,10 @@ export default function Leaderboard() {
       if (!ignore) { setEntries(data); setLoading(false) }
     })
     return () => { ignore = true }
-  }, [department])
+  }, [department, reloadKey])
 
   return (
-    <div className="w-full max-w-md space-y-4 pb-24">
+    <div className="w-full max-w-md space-y-4">
       {/* 学科タブ */}
       <div className="grid grid-cols-5 gap-1">
         {DEPARTMENTS.map((id) => {
@@ -60,7 +62,13 @@ export default function Leaderboard() {
       ) : entries === null ? (
         <div className="text-center text-gray-500 py-12" role="alert">
           <p>ランキングを読み込めませんでした</p>
-          <p className="text-sm mt-1">少し待ってから開き直してね</p>
+          <p className="text-sm mt-1">電波の良いところでもう一度試してね</p>
+          <button
+            onClick={() => setReloadKey(k => k + 1)}
+            className="mt-4 px-6 py-2 bg-gray-800 hover:bg-gray-700 text-white font-bold text-sm rounded-xl border border-gray-700 transition-colors"
+          >
+            もう一度読み込む
+          </button>
         </div>
       ) : entries.length === 0 ? (
         <div className="text-center text-gray-500 py-12">
