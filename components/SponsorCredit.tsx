@@ -11,7 +11,7 @@ export default function SponsorCredit({ inFlow = false }: Props) {
     <p
       className={`${inFlow ? '' : 'absolute bottom-3 inset-x-0 '}flex items-center justify-center gap-2 text-xs text-gray-500 pointer-events-none select-none`}
     >
-      <span>supported by</span>
+      <span>sponsored by</span>
       {/* 暗い背景用に白抜きにしたロゴ。小さい画像なので最適化は通さない（SW のキャッシュにも乗る） */}
       <Image
         src="/sponsor/bengo4.png"
