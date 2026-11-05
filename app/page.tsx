@@ -24,6 +24,19 @@ function TitleHeading() {
   )
 }
 
+// 高専祭の結果（クロージング画面）への入口
+function ClosingBanner() {
+  return (
+    <Link
+      href="/closing"
+      className="block w-full max-w-xs px-4 py-3 rounded-2xl border border-yellow-400/60 bg-yellow-400/10 hover:bg-yellow-400/20 text-center transition-colors"
+    >
+      <span className="block text-yellow-300 font-bold">🎉 高専祭は終了しました</span>
+      <span className="block text-gray-300 text-xs mt-0.5">ご来場ありがとうございました！ 結果を見る →</span>
+    </Link>
+  )
+}
+
 export default function Home() {
   const [isMounted, setIsMounted] = useState(false)
   const [nickname, setNickname] = useState('')
@@ -60,6 +73,7 @@ export default function Home() {
   if (!nickname) {
     return (
       <main className="relative flex flex-col items-center justify-center min-h-svh gap-6 px-4 pt-8 pb-14">
+        <ClosingBanner />
         <h2 className="text-3xl font-black">ニックネームを入力</h2>
         <p className="text-gray-400 text-sm">ランキングに表示される名前（最大{NICKNAME_MAX}文字）</p>
         <form onSubmit={handleNameSubmit} className="flex flex-col gap-4 w-full max-w-xs">
@@ -89,6 +103,8 @@ export default function Home() {
   return (
     <main className="relative flex flex-col items-center justify-center min-h-svh gap-6 sm:gap-8 px-4 py-8 text-center">
       <TitleHeading />
+
+      <ClosingBanner />
 
       <div className="grid grid-cols-5 gap-1.5 sm:gap-3 w-full max-w-sm text-[11px] max-[359px]:text-[10px] sm:text-xs">
         {DEPARTMENTS.map((id) => {
